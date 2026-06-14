@@ -50,11 +50,7 @@ describe('Cluster', () => {
 
   it('forwards props and merges caller style over layout', () => {
     render(
-      <Cluster
-        data-testid="cluster"
-        className="bar"
-        style={{ gap: '7px' }}
-      />,
+      <Cluster data-testid="cluster" className="bar" style={{ gap: '7px' }} />,
     );
     const el = screen.getByTestId('cluster');
     expect(el).toHaveClass('bar');

@@ -1,4 +1,8 @@
-import type { ComponentPropsWithoutRef, CSSProperties, ElementType } from 'react';
+import type {
+  ComponentPropsWithoutRef,
+  CSSProperties,
+  ElementType,
+} from 'react';
 import { type SpaceScale, spaceToken } from './tokens';
 
 export type ScreenProps = ComponentPropsWithoutRef<'main'> & {

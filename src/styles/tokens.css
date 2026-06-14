@@ -34,11 +34,15 @@
   /* ── Feedback (Okabe-Ito CUD palette — colour-blind-safe) ─────────────────
    * Always accompany with a non-colour cue (icon / text / shape). */
   --color-success: #009e73; /* bluish green — correct */
-  --color-success-contrast: #ffffff;
+  /* Near-black ink (not white): #1a1205 on #009e73 ≈ 5.4:1, clears the WCAG AA
+   * 4.5:1 floor for normal text. White on #009e73 is only ≈3.4:1 (AA-fail). */
+  --color-success-contrast: #1a1205;
   --color-error: #d55e00; /* vermillion — incorrect */
-  --color-error-contrast: #ffffff;
+  /* Near-black ink (not white): #1a1205 on #d55e00 ≈ 4.8:1, clears the WCAG AA
+   * 4.5:1 floor for normal text. White on #d55e00 is only ≈3.9:1 (AA-fail). */
+  --color-error-contrast: #1a1205;
   --color-warning: #e69f00; /* orange — caution / time low */
-  --color-warning-contrast: #1a1205;
+  --color-warning-contrast: #1a1205; /* ≈8.9:1 on #e69f00 — AA pass */
 
   /* ── Spacing scale ────────────────────────────────────────────────────── */
   --space-1: 4px;

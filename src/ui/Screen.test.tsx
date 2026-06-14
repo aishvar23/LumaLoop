@@ -56,7 +56,11 @@ describe('Screen', () => {
 
   it('forwards props and merges caller style over layout', () => {
     render(
-      <Screen data-testid="screen" className="shell" style={{ overflowY: 'scroll' }} />,
+      <Screen
+        data-testid="screen"
+        className="shell"
+        style={{ overflowY: 'scroll' }}
+      />,
     );
     const el = screen.getByTestId('screen');
     expect(el).toHaveClass('shell');
