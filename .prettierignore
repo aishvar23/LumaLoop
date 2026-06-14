@@ -1,0 +1,13 @@
+dist
+coverage
+node_modules
+supabase
+docs
+*.md
+
+# Not owned by the app source — leave untouched
+.secrets
+.agents
+.claude
+.mcp.json
+skills-lock.json
