@@ -31,5 +31,5 @@ export default function Button({
         : 'var(--color-accent-contrast)',
   } as const;
 
-  return <button style={{ ...base, ...style }} {...props} />;
+  return <button type="button" style={{ ...base, ...style }} {...props} />;
 }
