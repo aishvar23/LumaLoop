@@ -71,24 +71,45 @@ export type ValidationResult = {
   errors: ValidationError[];
 };
 
+/** The concrete card type for a given template discriminant. */
+type CardOfTemplate<K extends TemplateType> = Extract<
+  LiquidCard,
+  { templateType: K }
+>;
+
 /**
  * Validates that a card's template-specific correct answer is present and
  * internally consistent. One entry per template; the renderer/evaluator pair is
  * authored separately but relies on these invariants holding.
  *
- * Each value is typed as `(card: LiquidCard) => ...` so dispatch by key is fully
- * type-safe at the call site; the narrowing cast inside each entry is sound
- * because the map key guarantees the card's `templateType`.
+ * Typed as a mapped type over `TemplateType`, so each entry receives exactly its
+ * template's card (no per-entry cast) and the compiler forces a new template to
+ * add its validator here (the map would otherwise be incomplete). Dispatch by
+ * key goes through {@link validateTemplateAnswer}, which localizes the single
+ * cast the TypeScript "correlated union" limitation still requires.
  */
-const templateAnswerValidators: Record<
-  TemplateType,
-  (card: LiquidCard) => ValidationError[]
-> = {
-  spot_it: (card) => validateSpotItAnswer(card as SpotItCard),
-  what_changed: (card) => validateWhatChangedAnswer(card as WhatChangedCard),
-  rule_flip: (card) => validateRuleFlipAnswer(card as RuleFlipCard),
-  tiny_logic: (card) => validateTinyLogicAnswer(card as TinyLogicCard),
+const templateAnswerValidators: {
+  [K in TemplateType]: (card: CardOfTemplate<K>) => ValidationError[];
+} = {
+  spot_it: validateSpotItAnswer,
+  what_changed: validateWhatChangedAnswer,
+  rule_flip: validateRuleFlipAnswer,
+  tiny_logic: validateTinyLogicAnswer,
 };
+
+/**
+ * Dispatches a card to its template's answer validator. TypeScript cannot track
+ * the correlation between `card.templateType` and `card.config` across an indexed
+ * lookup (the "correlated union" limitation), so one cast is unavoidable here. It
+ * is guaranteed sound only because we index with the card's own discriminant, so
+ * the looked-up validator is exactly the one written for this card's type.
+ */
+function validateTemplateAnswer(card: LiquidCard): ValidationError[] {
+  const validate = templateAnswerValidators[card.templateType] as (
+    card: LiquidCard,
+  ) => ValidationError[];
+  return validate(card);
+}
 
 /** The set of template types backed by a validator — the "supported" set. */
 const SUPPORTED_TEMPLATE_TYPES = new Set<string>(
@@ -216,8 +237,9 @@ function validateCard(card: LiquidCard): ValidationError[] {
     });
   }
 
-  // Non-empty prompt.
-  if (card.prompt.trim().length === 0) {
+  // Non-empty prompt. Authored data can drift, so a missing/non-string prompt
+  // is treated as empty rather than allowed to throw on `.trim()`.
+  if (typeof card.prompt !== 'string' || card.prompt.trim().length === 0) {
     errors.push({
       cardId,
       rule: ValidationRule.NON_EMPTY_PROMPT,
@@ -225,9 +247,15 @@ function validateCard(card: LiquidCard): ValidationError[] {
     });
   }
 
-  // Per-template time limit between 5s and 30s inclusive.
+  // Per-template time limit between 5s and 30s inclusive. The finiteness guard
+  // leads so a NaN/Infinity timeLimitMs is rejected rather than slipping past
+  // the range comparisons (both `< MIN` and `> MAX` are false for NaN).
   const timeLimitMs = card.config.timeLimitMs;
-  if (timeLimitMs < MIN_TIME_LIMIT_MS || timeLimitMs > MAX_TIME_LIMIT_MS) {
+  if (
+    !Number.isFinite(timeLimitMs) ||
+    timeLimitMs < MIN_TIME_LIMIT_MS ||
+    timeLimitMs > MAX_TIME_LIMIT_MS
+  ) {
     errors.push({
       cardId,
       rule: ValidationRule.TIME_LIMIT_RANGE,
@@ -235,10 +263,16 @@ function validateCard(card: LiquidCard): ValidationError[] {
     });
   }
 
-  // Explanation present (title + body non-empty).
+  // Explanation present (title + body non-empty). Guard the nested fields for
+  // drifted/untyped data so a missing explanation reports an error instead of
+  // throwing a TypeError on `.trim()`.
+  const explanation = card.explanation;
   if (
-    card.explanation.title.trim().length === 0 ||
-    card.explanation.body.trim().length === 0
+    explanation == null ||
+    typeof explanation.title !== 'string' ||
+    typeof explanation.body !== 'string' ||
+    explanation.title.trim().length === 0 ||
+    explanation.body.trim().length === 0
   ) {
     errors.push({
       cardId,
@@ -257,7 +291,7 @@ function validateCard(card: LiquidCard): ValidationError[] {
   }
 
   // Template-specific correct answer present and consistent.
-  errors.push(...templateAnswerValidators[card.templateType](card));
+  errors.push(...validateTemplateAnswer(card));
 
   return errors;
 }

@@ -230,6 +230,22 @@ describe('validateCatalog', () => {
     expect(hasRule(result.errors, ValidationRule.TIME_LIMIT_RANGE)).toBe(true);
   });
 
+  it('rejects a NaN time limit (finiteness guard, not just range)', () => {
+    const card = validTinyLogic();
+    card.config.timeLimitMs = Number.NaN;
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.TIME_LIMIT_RANGE)).toBe(true);
+  });
+
+  it('rejects an Infinity time limit', () => {
+    const card = validTinyLogic();
+    card.config.timeLimitMs = Number.POSITIVE_INFINITY;
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.TIME_LIMIT_RANGE)).toBe(true);
+  });
+
   it('accepts time limits exactly on the inclusive bounds', () => {
     const low = validTinyLogic();
     low.config.timeLimitMs = MIN_TIME_LIMIT_MS;
@@ -241,6 +257,27 @@ describe('validateCatalog', () => {
   it('rejects a spot_it anomaly outside the grid bounds', () => {
     const card = validSpotIt();
     card.config.anomalyRow = card.config.rows; // one past the last row
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('rejects a spot_it grid with non-positive dimensions', () => {
+    const card = validSpotIt();
+    card.config.rows = 0;
+    card.config.columns = -1;
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('rejects a spot_it anomalyColumn outside the grid bounds', () => {
+    const card = validSpotIt();
+    card.config.anomalyColumn = card.config.columns; // one past the last column
     const result = validateCatalog([card]);
     expect(result.valid).toBe(false);
     expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
@@ -292,6 +329,32 @@ describe('validateCatalog', () => {
     const card = validSpotIt();
     card.explanation = { title: '', body: '' };
     const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.EXPLANATION_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('returns an error (does not throw) for a card missing prompt', () => {
+    const drifted = validSpotIt() as unknown as Record<string, unknown>;
+    delete drifted.prompt;
+    const card = drifted as unknown as LiquidCard;
+    let result!: ReturnType<typeof validateCatalog>;
+    expect(() => {
+      result = validateCatalog([card]);
+    }).not.toThrow();
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.NON_EMPTY_PROMPT)).toBe(true);
+  });
+
+  it('returns an error (does not throw) for a card missing explanation', () => {
+    const drifted = validSpotIt() as unknown as Record<string, unknown>;
+    delete drifted.explanation;
+    const card = drifted as unknown as LiquidCard;
+    let result!: ReturnType<typeof validateCatalog>;
+    expect(() => {
+      result = validateCatalog([card]);
+    }).not.toThrow();
     expect(result.valid).toBe(false);
     expect(hasRule(result.errors, ValidationRule.EXPLANATION_PRESENT)).toBe(
       true,
