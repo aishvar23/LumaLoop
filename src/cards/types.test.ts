@@ -53,6 +53,25 @@ describe('templateCategoryMap', () => {
     }
   });
 
+  it('is frozen at the record and array level so it cannot be mutated', () => {
+    expect(Object.isFrozen(templateCategoryMap)).toBe(true);
+    for (const categories of Object.values(templateCategoryMap)) {
+      expect(Object.isFrozen(categories)).toBe(true);
+    }
+  });
+
+  it('rejects runtime mutation of a template category list', () => {
+    // The array is frozen, so a push must throw in strict mode (the test file
+    // is an ES module and therefore strict).
+    expect(() => {
+      (templateCategoryMap.spot_it as ChallengeCategory[]).push('working_memory');
+    }).toThrow();
+    expect(templateCategoryMap.spot_it).toEqual([
+      'visual_attention',
+      'processing_speed',
+    ]);
+  });
+
   it('matches the Technical Design §11 mapping exactly', () => {
     expect(templateCategoryMap).toEqual({
       spot_it: ['visual_attention', 'processing_speed'],

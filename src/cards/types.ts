@@ -37,9 +37,10 @@ export type ChallengeCategory =
   | 'processing_speed';
 
 /**
- * How much measurement weight a card carries. The prototype catalog only allows
- * `entertainment_only` and `mechanic_mapped`; `benchmark_probe` is disallowed
- * unless explicitly whitelisted (Technical Design §11).
+ * How much measurement weight a card carries. The prototype catalog permits
+ * only `entertainment_only` and `mechanic_mapped`; both `telemetry_calibrated`
+ * and `benchmark_probe` are disallowed in the prototype (Technical Design §11).
+ * The higher tiers remain in the union so the schema scales into later phases.
  */
 export type EvidenceTier =
   | 'entertainment_only'
@@ -160,10 +161,18 @@ export type LiquidCard =
  * Catalog validation uses this to reject cards whose `category` is not valid
  * for their `templateType`. As a `Record<TemplateType, ...>`, the compiler
  * forces a new template (step 1) to add its entry here (step 3).
+ *
+ * Declared `Readonly<Record<...>>` over `readonly` arrays so this validation
+ * source-of-truth cannot be mutated at runtime: neither the record's keys nor
+ * any template's category list can be reassigned or pushed to. The `satisfies`
+ * clause keeps the literal data checked against the contract while preserving
+ * the precise readonly type.
  */
-export const templateCategoryMap: Record<TemplateType, ChallengeCategory[]> = {
-  spot_it: ['visual_attention', 'processing_speed'],
-  what_changed: ['working_memory', 'visual_attention'],
-  rule_flip: ['cognitive_flexibility', 'processing_speed'],
-  tiny_logic: ['logical_reasoning', 'pattern_recognition'],
-};
+export const templateCategoryMap: Readonly<
+  Record<TemplateType, readonly ChallengeCategory[]>
+> = Object.freeze({
+  spot_it: Object.freeze(['visual_attention', 'processing_speed'] as const),
+  what_changed: Object.freeze(['working_memory', 'visual_attention'] as const),
+  rule_flip: Object.freeze(['cognitive_flexibility', 'processing_speed'] as const),
+  tiny_logic: Object.freeze(['logical_reasoning', 'pattern_recognition'] as const),
+}) satisfies Readonly<Record<TemplateType, readonly ChallengeCategory[]>>;
