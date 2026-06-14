@@ -1,5 +1,11 @@
 @import './tokens.css';
 
+/*
+ * Base layer — resets, the stable mobile-first column, and global a11y
+ * defaults (focus-visible ring, reduced-motion). Component styling lives with
+ * the components / layout primitives, not here.
+ */
+
 *,
 *::before,
 *::after {
@@ -17,20 +23,49 @@ body {
   color: var(--color-text);
   font-family: var(--font-sans);
   font-size: var(--font-size-md);
-  line-height: 1.5;
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-normal);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
 #root {
-  /* Mobile-first: a single, centered, full-height column. */
+  /* Mobile-first: a single, centered, full-height column.
+   * #root owns the horizontal safe-area insets (notch edges in landscape) so
+   * the column never bleeds under hardware. The Screen primitive owns the
+   * vertical (status-bar / home-indicator) insets together with scrolling, so
+   * the two never double up. See src/ui/Screen.tsx. */
   min-height: 100dvh;
   max-width: 480px;
   margin: 0 auto;
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
   display: flex;
   flex-direction: column;
 }
 
 button {
   font-family: inherit;
+}
+
+/* Visible keyboard-focus indicator using the focus tokens. Mouse/touch
+ * activation does not trigger :focus-visible, so this stays out of the way of
+ * pointer users while remaining strong for keyboard / switch navigation. */
+:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* Respect users who ask for less motion: disable non-essential animation and
+ * transitions, and make programmatic scrolling instant. Essential motion (if
+ * any) should opt back in explicitly. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
