@@ -1,22 +1,46 @@
 /*
- * Design tokens — base palette, spacing, and typography scale.
- * Full token set lands with the design-system task; this is the scaffold seed.
+ * Design tokens — the single source of truth for LumaLoop's visual system.
+ *
+ * Every primitive and screen consumes these via `var(--…)`; no component
+ * hardcodes a colour, size, or spacing value. The seed set (surfaces, text,
+ * accent, spacing, radii, type) shipped with the scaffold (#50) and is kept
+ * intact below; this task (#51) formalises the rest of the system.
+ *
+ * Accessibility notes:
+ *  - Feedback colours are drawn from the Okabe-Ito Color-Universal-Design
+ *    palette and are deuteranopia/protanopia-safe. Colour is NEVER the sole
+ *    signal — pair every feedback colour with an icon, label, or shape
+ *    (Technical Design §556, §628; Design accessibility guardrails).
+ *  - Control sizing tokens guarantee tap targets of at least 44x44px
+ *    (WCAG 2.5.5 Target Size; one-handed mobile use, Technical Design §549).
+ *  - Safe-area tokens expose the device insets (notch / home indicator) so the
+ *    layout can stay clear of them under `viewport-fit=cover`.
  */
 :root {
-  /* Surfaces */
+  /* ── Surfaces ─────────────────────────────────────────────────────────── */
   --color-bg: #0c0d12;
   --color-surface: #16181f;
+  --color-surface-raised: #1d2029;
   --color-border: #262a33;
 
-  /* Text */
+  /* ── Text ─────────────────────────────────────────────────────────────── */
   --color-text: #f5f6fa;
   --color-text-muted: #9aa0ad;
 
-  /* Brand / accent */
+  /* ── Brand / accent ───────────────────────────────────────────────────── */
   --color-accent: #6c7bff;
   --color-accent-contrast: #ffffff;
 
-  /* Spacing scale */
+  /* ── Feedback (Okabe-Ito CUD palette — colour-blind-safe) ─────────────────
+   * Always accompany with a non-colour cue (icon / text / shape). */
+  --color-success: #009e73; /* bluish green — correct */
+  --color-success-contrast: #ffffff;
+  --color-error: #d55e00; /* vermillion — incorrect */
+  --color-error-contrast: #ffffff;
+  --color-warning: #e69f00; /* orange — caution / time low */
+  --color-warning-contrast: #1a1205;
+
+  /* ── Spacing scale ────────────────────────────────────────────────────── */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 16px;
@@ -24,12 +48,13 @@
   --space-5: 32px;
   --space-6: 48px;
 
-  /* Radii */
+  /* ── Radii ────────────────────────────────────────────────────────────── */
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 20px;
+  --radius-pill: 999px;
 
-  /* Typography */
+  /* ── Typography ───────────────────────────────────────────────────────── */
   --font-sans:
     -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
     sans-serif;
@@ -37,4 +62,51 @@
   --font-size-md: 16px;
   --font-size-lg: 20px;
   --font-size-xl: 28px;
+
+  /* Line-height scale (unitless — multiplies the element font-size). */
+  --line-height-tight: 1.2;
+  --line-height-snug: 1.35;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.65;
+
+  /* Font-weight scale. */
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* ── Control sizing / tap targets ─────────────────────────────────────────
+   * --tap-target-min is the WCAG 2.5.5 floor; never render an interactive
+   * control smaller than this in either dimension. */
+  --tap-target-min: 44px;
+  --control-height-sm: 40px;
+  --control-height-md: 48px;
+  --control-height-lg: 56px;
+
+  /* ── Focus ring ───────────────────────────────────────────────────────────
+   * High-contrast against both surfaces; used by :focus-visible in global.css. */
+  --focus-ring-color: #9db2ff;
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+
+  /* ── Elevation / shadow ───────────────────────────────────────────────── */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.32);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.48);
+
+  /* ── z-index scale ────────────────────────────────────────────────────────
+   * Named layers keep stacking predictable; never use ad-hoc z-index values. */
+  --z-base: 0;
+  --z-raised: 10;
+  --z-sticky: 100;
+  --z-overlay: 1000;
+  --z-toast: 1100;
+
+  /* ── Safe-area insets ─────────────────────────────────────────────────────
+   * Device notch / home-indicator insets exposed under viewport-fit=cover.
+   * Fallback to 0px on devices/browsers without insets. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
 }
