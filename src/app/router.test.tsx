@@ -49,4 +49,12 @@ describe('AppRoutes', () => {
       screen.queryByRole('heading', { name: 'LumaLoop' }),
     ).not.toBeInTheDocument();
   });
+
+  it('routes "Back to start" through a client-side link to `/`', () => {
+    renderAt('/totally/unknown');
+    const back = screen.getByRole('link', { name: 'Back to start' });
+    // React Router `Link` resolves to the session route and renders an anchor
+    // with the in-app href, so navigation stays client-side (no full reload).
+    expect(back).toHaveAttribute('href', '/');
+  });
 });

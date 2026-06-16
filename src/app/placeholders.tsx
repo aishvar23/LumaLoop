@@ -9,7 +9,7 @@
  * Routing only selects which element renders; it must never own session
  * progression (CLAUDE.md §4). Keep that boundary when swapping these out.
  */
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import Screen from '../ui/Screen';
 import Stack from '../ui/Stack';
 import StartScreen from '../ui/StartScreen';
@@ -67,7 +67,8 @@ export function NotFoundRoutePlaceholder() {
         <p style={{ margin: 0, color: 'var(--color-text-muted)' }}>
           That link doesn’t lead anywhere in LumaLoop.
         </p>
-        <a href={ROUTES.session}>Back to start</a>
+        {/* Client-side nav: `Link` keeps SPA state instead of full reload. */}
+        <Link to={ROUTES.session}>Back to start</Link>
       </Stack>
     </Screen>
   );
