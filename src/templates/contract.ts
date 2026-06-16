@@ -5,10 +5,11 @@
  * so the session engine stays template-agnostic: controllers own progression,
  * renderers own only card interaction.
  *
- * NOTE: timeout/timer behavior is intentionally NOT defined here. This module
- * is types only; the renderer-side timeout semantics (emitting
- * `resolutionType: 'timeout'` on `timeLimitMs` expiry, etc.) are owned by a
- * later task that implements the renderers.
+ * NOTE: this module stays pure types only. The renderer-side timeout semantics
+ * (arming a per-card `timeLimitMs` countdown and emitting a
+ * `resolutionType: 'timeout'` resolution on expiry) are implemented once as a
+ * shared primitive in `./useCardTimer` + `./timeoutResolution`, so every
+ * renderer consumes the same behavior instead of re-deriving it.
  */
 
 import type { LiquidCard } from '../cards/types';
