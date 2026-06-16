@@ -183,6 +183,32 @@ describe('starting a session', () => {
   });
 });
 
+describe('start() during a live session', () => {
+  it('is a no-op and does not swap the in-play card map out from under the session', () => {
+    const cards = [tinyLogicCard('c0'), tinyLogicCard('c1'), tinyLogicCard('c2')];
+    const capture = renderController({ now: () => 0 });
+    startSession(capture, 'one_minute_rescue', cards);
+    expect(current()).toBe('c0');
+
+    // A stray start() (e.g. a double-tap from a future UI) while resolving must
+    // be ignored: the reducer ignores START_SESSION outside idle/continue, and
+    // the controller must NOT swap providedCardsRef to the new (different) cards
+    // — otherwise the in-play card would trip the missing-card fail-safe.
+    const intruder = [tinyLogicCard('x0'), tinyLogicCard('x1')];
+    startSession(capture, 'three_minute_reset', intruder);
+
+    // Untouched: same card, same mode, still renderable (no fail-safe error).
+    expect(status()).toBe('resolving_card');
+    expect(current()).toBe('c0');
+    expect(capture.current!.mode).toBe('one_minute_rescue');
+    expect(screen.getByTestId('total').textContent).toBe('3');
+
+    // The original session still resolves normally through its own cards.
+    clickResolve('c0');
+    expect(current()).toBe('c1');
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Progression to completion at the card-COUNT limit.
 // ---------------------------------------------------------------------------

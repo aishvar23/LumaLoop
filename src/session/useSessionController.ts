@@ -85,7 +85,15 @@ function defaultGenerateSessionId(): string {
 export type SessionCardInput = LiquidCard | string;
 
 export type SessionControllerOptions = {
-  /** Maps each `TemplateType` to its renderer (dependency inversion). */
+  /**
+   * Maps each `TemplateType` to its renderer (dependency inversion).
+   *
+   * Must be referentially stable for the lifetime of a session: the registry is
+   * captured by ref (like the other injectables) so a card's renderer is looked
+   * up at render time, but a registry change ALONE does not re-resolve the
+   * in-play card. Pass a module-constant (or `useMemo`/`useRef`) registry, not a
+   * fresh inline object each render.
+   */
   registry: RendererRegistry;
   /** Injectable wall clock. Defaults to `Date.now`. */
   now?: () => number;
@@ -201,6 +209,13 @@ export function useSessionController(
 
   const start = useCallback(
     (mode: SessionMode, cards: ReadonlyArray<SessionCardInput>) => {
+      // `START_SESSION` is a reducer no-op unless the session is `idle` or
+      // `intentional_continue` (sessionReducer.ts). Gate the provided-cards
+      // side effect by the SAME precondition so a stray `start()` during a live
+      // session can't swap the by-value card map out from under the in-play
+      // card (which would silently trip the missing-card fail-safe).
+      const status = stateRef.current.status;
+      if (status !== 'idle' && status !== 'intentional_continue') return;
       const provided = new Map<string, LiquidCard>();
       const cardIds = cards.map((card) => {
         if (typeof card === 'string') return card;
