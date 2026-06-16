@@ -247,6 +247,27 @@ describe('BEGIN_RESOLVE', () => {
     const idle = initSession({ sessionId: 'sess-1', mode: 'one_minute_rescue' });
     expect(sessionReducer(idle, { type: 'BEGIN_RESOLVE' })).toBe(idle);
   });
+
+  it('is a no-op from completed (no new card starts after the card limit)', () => {
+    // Build the completed state via the normal reducer path: run a full
+    // one_minute_rescue session (3 cards) to completion.
+    let state = activeSession('one_minute_rescue', ['a', 'b', 'c']);
+    ['a', 'b', 'c'].forEach((id, i) => {
+      state = sessionReducer(state, { type: 'BEGIN_RESOLVE' });
+      state = sessionReducer(state, {
+        type: 'RESOLVE_CARD',
+        resolution: resolution(id),
+        nowMs: (i + 1) * 1_000,
+      });
+    });
+    expect(state.status).toBe('completed');
+
+    // BEGIN_RESOLVE from completed must not arm another card: same reference,
+    // status stays 'completed'.
+    const result = sessionReducer(state, { type: 'BEGIN_RESOLVE' });
+    expect(result).toBe(state);
+    expect(result.status).toBe('completed');
+  });
 });
 
 describe('EXIT', () => {

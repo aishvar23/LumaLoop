@@ -112,7 +112,16 @@ export function sessionReducer(
     }
 
     case 'BEGIN_RESOLVE': {
-      // A card moves into play. Legal only from `active`.
+      // A card moves into play. Legal only from `active`; in particular the
+      // `completed` no-op enforces the card-COUNT limit (no new card starts
+      // once maxCards is reached).
+      //
+      // DURATION-LIMIT CAVEAT (Technical Design §8): BEGIN_RESOLVE carries no
+      // `nowMs`, so the reducer CANNOT stop a new card from starting after the
+      // duration window has elapsed — it only enforces the card-count limit.
+      // The controller (Azure DevOps #59) MUST check the clock before
+      // dispatching BEGIN_RESOLVE, or dispatch COMPLETE on timer expiry, to
+      // honor the duration limit.
       if (state.status !== 'active') {
         return state;
       }
