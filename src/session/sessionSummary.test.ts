@@ -1,0 +1,275 @@
+import { describe, expect, it } from 'vitest';
+
+import type { ChallengeCategory } from '../cards/types';
+import type { CardResolution, ResolutionType } from '../templates/contract';
+import { computeSessionSummary } from './sessionSummary';
+import type { CategoryLookup } from './sessionSummary';
+import { MODE_DEFAULTS } from './sessionTypes';
+
+/**
+ * Session summary / receipt computation (Technical Design §9, Azure DevOps #62).
+ * These assert `computeSessionSummary` is pure and deterministic and honors the
+ * documented rules: `isCorrect` is the correctness source of truth (timeouts
+ * count as incorrect), fastest = fastest CORRECT card by `elapsedMs` (first
+ * occurrence on ties), per-category aggregation via the injected lookup, and the
+ * card-count exit badge. No trait/ranking language is produced.
+ */
+
+/** Build a CardResolution fixture; defaults keep each test focused on one axis. */
+function res(
+  cardId: string,
+  isCorrect: boolean,
+  elapsedMs: number,
+  resolutionType: ResolutionType = isCorrect ? 'correct' : 'incorrect',
+): CardResolution {
+  return {
+    cardId,
+    resolutionType,
+    isCorrect,
+    elapsedMs,
+    interactionElapsedMs: elapsedMs,
+    attemptCount: 1,
+    signals: {},
+  };
+}
+
+/** A category lookup backed by a plain record; unknown ids -> undefined. */
+function lookup(map: Record<string, ChallengeCategory>): CategoryLookup {
+  return (cardId) => map[cardId];
+}
+
+const noCategories: CategoryLookup = () => undefined;
+
+describe('computeSessionSummary — completedCards & accuracy', () => {
+  it('counts every resolved card and computes accuracy from isCorrect', () => {
+    const summary = computeSessionSummary({
+      sessionId: 's1',
+      mode: 'three_minute_reset',
+      resolutions: [
+        res('c0', true, 100),
+        res('c1', false, 200),
+        res('c2', true, 300),
+        res('c3', false, 400),
+      ],
+      categoryOf: noCategories,
+    });
+    expect(summary.completedCards).toBe(4);
+    expect(summary.correctCards).toBe(2);
+    expect(summary.accuracy).toBe(0.5);
+    expect(summary.totalElapsedMs).toBe(1000);
+    expect(summary.sessionId).toBe('s1');
+    expect(summary.mode).toBe('three_minute_reset');
+  });
+
+  it('treats a timeout resolution as incorrect (isCorrect:false)', () => {
+    const summary = computeSessionSummary({
+      sessionId: 's1',
+      mode: 'one_minute_rescue',
+      resolutions: [
+        res('c0', true, 100),
+        res('c1', false, 9_999, 'timeout'),
+        res('c2', false, 50, 'timeout'),
+      ],
+      categoryOf: noCategories,
+    });
+    expect(summary.completedCards).toBe(3);
+    expect(summary.correctCards).toBe(1);
+    expect(summary.accuracy).toBeCloseTo(1 / 3, 10);
+  });
+
+  it('defines accuracy as 0 (no division by zero) for an empty session', () => {
+    const summary = computeSessionSummary({
+      sessionId: 's1',
+      mode: 'one_minute_rescue',
+      resolutions: [],
+      categoryOf: noCategories,
+    });
+    expect(summary.completedCards).toBe(0);
+    expect(summary.correctCards).toBe(0);
+    expect(summary.accuracy).toBe(0);
+    expect(summary.totalElapsedMs).toBe(0);
+    expect(summary.fastestCorrectCard).toBeUndefined();
+    expect(summary.categoryBreakdown).toEqual([]);
+    expect(summary.earnedExitBadge).toBe(false);
+  });
+});
+
+describe('computeSessionSummary — fastestCorrectCard', () => {
+  it('picks the fastest CORRECT card by elapsedMs (ignoring faster incorrect ones)', () => {
+    const summary = computeSessionSummary({
+      sessionId: 's1',
+      mode: 'three_minute_reset',
+      resolutions: [
+        res('slow-correct', true, 500),
+        res('fast-wrong', false, 10), // faster but incorrect -> ineligible
+        res('fast-correct', true, 120),
+      ],
+      categoryOf: noCategories,
+    });
+    expect(summary.fastestCorrectCard).toEqual({ cardId: 'fast-correct', elapsedMs: 120 });
+  });
+
+  it('is undefined when there are no correct cards (all timeouts/incorrect)', () => {
+    const summary = computeSessionSummary({
+      sessionId: 's1',
+      mode: 'one_minute_rescue',
+      resolutions: [
+        res('c0', false, 10, 'timeout'),
+        res('c1', false, 20),
+      ],
+      categoryOf: noCategories,
+    });
+    expect(summary.fastestCorrectCard).toBeUndefined();
+    expect('fastestCorrectCard' in summary).toBe(false);
+  });
+
+  it('breaks ties on FIRST occurrence in resolutions', () => {
+    const summary = computeSessionSummary({
+      sessionId: 's1',
+      mode: 'three_minute_reset',
+      resolutions: [
+        res('first', true, 200),
+        res('tie', true, 200), // equal time, later -> not chosen
+      ],
+      categoryOf: noCategories,
+    });
+    expect(summary.fastestCorrectCard).toEqual({ cardId: 'first', elapsedMs: 200 });
+  });
+});
+
+describe('computeSessionSummary — categoryBreakdown', () => {
+  it('aggregates attempted/correct/medianElapsedMs per category in first-occurrence order', () => {
+    const categoryOf = lookup({
+      a0: 'visual_attention',
+      b0: 'working_memory',
+      a1: 'visual_attention',
+      a2: 'visual_attention',
+    });
+    const summary = computeSessionSummary({
+      sessionId: 's1',
+      mode: 'three_minute_reset',
+      resolutions: [
+        res('a0', true, 100),
+        res('b0', false, 400),
+        res('a1', true, 300),
+        res('a2', false, 200),
+      ],
+      categoryOf,
+    });
+    // First-occurrence order: visual_attention (a0) then working_memory (b0).
+    expect(summary.categoryBreakdown).toEqual([
+      {
+        category: 'visual_attention',
+        attempted: 3,
+        correct: 2,
+        medianElapsedMs: 200, // median of [100, 300, 200] = 200
+      },
+      {
+        category: 'working_memory',
+        attempted: 1,
+        correct: 0,
+        medianElapsedMs: 400,
+      },
+    ]);
+  });
+
+  it('uses the mean of the two middle values for an even-sized category sample', () => {
+    const categoryOf = lookup({ a0: 'logical_reasoning', a1: 'logical_reasoning' });
+    const summary = computeSessionSummary({
+      sessionId: 's1',
+      mode: 'one_minute_rescue',
+      resolutions: [res('a0', true, 100), res('a1', true, 200)],
+      categoryOf,
+    });
+    expect(summary.categoryBreakdown[0].medianElapsedMs).toBe(150);
+  });
+
+  it('omits cards with no resolved category from the breakdown but still counts them overall', () => {
+    const categoryOf = lookup({ known: 'pattern_recognition' });
+    const summary = computeSessionSummary({
+      sessionId: 's1',
+      mode: 'one_minute_rescue',
+      resolutions: [
+        res('known', true, 100),
+        res('orphan', false, 200), // categoryOf -> undefined
+      ],
+      categoryOf,
+    });
+    expect(summary.completedCards).toBe(2);
+    expect(summary.correctCards).toBe(1);
+    expect(summary.categoryBreakdown).toHaveLength(1);
+    expect(summary.categoryBreakdown[0].category).toBe('pattern_recognition');
+    expect(summary.categoryBreakdown[0].attempted).toBe(1);
+  });
+});
+
+describe('computeSessionSummary — earnedExitBadge', () => {
+  it('is earned exactly at the mode card-count threshold (one_minute_rescue = 3)', () => {
+    const max = MODE_DEFAULTS.one_minute_rescue.maxCards;
+    expect(max).toBe(3);
+    const below = computeSessionSummary({
+      sessionId: 's1',
+      mode: 'one_minute_rescue',
+      resolutions: [res('c0', true, 10), res('c1', true, 10)], // 2 < 3
+      categoryOf: noCategories,
+    });
+    expect(below.earnedExitBadge).toBe(false);
+
+    const at = computeSessionSummary({
+      sessionId: 's1',
+      mode: 'one_minute_rescue',
+      resolutions: [res('c0', true, 10), res('c1', false, 10), res('c2', false, 10)], // 3 >= 3
+      categoryOf: noCategories,
+    });
+    expect(at.earnedExitBadge).toBe(true); // badge is about completing, not accuracy
+  });
+
+  it('uses the larger threshold for three_minute_reset (= 7)', () => {
+    const max = MODE_DEFAULTS.three_minute_reset.maxCards;
+    expect(max).toBe(7);
+    const six = Array.from({ length: 6 }, (_, i) => res(`c${i}`, true, 10));
+    const seven = Array.from({ length: 7 }, (_, i) => res(`c${i}`, true, 10));
+    expect(
+      computeSessionSummary({ sessionId: 's', mode: 'three_minute_reset', resolutions: six, categoryOf: noCategories })
+        .earnedExitBadge,
+    ).toBe(false);
+    expect(
+      computeSessionSummary({ sessionId: 's', mode: 'three_minute_reset', resolutions: seven, categoryOf: noCategories })
+        .earnedExitBadge,
+    ).toBe(true);
+  });
+});
+
+describe('computeSessionSummary — edge cases & purity', () => {
+  it('handles a single correct card', () => {
+    const summary = computeSessionSummary({
+      sessionId: 's1',
+      mode: 'one_minute_rescue',
+      resolutions: [res('only', true, 250)],
+      categoryOf: lookup({ only: 'processing_speed' }),
+    });
+    expect(summary.completedCards).toBe(1);
+    expect(summary.accuracy).toBe(1);
+    expect(summary.fastestCorrectCard).toEqual({ cardId: 'only', elapsedMs: 250 });
+    expect(summary.categoryBreakdown).toEqual([
+      { category: 'processing_speed', attempted: 1, correct: 1, medianElapsedMs: 250 },
+    ]);
+  });
+
+  it('is deterministic: identical inputs yield a deeply equal result and never mutates inputs', () => {
+    const resolutions: readonly CardResolution[] = [
+      res('a0', true, 100),
+      res('b0', false, 200),
+      res('a1', true, 300),
+    ];
+    const frozen = resolutions.map((r) => ({ ...r }));
+    const categoryOf = lookup({ a0: 'visual_attention', b0: 'working_memory', a1: 'visual_attention' });
+    const input = { sessionId: 's1', mode: 'three_minute_reset' as const, resolutions, categoryOf };
+
+    const first = computeSessionSummary(input);
+    const second = computeSessionSummary(input);
+    expect(first).toEqual(second);
+    // Inputs are untouched (pure).
+    expect(resolutions).toEqual(frozen);
+  });
+});
