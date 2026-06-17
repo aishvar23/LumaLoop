@@ -20,8 +20,9 @@
  * Composition rules (Design §19 / Tech §12) and how they are satisfied:
  *
  *   - Fixed seeded order per (user, day, mode): a `xmur3`-hashed seed feeds a
- *     `mulberry32` PRNG keyed on `${anonymousUserId}:${dayKey}:${mode}`, which
- *     drives one seeded Fisher-Yates shuffle of the eligible pool.
+ *     `mulberry32` PRNG keyed on an injective `JSON.stringify([anonymousUserId,
+ *     dayKey, mode])`, which drives one seeded Fisher-Yates shuffle of the
+ *     eligible pool.
  *   - Length = `MODE_DEFAULTS[mode].maxCards` where the catalog allows.
  *   - Difficulty ramp (easy -> medium): slots are filled in ascending
  *     difficulty so the emitted sequence is non-decreasing in difficulty. A
@@ -270,8 +271,11 @@ export function composeSession(params: ComposeSessionParams): readonly string[] 
 
   // One seeded shuffle establishes the per-(user, day, mode) base order; every
   // downstream tiebreak is a stable index into this order, so the whole result
-  // is a deterministic function of the seed key.
-  const rng = makeRng(`${anonymousUserId}:${dayKey}:${mode}`);
+  // is a deterministic function of the seed key. The key is built with
+  // `JSON.stringify` so the three components are unambiguously delimited: a
+  // plain `:`-join would collide for inputs like (`a:b`, `c`) vs (`a`, `b:c`)
+  // when an anonymousUserId can contain the delimiter.
+  const rng = makeRng(JSON.stringify([anonymousUserId, dayKey, mode]));
   const shuffled = seededShuffle(eligible, rng);
 
   // Bucket the shuffled pool by difficulty, preserving seeded order within each.

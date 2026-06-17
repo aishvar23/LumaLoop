@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import { catalog } from '../cards/catalog';
-import type { Difficulty, LiquidCard, SpotItCard } from '../cards/types';
+import type {
+  ChallengeCategory,
+  Difficulty,
+  LiquidCard,
+  SpotItCard,
+} from '../cards/types';
 import { composeSession, toDayKey } from './composeSession';
 import { MODE_DEFAULTS, type SessionMode } from './sessionTypes';
 
@@ -68,6 +73,15 @@ describe('composeSession — determinism', () => {
     const rescue = composeSession({ mode: 'one_minute_rescue', anonymousUserId: 'user-1', day: '2026-06-16' });
     const reset = composeSession({ mode: 'three_minute_reset', anonymousUserId: 'user-1', day: '2026-06-16' });
     expect(rescue).not.toEqual(reset);
+  });
+
+  it('uses an injective seed key (no delimiter collision across user/day)', () => {
+    // Under a naive `${user}:${day}:${mode}` join these two inputs would share
+    // the key `a:b:c:three_minute_reset` and compose identical sessions. With an
+    // injective (JSON-encoded) key they must diverge.
+    const a = composeSession({ mode: 'three_minute_reset', anonymousUserId: 'a:b', day: 'c' });
+    const b = composeSession({ mode: 'three_minute_reset', anonymousUserId: 'a', day: 'b:c' });
+    expect(a).not.toEqual(b);
   });
 });
 
@@ -236,5 +250,128 @@ describe('composeSession — graceful degradation on a too-small catalog', () =>
       catalog: noneEligible,
     });
     expect(ids).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Synthetic catalogs that FORCE each documented fallback path. The real
+// 26-card catalog satisfies every constraint trivially, so these construct
+// pathological pools to actually exercise the run-limit relaxation, the
+// difficulty-tier spill, and the soft time-budget degrade.
+// ---------------------------------------------------------------------------
+
+describe('composeSession — forced fallback paths (synthetic catalogs)', () => {
+  const spotItBase = catalog.find((c) => c.templateType === 'spot_it');
+  const tinyLogicBase = catalog.find((c) => c.templateType === 'tiny_logic');
+  if (!spotItBase || !tinyLogicBase) {
+    throw new Error('test setup expects spot_it and tiny_logic cards in the catalog');
+  }
+
+  /**
+   * Clone a real (union-valid) card, forcing eligibility and overriding only the
+   * metadata the composer reads. `templateType`/`config` come from the base so
+   * the discriminated union stays valid.
+   */
+  function variant(
+    base: LiquidCard,
+    cardId: string,
+    difficulty: Difficulty,
+    category: ChallengeCategory,
+    estimatedSeconds: number,
+  ): LiquidCard {
+    return {
+      ...base,
+      cardId,
+      difficulty,
+      category,
+      estimatedSeconds,
+      reviewStatus: 'manual_reviewed',
+      evidenceTier: 'mechanic_mapped',
+    };
+  }
+
+  const templateOf = (pool: readonly LiquidCard[], id: string) =>
+    pool.find((c) => c.cardId === id)!.templateType;
+  const rankOf = (pool: readonly LiquidCard[], id: string) =>
+    DIFFICULTY_RANK[pool.find((c) => c.cardId === id)!.difficulty];
+
+  it('relaxes the no-3-in-a-row rule (pass 2) on a single-template pool, still filling the session', () => {
+    // Every card is spot_it, so a 3-in-a-row is mathematically unavoidable for a
+    // 7-card session. The composer must reach full length via the run-limit
+    // relaxation rather than throwing or returning a short session.
+    const pool: readonly LiquidCard[] = [
+      variant(spotItBase, 's-e1', 'easy', 'visual_attention', 10),
+      variant(spotItBase, 's-e2', 'easy', 'working_memory', 10),
+      variant(spotItBase, 's-e3', 'easy', 'logical_reasoning', 10),
+      variant(spotItBase, 's-e4', 'easy', 'pattern_recognition', 10),
+      variant(spotItBase, 's-m1', 'medium', 'visual_attention', 10),
+      variant(spotItBase, 's-m2', 'medium', 'working_memory', 10),
+      variant(spotItBase, 's-m3', 'medium', 'logical_reasoning', 10),
+    ];
+    const ids = composeSession({
+      mode: 'three_minute_reset',
+      anonymousUserId: 'u',
+      day: '2026-06-16',
+      catalog: pool,
+    });
+    expect(ids).toHaveLength(MODE_DEFAULTS.three_minute_reset.maxCards); // 7
+    expect(new Set(ids).size).toBe(ids.length); // duplicate-free
+    // A 3-in-a-row necessarily appears -> proves the relaxation path executed.
+    const templates = ids.map((id) => templateOf(pool, id));
+    const hasThreeInARow = templates.some(
+      (t, i) => i >= 2 && t === templates[i - 1] && templates[i - 1] === templates[i - 2],
+    );
+    expect(hasThreeInARow).toBe(true);
+  });
+
+  it('spills easy->medium to keep the non-decreasing ramp when easy is exhausted', () => {
+    // one_minute_rescue wants [easy, easy, medium] but only ONE easy card exists,
+    // so slot 1 must spill into the harder (medium) tier; the ramp must stay
+    // non-decreasing and never spill DOWN.
+    const pool: readonly LiquidCard[] = [
+      variant(spotItBase, 'only-easy', 'easy', 'visual_attention', 10),
+      variant(tinyLogicBase, 'med-1', 'medium', 'working_memory', 10),
+      variant(spotItBase, 'med-2', 'medium', 'logical_reasoning', 10),
+      variant(tinyLogicBase, 'med-3', 'medium', 'pattern_recognition', 10),
+    ];
+    const ids = composeSession({
+      mode: 'one_minute_rescue',
+      anonymousUserId: 'u',
+      day: '2026-06-16',
+      catalog: pool,
+    });
+    expect(ids).toHaveLength(MODE_DEFAULTS.one_minute_rescue.maxCards); // 3
+    expect(ids[0]).toBe('only-easy'); // the sole easy card leads the ramp
+    const ranks = ids.map((id) => rankOf(pool, id));
+    for (let i = 1; i < ranks.length; i++) {
+      expect(ranks[i] >= ranks[i - 1], `ramp decreased at ${i}: ${ranks.join(',')}`).toBe(true);
+    }
+    expect(ranks[ranks.length - 1]).toBe(DIFFICULTY_RANK.medium); // spilled into medium
+  });
+
+  it('honors the time budget as a SOFT cap: fills full length even when every card exceeds it', () => {
+    // one_minute_rescue budget = 60s; each card costs far more. The session is
+    // card-count bounded, so it must still reach maxCards rather than truncating
+    // to fit the budget (the documented soft-cap degrade).
+    const big = 999;
+    const pool: readonly LiquidCard[] = [
+      variant(spotItBase, 'b-e1', 'easy', 'visual_attention', big),
+      variant(tinyLogicBase, 'b-e2', 'easy', 'working_memory', big),
+      variant(spotItBase, 'b-m1', 'medium', 'logical_reasoning', big),
+      variant(tinyLogicBase, 'b-m2', 'medium', 'pattern_recognition', big),
+    ];
+    const ids = composeSession({
+      mode: 'one_minute_rescue',
+      anonymousUserId: 'u',
+      day: '2026-06-16',
+      catalog: pool,
+    });
+    expect(ids).toHaveLength(MODE_DEFAULTS.one_minute_rescue.maxCards); // 3
+    const total = ids.reduce(
+      (sum, id) => sum + pool.find((c) => c.cardId === id)!.estimatedSeconds,
+      0,
+    );
+    const budgetSeconds = MODE_DEFAULTS.one_minute_rescue.maxDurationMs / 1000; // 60
+    expect(total).toBeGreaterThan(budgetSeconds); // not truncated to fit budget
   });
 });
