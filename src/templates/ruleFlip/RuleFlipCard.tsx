@@ -252,10 +252,14 @@ function RuleFlipStream({
     (evaluation: RuleFlipEvaluation, correct: boolean, atMs: number) => ({
       pre_flip_accuracy: evaluation.preFlipAccuracy,
       post_flip_accuracy: evaluation.postFlipAccuracy,
+      // -1 is the "absent" sentinel (the signals map can't carry null): it means
+      // no responded post-flip stimulus, so switch latency is undefined.
+      // Downstream consumers MUST exclude -1 before averaging latencies.
       switch_latency_ms: evaluation.switchLatencyMs ?? -1,
       perseveration: evaluation.perseverationCount,
       overall_accuracy: evaluation.overallAccuracy,
       correct,
+      // -1 = no interaction at all (player never responded); exclude before averaging.
       time_to_interaction: firstResponseRtRef.current ?? -1,
       elapsed: atMs - streamStartMs,
     }),
@@ -347,6 +351,9 @@ function RuleFlipStream({
       });
 
       // First meaningful input across the whole stream: record the attempt once.
+      // `attemptCount` here is card-level (one streamed attempt), matching the
+      // single-answer templates — the granular per-stimulus engagement lives in
+      // the accuracy/perseveration signals, not in attemptCount.
       if (!firstResponseRef.current) {
         firstResponseRef.current = true;
         firstResponseRtRef.current = rt;
