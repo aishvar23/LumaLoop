@@ -22,6 +22,7 @@ import type { ComponentType, ReactNode } from 'react';
 
 import type { LiquidCard, TemplateType } from '../cards/types';
 import type { TemplateProps } from '../templates/contract';
+import SpotItCard from '../templates/spotIt/SpotItCard';
 
 /**
  * A template renderer: a component that accepts {@link TemplateProps} for its
@@ -72,3 +73,16 @@ export function resolveRenderer(
 
 /** A rendered card element (or `null` when nothing is in play / renderable). */
 export type ActiveCardElement = ReactNode;
+
+/**
+ * The concrete registry the app ships with. Each template task (#64-67) wires
+ * its own slot here as its renderer lands; the controller stays untouched
+ * because adding a template is a single localized entry (CLAUDE.md §6).
+ *
+ * Partial by design: templates without a shipped renderer yet are simply
+ * absent, and the controller fails safe on a missing slot (see
+ * {@link resolveRenderer}).
+ */
+export const defaultRendererRegistry: RendererRegistry = {
+  spot_it: SpotItCard,
+};
