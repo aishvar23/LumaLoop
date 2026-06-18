@@ -3,14 +3,20 @@
  * (Azure DevOps #64; Technical Design §4, §7).
  *
  * `resolveRenderer` is the fail-safe lookup the controller relies on; the
- * default registry is the concrete map the app ships with. `spot_it` (#64) and
- * `what_changed` (#65) are wired so far — the remaining templates (#66-67)
- * register their own slots.
+ * default registry is the concrete map the app ships with. `spot_it` (#64),
+ * `what_changed` (#65), and `rule_flip` (#66) are wired so far — the remaining
+ * template (#67) registers its own slot.
  */
 
 import { describe, expect, it } from 'vitest';
 
-import type { LiquidCard, SpotItCard, WhatChangedCard } from '../cards/types';
+import type {
+  LiquidCard,
+  RuleFlipCard,
+  SpotItCard,
+  WhatChangedCard,
+} from '../cards/types';
+import RuleFlipCardRenderer from '../templates/ruleFlip/RuleFlipCard';
 import SpotItCardRenderer from '../templates/spotIt/SpotItCard';
 import WhatChangedCardRenderer from '../templates/whatChanged/WhatChangedCard';
 import { defaultRendererRegistry, resolveRenderer } from './rendererRegistry';
@@ -67,6 +73,35 @@ function whatChangedCard(): WhatChangedCard {
   };
 }
 
+function ruleFlipCard(): RuleFlipCard {
+  return {
+    cardId: 'rf-1',
+    creatorHandle: '@test',
+    templateType: 'rule_flip',
+    category: 'cognitive_flexibility',
+    difficulty: 'easy',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 12,
+    prompt: 'Apply the rule — it will change',
+    puzzleDna: { mechanic: 'm', inputMode: 'tap', measuredSignals: ['correct'] },
+    explanation: { title: 't', body: 'b' },
+    config: {
+      timeLimitMs: 15_000,
+      stimulusDurationMs: 1_000,
+      interStimulusGapMs: 300,
+      initialRuleLabel: 'Tap red',
+      flippedRuleLabel: 'Tap blue',
+      flipAtStimulusIndex: 2,
+      stimuli: [
+        { id: 's0', label: 'A', matchesInitialRule: true, matchesFlippedRule: false },
+        { id: 's1', label: 'B', matchesInitialRule: false, matchesFlippedRule: true },
+        { id: 's2', label: 'C', matchesInitialRule: true, matchesFlippedRule: false },
+      ],
+    },
+  };
+}
+
 describe('defaultRendererRegistry', () => {
   it('wires the spot_it renderer', () => {
     expect(defaultRendererRegistry.spot_it).toBe(SpotItCardRenderer);
@@ -74,6 +109,10 @@ describe('defaultRendererRegistry', () => {
 
   it('wires the what_changed renderer', () => {
     expect(defaultRendererRegistry.what_changed).toBe(WhatChangedCardRenderer);
+  });
+
+  it('wires the rule_flip renderer', () => {
+    expect(defaultRendererRegistry.rule_flip).toBe(RuleFlipCardRenderer);
   });
 
   it('resolves the spot_it card to its renderer', () => {
@@ -85,6 +124,12 @@ describe('defaultRendererRegistry', () => {
   it('resolves the what_changed card to its renderer', () => {
     expect(resolveRenderer(defaultRendererRegistry, whatChangedCard())).toBe(
       WhatChangedCardRenderer,
+    );
+  });
+
+  it('resolves the rule_flip card to its renderer', () => {
+    expect(resolveRenderer(defaultRendererRegistry, ruleFlipCard())).toBe(
+      RuleFlipCardRenderer,
     );
   });
 
