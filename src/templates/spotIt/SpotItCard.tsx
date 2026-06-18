@@ -21,9 +21,9 @@
 import { useCallback, useRef, useState } from 'react';
 
 import type { SpotItCard as SpotItCardType } from '../../cards/types';
-import type { TemplateProps } from '../contract';
+import type { CardResolution, TemplateProps } from '../contract';
 import { useCardTimer } from '../useCardTimer';
-import { isAnomalyCell } from './spotItEvaluator';
+import { evaluateSpotItTap, isAnomalyCell } from './spotItEvaluator';
 
 /**
  * The renderer accepts the shared {@link TemplateProps} plus an optional
@@ -52,12 +52,27 @@ export default function SpotItCard({
   const firstTapElapsedRef = useRef<number | null>(null);
   const falseTapsRef = useRef(0);
   const attemptCountRef = useRef(0);
+  // Latched once the card resolves (by correct tap OR by timeout) so that any
+  // late tap is ignored — without this, post-resolution taps would keep
+  // incrementing false_taps and re-announcing on an already-finished card.
+  const resolvedRef = useRef(false);
   const [falseTaps, setFalseTaps] = useState(0);
+
+  // Wrap the resolution sink so BOTH resolution paths latch `resolvedRef`: the
+  // renderer's own correct-resolve (via `timer.resolve`) and the hook's timeout
+  // (via its internal `onResolve`) both flow through here exactly once.
+  const handleResolve = useCallback(
+    (resolution: CardResolution) => {
+      resolvedRef.current = true;
+      onResolve(resolution);
+    },
+    [onResolve],
+  );
 
   const timer = useCardTimer({
     card,
     context,
-    onResolve,
+    onResolve: handleResolve,
     now,
     // Read at expiry: report how far the player got before the clock ran out.
     timeoutSignals: () => ({
@@ -70,10 +85,19 @@ export default function SpotItCard({
 
   const handleCellTap = useCallback(
     (row: number, column: number) => {
+      // Once the card has resolved (correct or timeout), taps are inert — no
+      // false_taps increment, no live-region change.
+      if (resolvedRef.current) return;
+
       const tappedAtMs = now();
 
       // First meaningful input: record the attempt exactly once and capture
       // time-to-first-tap off the interaction-enabled origin.
+      //
+      // `attemptCount` is engagement, not a tap tally: it is 0 if the player
+      // never touched the card and 1 once they do (markAttempt runs only on the
+      // first tap). The granular per-tap count lives in `false_taps`, which is
+      // what receipt/telemetry read for search effort (Technical Design §7).
       if (firstTapElapsedRef.current === null) {
         const ttf = tappedAtMs - context.interactionEnabledAtMs;
         firstTapElapsedRef.current = ttf;
@@ -81,7 +105,7 @@ export default function SpotItCard({
         attemptCountRef.current = timer.markAttempt();
       }
 
-      if (!isAnomalyCell(config, row, column)) {
+      if (!evaluateSpotItTap(config, { row, column }).isCorrect) {
         // False tap: count it and let the player keep searching (Design §9.1).
         falseTapsRef.current += 1;
         setFalseTaps(falseTapsRef.current);

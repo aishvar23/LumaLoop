@@ -242,3 +242,44 @@ describe('timeout', () => {
     expect(onResolve).toHaveBeenCalledTimes(1); // no second resolution
   });
 });
+
+// ---------------------------------------------------------------------------
+// Post-resolution taps are inert (no false_taps, no live-region change).
+// ---------------------------------------------------------------------------
+
+describe('taps after the card has resolved', () => {
+  it('ignores taps after a correct resolution (no false_taps, no announce)', () => {
+    let clock = 1_200;
+    const { onResolve } = renderCard({ now: () => clock });
+
+    clock = 2_000;
+    tapCell(1, 2); // correct — card is now resolved
+    expect(onResolve).toHaveBeenCalledTimes(1);
+    expect(lastResolution(onResolve).signals.false_taps).toBe(0);
+
+    // A wrong tap after resolution must be a no-op.
+    clock = 2_500;
+    tapCell(0, 0);
+
+    expect(onResolve).toHaveBeenCalledTimes(1); // still just the one resolution
+    expect(screen.getByRole('status')).toHaveTextContent(''); // no "incorrect tap"
+  });
+
+  it('ignores taps after a timeout resolution', () => {
+    let clock = 1_200;
+    const { onResolve } = renderCard({ now: () => clock });
+
+    // Time the card out without ever finding the anomaly.
+    clock = 11_200;
+    act(() => void vi.advanceTimersByTime(10_000));
+    expect(onResolve).toHaveBeenCalledTimes(1);
+    expect(lastResolution(onResolve).resolutionType).toBe('timeout');
+
+    // A tap after timeout must not increment false_taps or re-announce.
+    clock = 11_500;
+    tapCell(0, 0);
+
+    expect(onResolve).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('status')).toHaveTextContent('');
+  });
+});

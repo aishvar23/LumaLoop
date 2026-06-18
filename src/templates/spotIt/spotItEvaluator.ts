@@ -29,7 +29,14 @@ export type GridCell = { row: number; column: number };
 /** The result of evaluating a single tap. */
 export type SpotItTapResult = { isCorrect: boolean };
 
-/** True iff (`row`, `column`) is the grid's anomaly cell. */
+/**
+ * True iff (`row`, `column`) is the grid's anomaly cell.
+ *
+ * This predicate has two distinct callers and is exported for both: the
+ * renderer uses it for DISPLAY (which glyph each cell shows), while
+ * {@link evaluateSpotItTap} uses it for the CORRECTNESS decision. Keeping the
+ * predicate shared means display and scoring can never drift apart.
+ */
 export function isAnomalyCell(
   grid: SpotItGrid,
   row: number,
@@ -38,17 +45,11 @@ export function isAnomalyCell(
   return row === grid.anomalyRow && column === grid.anomalyColumn;
 }
 
-/** Row-major flat index of a cell, for index-addressed callers. */
-export function cellIndex(grid: SpotItGrid, row: number, column: number): number {
-  return row * grid.columns + column;
-}
-
-/** True iff the flat (row-major) `index` addresses the anomaly cell. */
-export function isAnomalyAtIndex(grid: SpotItGrid, index: number): boolean {
-  return index === cellIndex(grid, grid.anomalyRow, grid.anomalyColumn);
-}
-
-/** Evaluate a tap by grid position; the renderer's single source of truth. */
+/**
+ * Evaluate a tap by grid position. This is the renderer's single source of
+ * truth for tap correctness: `SpotItCard` routes every tap through here rather
+ * than re-deriving the anomaly check inline.
+ */
 export function evaluateSpotItTap(
   grid: SpotItGrid,
   tap: GridCell,

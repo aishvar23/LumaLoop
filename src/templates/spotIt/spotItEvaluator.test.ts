@@ -8,12 +8,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { SpotItGrid } from './spotItEvaluator';
-import {
-  cellIndex,
-  evaluateSpotItTap,
-  isAnomalyAtIndex,
-  isAnomalyCell,
-} from './spotItEvaluator';
+import { evaluateSpotItTap, isAnomalyCell } from './spotItEvaluator';
 
 // A 3×4 grid with the anomaly at (row 1, column 2).
 const grid: SpotItGrid = {
@@ -60,19 +55,5 @@ describe('evaluateSpotItTap', () => {
   it('reports any other tap as incorrect', () => {
     expect(evaluateSpotItTap(grid, { row: 0, column: 0 })).toEqual({ isCorrect: false });
     expect(evaluateSpotItTap(grid, { row: 2, column: 3 })).toEqual({ isCorrect: false });
-  });
-});
-
-describe('flat-index helpers', () => {
-  it('computes the row-major flat index', () => {
-    expect(cellIndex(grid, 0, 0)).toBe(0);
-    expect(cellIndex(grid, 1, 2)).toBe(6); // 1*4 + 2
-    expect(cellIndex(grid, 2, 3)).toBe(11);
-  });
-
-  it('matches the anomaly by flat index', () => {
-    expect(isAnomalyAtIndex(grid, 6)).toBe(true);
-    expect(isAnomalyAtIndex(grid, 0)).toBe(false);
-    expect(isAnomalyAtIndex(grid, 11)).toBe(false);
   });
 });
