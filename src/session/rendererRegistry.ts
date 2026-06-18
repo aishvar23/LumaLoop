@@ -22,6 +22,7 @@ import type { ComponentType, ReactNode } from 'react';
 
 import type { LiquidCard, TemplateType } from '../cards/types';
 import type { TemplateProps } from '../templates/contract';
+import RuleFlipCard from '../templates/ruleFlip/RuleFlipCard';
 import SpotItCard from '../templates/spotIt/SpotItCard';
 import WhatChangedCard from '../templates/whatChanged/WhatChangedCard';
 
@@ -87,4 +88,5 @@ export type ActiveCardElement = ReactNode;
 export const defaultRendererRegistry: RendererRegistry = {
   spot_it: SpotItCard,
   what_changed: WhatChangedCard,
+  rule_flip: RuleFlipCard,
 };
