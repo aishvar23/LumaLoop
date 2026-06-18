@@ -32,8 +32,9 @@
  *
  * Accessibility (Technical Design §14): options are real `<button>`s, large
  * (≥ `--tap-target-min`), labeled, and keyboard-focusable; selection state is
- * conveyed by an explicit `aria-pressed` + text affordance, never by colour
- * alone.
+ * conveyed by an explicit `aria-pressed` on each option plus a polite
+ * `role="status"` live region that announces the committed choice, never by
+ * colour alone.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -214,6 +215,14 @@ function WhatChangedAnswer({
     [card.cardId, config, context.activeAtMs, answerStartMs, now, onAttempt, timer],
   );
 
+  // The committed selection drives a polite live-region announcement so the
+  // choice is conveyed to assistive tech without relying on the `aria-pressed`
+  // visual state alone (Technical Design §14). This renderer does not reveal
+  // correctness to the player, so the announcement names the chosen option only.
+  const selectedLabel = selectedId
+    ? (config.options.find((option) => option.id === selectedId)?.label ?? null)
+    : null;
+
   return (
     <>
       <PatternStrip
@@ -238,6 +247,9 @@ function WhatChangedAnswer({
           );
         })}
       </div>
+      <p role="status" aria-live="polite" style={liveRegionStyle}>
+        {selectedLabel ? `Selected: ${selectedLabel}` : ''}
+      </p>
     </>
   );
 }
@@ -325,4 +337,11 @@ const optionStyle = {
   fontSize: 'var(--font-size-md)',
   fontFamily: 'var(--font-sans)',
   cursor: 'pointer',
+} as const;
+
+const liveRegionStyle = {
+  margin: 0,
+  minHeight: 'var(--font-size-md)',
+  fontSize: 'var(--font-size-sm)',
+  color: 'var(--color-text-muted)',
 } as const;

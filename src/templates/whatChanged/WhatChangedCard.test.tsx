@@ -217,6 +217,42 @@ describe('selecting the correct option', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Accessibility — selection is conveyed by aria-pressed + a polite live region,
+// never by colour alone (Tech §14, parity with the Spot It renderer).
+// ---------------------------------------------------------------------------
+
+describe('selection accessibility', () => {
+  it('starts the answer phase with an empty polite live region', () => {
+    let clock = 1_000;
+    renderCard({ now: () => clock });
+
+    clock = 3_000;
+    advancePreview(2_000);
+
+    const liveRegion = screen.getByRole('status');
+    expect(liveRegion).toHaveAttribute('aria-live', 'polite');
+    expect(liveRegion).toHaveTextContent('');
+  });
+
+  it('announces the committed choice in the live region when an option is selected', () => {
+    let clock = 1_000;
+    renderCard({ now: () => clock });
+
+    clock = 3_000;
+    advancePreview(2_000);
+
+    clock = 4_000;
+    selectOption('opt-2');
+
+    // The chosen option's label is announced, and the button reports its pressed
+    // state — selection is conveyed without relying on colour.
+    expect(screen.getByRole('status')).toHaveTextContent('Selected: Second changed');
+    expect(screen.getByTestId('wc-option-opt-2')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('wc-option-opt-1')).toHaveAttribute('aria-pressed', 'false');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Wrong selection — single-choice resolves incorrect on the first commit.
 // ---------------------------------------------------------------------------
 
