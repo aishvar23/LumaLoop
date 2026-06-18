@@ -18,7 +18,6 @@
  * / employment framing — neutral "performance categories" language only.
  */
 
-import { MODE_DEFAULTS } from './sessionTypes';
 import type { SessionMode } from './sessionTypes';
 import type { CardResolution } from '../templates/contract';
 import type { ChallengeCategory } from '../cards/types';
@@ -67,6 +66,16 @@ export type SessionSummaryInput = {
   mode: SessionMode;
   resolutions: readonly CardResolution[];
   categoryOf: CategoryLookup;
+  /**
+   * Whether the user "left on time" — i.e. the session reached its bounded end
+   * (Design §8.3: "after the bounded card count OR timer completes"), which is
+   * the reducer's terminal `completed` status. The controller owns the clock
+   * and the terminal status, so it supplies this; the pure summary must NOT
+   * infer it from card count (a duration-limited session that completes with
+   * fewer than `maxCards` still earned the badge). `false` for a session the
+   * user abandoned mid-window (`exited`).
+   */
+  completedOnTime: boolean;
 };
 
 /**
@@ -96,11 +105,13 @@ function median(values: readonly number[]): number {
  *   correct (Technical Design §7).
  * - `accuracy = correctCards / completedCards`, in [0, 1]. With zero completed
  *   cards accuracy is defined as 0 (no division by zero).
- * - `fastestCorrectCard` ranks CORRECT cards only (§9: "Only resolutionType
- *   'correct' cards are eligible") by `elapsedMs` — the time field §9's struct
- *   names. (`interactionElapsedMs` is the input-only measure; §9 selects the
- *   full `elapsedMs`.) Ties break on FIRST OCCURRENCE in `resolutions` (stable).
- *   Absent (`undefined`) when there were no correct cards.
+ * - `fastestCorrectCard` ranks cards with `resolutionType === 'correct'` only
+ *   (§9 verbatim: "Only `resolutionType: 'correct'` cards are eligible") by
+ *   `elapsedMs` — the time field §9's struct names. (`interactionElapsedMs` is
+ *   the input-only measure; §9 selects the full `elapsedMs`.) `resolutionType`
+ *   is the spec's eligibility key, distinct from `isCorrect`. Ties break on
+ *   FIRST OCCURRENCE in `resolutions` (stable). Absent (`undefined`) when there
+ *   were no correct cards.
  * - `totalElapsedMs` sums `elapsedMs` across every completed card.
  * - `categoryBreakdown` groups resolutions by their injected category;
  *   `medianElapsedMs` is the median `elapsedMs` over that category's attempted
@@ -108,17 +119,17 @@ function median(values: readonly number[]): number {
  *   mirrors the "this session included …" receipt copy). Cards with no resolved
  *   category are omitted from the breakdown (but still counted overall).
  * - `earnedExitBadge`: Design §8.3/§8.4 — "Exit badge when the user leaves on
- *   time", i.e. they completed the bounded session rather than abandoning it.
- *   DECISION: the pure summary is handed no session timing/status, so the
- *   neutral, testable criterion is reaching the mode's bounded card count:
- *   `completedCards >= MODE_DEFAULTS[mode].maxCards`. (Duration-based early
- *   completion is the controller's concern and is intentionally out of scope
- *   for this pure function.)
+ *   time". This is a property of HOW the session ended, not of card count: a
+ *   session that completes on the duration timer with fewer than `maxCards`
+ *   still earned it. The summary therefore takes the boundary signal
+ *   `completedOnTime` (the controller's terminal `completed` status, from
+ *   either the card-count OR the duration limit) and the badge is exactly that
+ *   signal — never inferred from `completedCards`.
  */
 export function computeSessionSummary(
   input: SessionSummaryInput,
 ): SessionSummary {
-  const { sessionId, mode, resolutions, categoryOf } = input;
+  const { sessionId, mode, resolutions, categoryOf, completedOnTime } = input;
 
   const completedCards = resolutions.length;
   const correctCards = resolutions.reduce(
@@ -128,11 +139,12 @@ export function computeSessionSummary(
   const accuracy = completedCards === 0 ? 0 : correctCards / completedCards;
   const totalElapsedMs = resolutions.reduce((sum, r) => sum + r.elapsedMs, 0);
 
-  // Fastest CORRECT card by elapsedMs; ties resolve to the first occurrence
-  // (strict `<` keeps the earliest of equal times).
+  // Fastest card with resolutionType 'correct' (§9's eligibility key) by
+  // elapsedMs; ties resolve to the first occurrence (strict `<` keeps the
+  // earliest of equal times).
   let fastestCorrectCard: SessionSummary['fastestCorrectCard'];
   for (const r of resolutions) {
-    if (!r.isCorrect) {
+    if (r.resolutionType !== 'correct') {
       continue;
     }
     if (
@@ -180,7 +192,7 @@ export function computeSessionSummary(
     };
   });
 
-  const earnedExitBadge = completedCards >= MODE_DEFAULTS[mode].maxCards;
+  const earnedExitBadge = completedOnTime;
 
   return {
     sessionId,
