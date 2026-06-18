@@ -23,6 +23,7 @@ import type { ComponentType, ReactNode } from 'react';
 import type { LiquidCard, TemplateType } from '../cards/types';
 import type { TemplateProps } from '../templates/contract';
 import SpotItCard from '../templates/spotIt/SpotItCard';
+import WhatChangedCard from '../templates/whatChanged/WhatChangedCard';
 
 /**
  * A template renderer: a component that accepts {@link TemplateProps} for its
@@ -85,4 +86,5 @@ export type ActiveCardElement = ReactNode;
  */
 export const defaultRendererRegistry: RendererRegistry = {
   spot_it: SpotItCard,
+  what_changed: WhatChangedCard,
 };
