@@ -33,6 +33,18 @@ describe('ExitControl', () => {
     expect(onExit).toHaveBeenCalledTimes(1);
   });
 
+  it('moves focus to the non-destructive choice and announces the confirm', () => {
+    render(<ExitControl onExit={() => {}} />);
+
+    fireEvent.click(screen.getByTestId('exit-open'));
+
+    // Focus lands on "Keep playing" (not dropped to <body>), and the prompt is
+    // a polite live region so it is announced on reveal.
+    expect(screen.getByTestId('exit-cancel')).toHaveFocus();
+    const prompt = screen.getByText(/end this session\?/i);
+    expect(prompt).toHaveAttribute('aria-live', 'polite');
+  });
+
   it('cancelling the confirm keeps the session without leaving', () => {
     const onExit = vi.fn();
     render(<ExitControl onExit={onExit} />);

@@ -21,6 +21,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { catalog } from '../cards/catalog';
 import type { ChallengeCategory } from '../cards/types';
 import { composeSession } from '../session/composeSession';
+import { continueSeedUserId } from './continueSeed';
 import { computeSessionSummary } from '../session/sessionSummary';
 import type { SessionCardInput } from '../session/useSessionController';
 import { useSessionController } from '../session/useSessionController';
@@ -116,10 +117,7 @@ export function FeedSession({
   // documented "deterministic per (user, day, mode)" contract.
   const deck = useMemo<ReadonlyArray<SessionCardInput>>(() => {
     if (cards) return cards;
-    const seedUserId =
-      continueCount === 0
-        ? anonymousUserId
-        : `${anonymousUserId}#continue-${continueCount}`;
+    const seedUserId = continueSeedUserId(anonymousUserId, continueCount);
     return composeSession({ mode, anonymousUserId: seedUserId, day });
   }, [cards, mode, anonymousUserId, day, continueCount]);
 

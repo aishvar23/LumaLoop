@@ -16,6 +16,8 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { TinyLogicCard } from '../cards/types';
+import { composeSession } from '../session/composeSession';
+import { continueSeedUserId } from './continueSeed';
 import SessionRoute, { FeedSession } from './SessionRoute';
 
 // ---------------------------------------------------------------------------
@@ -269,5 +271,45 @@ describe('FeedSession — exit + intentional continue', () => {
     expect(screen.getByRole('progressbar')).toBeInTheDocument();
     expect(screen.getByTestId('tl-stem')).toBeInTheDocument();
     expect(screen.queryByTestId('session-complete-seam')).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Continue-deck seed decision (#72): the first window keeps the plain seed; each
+// continue varies the seed so composition reshuffles the same pool.
+// ---------------------------------------------------------------------------
+
+describe('continueSeedUserId', () => {
+  it('keeps the plain id for the first window and suffixes the counter after', () => {
+    expect(continueSeedUserId('anon-local-dev', 0)).toBe('anon-local-dev');
+    expect(continueSeedUserId('anon-local-dev', 1)).toBe(
+      'anon-local-dev#continue-1',
+    );
+    expect(continueSeedUserId('anon-local-dev', 2)).toBe(
+      'anon-local-dev#continue-2',
+    );
+  });
+
+  it('varies the composed deck across continue windows (real composition)', () => {
+    const base = 'anon-local-dev';
+    const day = '2026-06-19';
+    // composeSession returns an ordered list of cardIds (readonly string[]).
+    const first = composeSession({
+      mode: 'three_minute_reset',
+      anonymousUserId: continueSeedUserId(base, 0),
+      day,
+    });
+    const afterContinue = composeSession({
+      mode: 'three_minute_reset',
+      anonymousUserId: continueSeedUserId(base, 1),
+      day,
+    });
+
+    // The first window is the documented plain-seed baseline...
+    expect(
+      composeSession({ mode: 'three_minute_reset', anonymousUserId: base, day }),
+    ).toEqual(first);
+    // ...and a continue produces a different ordered deck (seed actually varied).
+    expect(afterContinue).not.toEqual(first);
   });
 });

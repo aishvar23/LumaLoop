@@ -50,12 +50,21 @@ export default function ExitControl({ onExit }: ExitControlProps) {
       aria-label="End this session?"
       data-testid="exit-confirm"
     >
-      <p style={{ margin: 0, textAlign: 'center', color: 'var(--color-text-muted)' }}>
+      {/* Announce the confirm prompt (polite) since revealing it replaces the
+          trigger button and moves focus. */}
+      <p
+        role="status"
+        aria-live="polite"
+        style={{ margin: 0, textAlign: 'center', color: 'var(--color-text-muted)' }}
+      >
         End this session? Your progress so far is saved to your receipt.
       </p>
       <Cluster gap={2} justify="center">
+        {/* Land focus on the non-destructive choice when the confirm appears, so
+            keyboard / SR users aren't dropped to <body>. */}
         <Button
           variant="ghost"
+          autoFocus
           data-testid="exit-cancel"
           onClick={() => setConfirming(false)}
         >
