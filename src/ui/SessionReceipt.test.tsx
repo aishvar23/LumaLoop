@@ -123,10 +123,31 @@ describe('SessionReceipt', () => {
   });
 
   it('keeps copy within the positioning guardrails (no trait/ability claims)', () => {
-    const { container } = render(<SessionReceipt summary={summary()} />);
+    // Render EVERY performance category so all CATEGORY_LABELS are exercised —
+    // a future label/copy regression in any category is caught, not just the two
+    // that happen to be in the default fixture.
+    const allCategories = summary({
+      categoryBreakdown: (
+        [
+          'visual_attention',
+          'working_memory',
+          'logical_reasoning',
+          'cognitive_flexibility',
+          'pattern_recognition',
+          'processing_speed',
+        ] as const
+      ).map((category) => ({
+        category,
+        attempted: 2,
+        correct: 1,
+        medianElapsedMs: 5_000,
+      })),
+    });
+    const { container } = render(<SessionReceipt summary={allCategories} />);
     const text = container.textContent ?? '';
+    // Widened forbidden-term list: trait/ability/clinical/employment framing.
     expect(text).not.toMatch(
-      /\b(IQ|trait|traits|intelligence|brain[- ]?training|clinical|diagnos)/i,
+      /\b(IQ|trait|traits|intelligence|smart|genius|ability|abilities|aptitude|brain[- ]?training|clinical|diagnos|disorder|employment|hire|hiring)\b/i,
     );
   });
 });

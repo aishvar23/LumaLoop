@@ -54,8 +54,11 @@ function formatElapsed(ms: number): string {
   if (totalSeconds < 60) {
     return `${totalSeconds.toFixed(1)}s`;
   }
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = Math.round(totalSeconds - minutes * 60);
+  // Round to whole seconds FIRST, then divmod, so a boundary value can never
+  // render "1m 60s" (e.g. 119_500ms → 120s → "2m 0s", not "1m 60s").
+  const wholeSeconds = Math.round(totalSeconds);
+  const minutes = Math.floor(wholeSeconds / 60);
+  const seconds = wholeSeconds - minutes * 60;
   return `${minutes}m ${seconds}s`;
 }
 
