@@ -126,9 +126,11 @@ export function FeedSession({
           >
             Session complete
           </h1>
+          {/* SEAM FOR #71: the real session summary replaces this line. Keep
+              user-facing copy free of internal task jargon. */}
           <p style={{ margin: 0, color: 'var(--color-text-muted)' }}>
-            You finished the {MODE_LABELS[mode]} session. Your receipt lands in
-            #71.
+            You finished the {MODE_LABELS[mode]} session. Your session summary is
+            coming soon.
           </p>
         </Stack>
       </Screen>

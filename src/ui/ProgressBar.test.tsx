@@ -16,6 +16,8 @@ describe('ProgressBar', () => {
     render(<ProgressBar index={0} total={7} />);
 
     const bar = screen.getByRole('progressbar');
+    // The progressbar has an accessible NAME, not just a value.
+    expect(bar).toHaveAccessibleName('Session progress');
     expect(bar).toHaveAttribute('aria-valuemin', '0');
     expect(bar).toHaveAttribute('aria-valuemax', '7');
     // Zero cards completed while the first card is in play.

@@ -3,10 +3,10 @@
  * Design §8, §14). Presentational only: it reflects the controller's
  * `index` / `total`, it does not own progression.
  *
- * Accessibility (Technical Design §14): a real `role="progressbar"` with
- * `aria-valuemin` / `aria-valuemax` / `aria-valuenow`, plus an `aria-valuetext`
- * and matching visible label so the position is conveyed as text — never by the
- * fill width (colour/size) alone.
+ * Accessibility (Technical Design §14): a real `role="progressbar"` with a
+ * static `aria-label` accessible name, `aria-valuemin` / `aria-valuemax` /
+ * `aria-valuenow`, plus an `aria-valuetext` and matching visible label so the
+ * position is conveyed as text — never by the fill width (colour/size) alone.
  */
 
 export type ProgressBarProps = {
@@ -29,6 +29,10 @@ export default function ProgressBar({ index, total }: ProgressBarProps) {
     <div style={wrapperStyle}>
       <div
         role="progressbar"
+        // A static accessible NAME for the control ("what is this?"); the
+        // position ("where are we?") is the value, carried by aria-valuetext and
+        // the visible label. Without this the progressbar has no accessible name.
+        aria-label="Session progress"
         aria-valuemin={0}
         aria-valuemax={total}
         aria-valuenow={completed}

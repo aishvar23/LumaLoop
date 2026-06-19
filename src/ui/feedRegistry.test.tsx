@@ -168,6 +168,11 @@ describe('FeedbackGate — feedback + explanation step', () => {
     const feedback = screen.getByTestId('card-feedback');
     expect(feedback).toHaveAttribute('data-outcome', 'correct');
     expect(screen.getByText('Correct')).toBeInTheDocument();
+    // The outcome is announced via a polite live region (populated post-mount so
+    // assistive tech hears the mutation, not silent initial content).
+    const liveRegion = feedback.querySelector('[role="status"][aria-live="polite"]');
+    expect(liveRegion).not.toBeNull();
+    expect(liveRegion).toHaveTextContent('Correct.');
     // The card's authored explanation is shown.
     expect(screen.getByText('Why opt-2 is right')).toBeInTheDocument();
     expect(

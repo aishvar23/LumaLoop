@@ -12,11 +12,17 @@
  * (renderers/feedback never advance the feed directly; Technical Design §4).
  *
  * Non-modal by design (Technical Design §14 "No nested modal game experiences"):
- * this renders in-flow as a `<section>`, never as an overlay/dialog. The result
- * line is a polite live region so assistive tech hears the outcome; the
- * explanation is plain headed copy (not a second live region) so the outcome is
- * announced exactly once.
+ * this renders in-flow as a `<section>`, never as an overlay/dialog.
+ *
+ * The outcome is announced via a dedicated polite live region whose text is set
+ * AFTER mount (empty on first paint, then the outcome in an effect): a live
+ * region reliably announces a MUTATION, not content already present on a freshly
+ * inserted node, so populating it post-mount is what guarantees assistive tech
+ * hears the outcome. The visible heading/detail are plain (non-live) text so the
+ * outcome is announced exactly once; the explanation is plain headed copy too.
  */
+
+import { useEffect, useState } from 'react';
 
 import type { CardResolution, ResolutionType } from '../templates/contract';
 import Button from './Button';
@@ -53,6 +59,13 @@ export default function CardFeedback({
   const heading = OUTCOME_HEADING[resolution.resolutionType];
   const detail = OUTCOME_DETAIL[resolution.resolutionType];
 
+  // Populate the live region AFTER mount so it announces as a mutation. Keyed on
+  // the outcome so a new card's feedback re-announces.
+  const [announced, setAnnounced] = useState('');
+  useEffect(() => {
+    setAnnounced(`${heading}. ${detail}`);
+  }, [heading, detail]);
+
   return (
     <section
       aria-label="Card feedback"
@@ -61,9 +74,15 @@ export default function CardFeedback({
       style={sectionStyle}
     >
       <Stack gap={3}>
-        {/* Outcome — announced once (polite). Not colour-only: the outcome word
-            itself carries the meaning (Technical Design §14). */}
-        <div role="status" aria-live="polite">
+        {/* Dedicated polite live region — empty on first paint, set post-mount
+            (above) so the outcome reliably announces. Visually hidden; the
+            visible outcome text below carries the meaning on screen. */}
+        <div role="status" aria-live="polite" style={visuallyHidden}>
+          {announced}
+        </div>
+        {/* Visible outcome — plain (non-live) text. Not colour-only: the outcome
+            word itself carries the meaning (Technical Design §14). */}
+        <div>
           <p style={outcomeHeadingStyle}>{heading}</p>
           <p style={outcomeDetailStyle}>{detail}</p>
         </div>
@@ -93,6 +112,20 @@ const sectionStyle = {
   display: 'flex',
   flexDirection: 'column',
   gap: 'var(--space-3)',
+} as const;
+
+/** Off-screen but accessible — carries the announced outcome for assistive tech
+ * without affecting the visible layout. */
+const visuallyHidden = {
+  position: 'absolute',
+  width: 1,
+  height: 1,
+  padding: 0,
+  margin: -1,
+  overflow: 'hidden',
+  clip: 'rect(0, 0, 0, 0)',
+  whiteSpace: 'nowrap',
+  border: 0,
 } as const;
 
 const outcomeHeadingStyle = {

@@ -60,6 +60,15 @@ export function withFeedbackGate(
     const [resolution, setResolution] = useState<CardResolution | null>(null);
 
     if (resolution) {
+      // KNOWN TRADEOFF (tracked: ADO #99). Because we delay the controller's
+      // `onResolve` until "Next", the controller still considers this card
+      // `resolving_card` during the feedback step — so the session duration
+      // timer keeps running while the player reads, and if the window elapses
+      // mid-feedback the controller force-completes and this captured answer is
+      // dropped (its `onResolve` then no-ops). This is inherent to the feed-
+      // layer-only design (controller intentionally untouched, CLAUDE.md §4);
+      // a proper fix is controller territory (#58/#59), deliberately not done
+      // here. Acceptable for the prototype (feedback steps are short).
       return (
         <CardFeedback
           resolution={resolution}
