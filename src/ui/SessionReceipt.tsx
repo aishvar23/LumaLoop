@@ -17,6 +17,8 @@
  * *included*, never as scores a person *has*. This is the highest-risk surface
  * for guardrail violations, so the copy here is deliberately conservative.
  */
+import type { ReactNode } from 'react';
+
 import type { ChallengeCategory } from '../cards/types';
 import { MODE_LABELS } from '../session/sessionTypes';
 import type { SessionSummary } from '../session/sessionSummary';
@@ -81,9 +83,28 @@ function Stat({ label, value }: { label: string; value: string }) {
 export type SessionReceiptProps = {
   /** The pre-computed session summary to render (Technical Design §9). */
   summary: SessionSummary;
+  /**
+   * Whether the session reached its bounded end (`completed`) or the user left
+   * early (`exited`, Design §8.3). Drives ONLY the framing copy — the stats and
+   * the on-time exit badge come entirely from `summary` (a `completedOnTime`
+   * session earns the badge; an early leave does not). Defaults to `completed`
+   * so existing call sites and tests are unaffected. The early-exit copy is
+   * modest, not punitive (Design §8.3 — celebrate completion, never pressure).
+   */
+  outcome?: 'completed' | 'exited';
+  /**
+   * Optional controls rendered below the receipt body — the #72 seam for the
+   * intentional "Keep going" continue control on a completed session. Kept a
+   * slot so the receipt stays presentational and template-agnostic.
+   */
+  footer?: ReactNode;
 };
 
-export default function SessionReceipt({ summary }: SessionReceiptProps) {
+export default function SessionReceipt({
+  summary,
+  outcome = 'completed',
+  footer,
+}: SessionReceiptProps) {
   const {
     mode,
     completedCards,
@@ -94,20 +115,25 @@ export default function SessionReceipt({ summary }: SessionReceiptProps) {
     earnedExitBadge,
   } = summary;
 
+  const exited = outcome === 'exited';
+
   return (
     <Screen aria-labelledby="session-complete-heading">
       <Stack gap={5} justify="center" style={{ flex: 1 }}>
-        {/* Celebration — modest: effort + completion, never ability praise. */}
+        {/* Celebration — modest: effort + completion, never ability praise. The
+            early-exit framing is neutral (no "complete" claim, not punitive). */}
         <Stack gap={1} as="header">
           <h1
             id="session-complete-heading"
             data-testid="session-complete-seam"
             style={{ margin: 0, fontSize: 'var(--font-size-xl)' }}
           >
-            Session complete
+            {exited ? 'Session ended' : 'Session complete'}
           </h1>
           <p style={{ margin: 0, color: 'var(--color-text-muted)' }}>
-            Nice work finishing your {MODE_LABELS[mode]} loop.
+            {exited
+              ? `You stepped away from your ${MODE_LABELS[mode]} loop. Here's your progress so far.`
+              : `Nice work finishing your ${MODE_LABELS[mode]} loop.`}
           </p>
         </Stack>
 
@@ -196,6 +222,11 @@ export default function SessionReceipt({ summary }: SessionReceiptProps) {
             </Stack>
           </Stack>
         )}
+
+        {/* Optional controls (e.g. the #72 intentional continue). Rendered as a
+            modest footer so continuing never overshadows finishing (Design
+            §8.3 — the receipt rewards completion, it does not pressure more). */}
+        {footer && <div>{footer}</div>}
       </Stack>
     </Screen>
   );

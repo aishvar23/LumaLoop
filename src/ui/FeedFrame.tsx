@@ -27,12 +27,20 @@ export type FeedFrameProps = {
   index: number;
   /** Total cards composed into this session (the controller's `total`). */
   total: number;
+  /**
+   * Optional exit affordance pinned below the feed (Design §8.3 / Tech §14 —
+   * the exit path must be visually clear). Kept a slot so the frame stays
+   * presentational and owns no session progression (CLAUDE.md §4): the control
+   * itself (#72's {@link ExitControl}) carries the leave action.
+   */
+  exitSlot?: ReactNode;
 };
 
 export default function FeedFrame({
   activeCardElement,
   index,
   total,
+  exitSlot,
 }: FeedFrameProps) {
   return (
     <Screen aria-labelledby="feed-heading" scrollable={false}>
@@ -47,6 +55,9 @@ export default function FeedFrame({
         {/* The active card mounts here in-flow — no overlay, no transition
             screen. Empty between session arm and the first card. */}
         <div style={cardSlotStyle}>{activeCardElement}</div>
+        {/* The exit affordance sits below the card, pinned to the foot of the
+            feed so leaving stays one clear tap away (Design §8.3). */}
+        {exitSlot}
       </Stack>
     </Screen>
   );
