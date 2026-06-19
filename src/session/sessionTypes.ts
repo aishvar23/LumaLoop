@@ -71,6 +71,16 @@ export const MODE_DEFAULTS: Readonly<Record<SessionMode, ModeLimits>> =
   }) satisfies Readonly<Record<SessionMode, ModeLimits>>;
 
 /**
+ * Human-readable label for each session mode (Design §8.1). Single source of
+ * truth so the start-screen choice and any downstream surface (in-session,
+ * receipt) can never show divergent copy for the same mode.
+ */
+export const MODE_LABELS: Readonly<Record<SessionMode, string>> = Object.freeze({
+  one_minute_rescue: '1-minute rescue',
+  three_minute_reset: '3-minute reset',
+});
+
+/**
  * Actions the reducer understands (typed discriminated union — no
  * `Record<string, unknown>`). Clock reads and id generation happen in the
  * caller; the reducer only consumes the values handed to it.

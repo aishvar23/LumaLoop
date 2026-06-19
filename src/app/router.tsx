@@ -12,17 +12,17 @@
  */
 import { Route, Routes } from 'react-router-dom';
 import { ROUTES } from './routes';
+import SessionRoute from './SessionRoute';
 import {
   CardDeepLinkRoutePlaceholder,
   NotFoundRoutePlaceholder,
-  SessionRoutePlaceholder,
 } from './placeholders';
 
 /** The route table. Mount under a router (BrowserRouter / MemoryRouter). */
 export function AppRoutes() {
   return (
     <Routes>
-      <Route path={ROUTES.session} element={<SessionRoutePlaceholder />} />
+      <Route path={ROUTES.session} element={<SessionRoute />} />
       <Route
         path={ROUTES.cardDeepLink}
         element={<CardDeepLinkRoutePlaceholder />}

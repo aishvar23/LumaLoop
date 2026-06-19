@@ -1,28 +1,18 @@
 /**
  * Top-level route placeholder elements (Azure DevOps #52, Technical Design §12).
  *
- * These are deliberately minimal stand-ins so `/` and `/c/:cardId` resolve
- * today. The REAL screens are other tasks and must replace these here:
- *   - Start / Session screen + feed → #69-72
- *   - Session reducer / controller   → #58-59
+ * These are deliberately minimal stand-ins so `/c/:cardId` and unknown paths
+ * resolve today. The REAL screens are other tasks and must replace these here:
  *   - Single-card (deep-link) render → #69-72 (share arrival surface)
- * Routing only selects which element renders; it must never own session
- * progression (CLAUDE.md §4). Keep that boundary when swapping these out.
+ * The `/` session route now mounts the real {@link SessionRoute} container
+ * (#69) — its scaffold placeholder has been retired. Routing only selects which
+ * element renders; it must never own session progression (CLAUDE.md §4). Keep
+ * that boundary when swapping these out.
  */
 import { Link, useParams } from 'react-router-dom';
 import Screen from '../ui/Screen';
 import Stack from '../ui/Stack';
-import StartScreen from '../ui/StartScreen';
 import { ROUTES } from './routes';
-
-/**
- * `/` placeholder. Reuses the scaffold {@link StartScreen} so the "LumaLoop"
- * brand and the required anonymous-data / non-assessment disclaimer stay on the
- * session route until the real Start screen (#69-72) lands.
- */
-export function SessionRoutePlaceholder() {
-  return <StartScreen />;
-}
 
 /**
  * `/c/:cardId` placeholder. Reads and exposes the (already-decoded) `cardId`
