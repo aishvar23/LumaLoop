@@ -16,20 +16,19 @@
  * switches phases. Cards play in-feed: no loading screen, no nested modal
  * (Technical Design §14).
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { catalog } from '../cards/catalog';
+import type { ChallengeCategory } from '../cards/types';
 import { composeSession } from '../session/composeSession';
+import { computeSessionSummary } from '../session/sessionSummary';
 import type { SessionCardInput } from '../session/useSessionController';
 import { useSessionController } from '../session/useSessionController';
 import type { RendererRegistry } from '../session/rendererRegistry';
-import {
-  MODE_LABELS,
-  type SessionMode,
-} from '../session/sessionTypes';
+import { type SessionMode } from '../session/sessionTypes';
 import FeedFrame from '../ui/FeedFrame';
 import { feedRegistry } from '../ui/feedRegistry';
-import Screen from '../ui/Screen';
-import Stack from '../ui/Stack';
+import SessionReceipt from '../ui/SessionReceipt';
 import StartScreen from '../ui/StartScreen';
 
 type Phase =
@@ -100,6 +99,28 @@ export function FeedSession({
     [cards, mode, anonymousUserId, day],
   );
 
+  // cardId -> performance category for the receipt's category mix. Cards passed
+  // by value carry their own `category`; cardId-only decks (production
+  // composition) resolve against the authored catalog. Kept as an injected
+  // lookup so `computeSessionSummary` stays pure (it never imports the catalog).
+  const cardCategoryById = useMemo<ReadonlyMap<string, ChallengeCategory>>(() => {
+    const map = new Map<string, ChallengeCategory>();
+    for (const card of catalog) {
+      map.set(card.cardId, card.category);
+    }
+    for (const card of deck) {
+      if (typeof card !== 'string') {
+        map.set(card.cardId, card.category);
+      }
+    }
+    return map;
+  }, [deck]);
+  const categoryOf = useCallback(
+    (cardId: string): ChallengeCategory | undefined =>
+      cardCategoryById.get(cardId),
+    [cardCategoryById],
+  );
+
   // Arm the session once on mount. `start` is a reducer no-op unless idle, so a
   // re-render can't restart a live session; the ref guards against a duplicate
   // arm within the same idle window.
@@ -111,30 +132,21 @@ export function FeedSession({
     start(mode, deck);
   }, [start, mode, deck]);
 
-  // SEAM FOR #71/#72: the session is over. The receipt (#71) and the
-  // exit/continue controls (#72) mount here, reading `controller.state` /
-  // `controller.results`. This task renders only a clearly-marked completion
-  // surface — it does NOT build the receipt or the exit/continue UI.
+  // The session is over: render the real receipt (#71). The summary is computed
+  // by the pure `computeSessionSummary` (#62) — the UI never recomputes stats.
+  // At this seam the terminal status is `completed`, so the session reached its
+  // bounded end and `completedOnTime` is `true` (the pure fn derives the exit
+  // badge from it). #72 will add the exit/continue controls AROUND this receipt
+  // and supply `completedOnTime: false` on the `exited` path.
   if (controller.status === 'completed') {
-    return (
-      <Screen aria-labelledby="session-complete-heading">
-        <Stack gap={3} justify="center" style={{ flex: 1 }}>
-          <h1
-            id="session-complete-heading"
-            data-testid="session-complete-seam"
-            style={{ margin: 0, fontSize: 'var(--font-size-lg)' }}
-          >
-            Session complete
-          </h1>
-          {/* SEAM FOR #71: the real session summary replaces this line. Keep
-              user-facing copy free of internal task jargon. */}
-          <p style={{ margin: 0, color: 'var(--color-text-muted)' }}>
-            You finished the {MODE_LABELS[mode]} session. Your session summary is
-            coming soon.
-          </p>
-        </Stack>
-      </Screen>
-    );
+    const summary = computeSessionSummary({
+      sessionId: controller.state.sessionId,
+      mode,
+      resolutions: controller.results,
+      categoryOf,
+      completedOnTime: true,
+    });
+    return <SessionReceipt summary={summary} />;
   }
 
   return (

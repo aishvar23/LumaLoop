@@ -168,4 +168,31 @@ describe('FeedSession — in-feed play-through', () => {
     fireEvent.click(screen.getByTestId('feedback-next'));
     expect(screen.getByTestId('session-complete-seam')).toBeInTheDocument();
   });
+
+  it('renders the real receipt with the computed numbers on completion', () => {
+    const deck = [
+      tinyLogicCard('card-1', 'First explanation'),
+      tinyLogicCard('card-2', 'Second explanation'),
+    ];
+
+    render(<FeedSession mode="one_minute_rescue" cards={deck} />);
+
+    // Answer both cards correctly and advance to completion.
+    fireEvent.click(screen.getByTestId('tl-option-a'));
+    fireEvent.click(screen.getByTestId('feedback-next'));
+    fireEvent.click(screen.getByTestId('tl-option-a'));
+    fireEvent.click(screen.getByTestId('feedback-next'));
+
+    // The real receipt surface (not the old placeholder copy).
+    expect(screen.getByTestId('session-complete-seam')).toBeInTheDocument();
+    expect(screen.getByText('Session complete')).toBeInTheDocument();
+    // Computed stats: 2 completed, both correct → 100%, "2 of 2".
+    expect(screen.getByText('2')).toBeInTheDocument();
+    expect(screen.getByText('100%')).toBeInTheDocument();
+    expect(screen.getByText('2 of 2')).toBeInTheDocument();
+    // Category mix attributed via the injected deck's category.
+    expect(screen.getByTestId('category-row-logical_reasoning')).toBeInTheDocument();
+    // Reaching the bounded end earns the exit badge (completedOnTime: true).
+    expect(screen.getByTestId('exit-badge')).toBeInTheDocument();
+  });
 });
