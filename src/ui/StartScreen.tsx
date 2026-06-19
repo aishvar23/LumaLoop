@@ -12,7 +12,11 @@
  * of truth in src/session/sessionTypes.ts) so the copy can never drift from the
  * limits the reducer actually enforces.
  */
-import { MODE_DEFAULTS, type SessionMode } from '../session/sessionTypes';
+import {
+  MODE_DEFAULTS,
+  MODE_LABELS,
+  type SessionMode,
+} from '../session/sessionTypes';
 import Button from './Button';
 import Screen from './Screen';
 import Stack from './Stack';
@@ -33,13 +37,14 @@ function minutesFor(mode: SessionMode): number {
 }
 
 /**
- * Presentational copy for each session choice (Design §8.1). The two choices
- * map one-to-one onto the existing {@link SessionMode} union; their limits come
- * from {@link MODE_DEFAULTS}, never hardcoded here.
+ * The session choices (Design §8.1), in display order. The two choices map
+ * one-to-one onto the existing {@link SessionMode} union; their labels come
+ * from {@link MODE_LABELS} and their limits from {@link MODE_DEFAULTS}, never
+ * hardcoded here, so the start screen can't drift from those sources.
  */
-const MODE_CHOICES: ReadonlyArray<{ mode: SessionMode; label: string }> = [
-  { mode: 'one_minute_rescue', label: '1-minute rescue' },
-  { mode: 'three_minute_reset', label: '3-minute reset' },
+const MODE_CHOICES: ReadonlyArray<SessionMode> = [
+  'one_minute_rescue',
+  'three_minute_reset',
 ];
 
 export type StartScreenProps = {
@@ -84,13 +89,9 @@ export default function StartScreen({ onStart }: StartScreenProps = {}) {
             >
               Before you start
             </h2>
-            <p
-              style={{
-                margin: 0,
-                fontSize: 'var(--font-size-sm)',
-                color: 'var(--color-text-muted)',
-              }}
-            >
+            {/* Default (non-muted) text so the REQUIRED notice (§21.8/§14)
+                reads as required, not as decorative muted copy. */}
+            <p style={{ margin: 0, fontSize: 'var(--font-size-sm)' }}>
               {DATA_NOTICE}
             </p>
           </Stack>
@@ -104,7 +105,8 @@ export default function StartScreen({ onStart }: StartScreenProps = {}) {
             Choose a session
           </h2>
           <Stack gap={2}>
-            {MODE_CHOICES.map(({ mode, label }) => {
+            {MODE_CHOICES.map((mode) => {
+              const label = MODE_LABELS[mode];
               const limits = MODE_DEFAULTS[mode];
               const minutes = minutesFor(mode);
               const detail = `${minutes} minute${

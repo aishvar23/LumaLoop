@@ -20,17 +20,15 @@ import { useState } from 'react';
 import Screen from '../ui/Screen';
 import Stack from '../ui/Stack';
 import StartScreen from '../ui/StartScreen';
-import { MODE_DEFAULTS, type SessionMode } from '../session/sessionTypes';
+import {
+  MODE_DEFAULTS,
+  MODE_LABELS,
+  type SessionMode,
+} from '../session/sessionTypes';
 
 type Phase =
   | { name: 'start' }
   | { name: 'in_progress'; mode: SessionMode };
-
-/** Human-readable label for the placeholder, kept in sync with the docs copy. */
-const MODE_LABELS: Record<SessionMode, string> = {
-  one_minute_rescue: '1-minute rescue',
-  three_minute_reset: '3-minute reset',
-};
 
 export default function SessionRoute() {
   const [phase, setPhase] = useState<Phase>({ name: 'start' });
