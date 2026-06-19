@@ -126,7 +126,12 @@ function defaultBeacon(): BeaconSender | null {
   try {
     const nav = globalThis.navigator;
     if (nav && typeof nav.sendBeacon === 'function') {
-      return (url, body) => nav.sendBeacon(url, body);
+      // Wrap the body in a typed Blob so the browser sends
+      // `Content-Type: application/json` (matching the fetch transport) instead
+      // of the `text/plain` it would force for a raw string — a
+      // content-type-sensitive `/api/event` handler must parse both identically.
+      return (url, body) =>
+        nav.sendBeacon(url, new Blob([body], { type: 'application/json' }));
     }
   } catch {
     // fall through to null
@@ -262,8 +267,21 @@ export function createTelemetryClient(
       if (!delivered) failed.push(event);
     }
 
-    // Successful events drop out; only failures remain persisted (capped).
-    writeRetryQueue(failed);
+    // Re-read current storage and MERGE rather than blindly overwriting the key:
+    // a `persistFailure` (abandonment fallback) may have written a new event
+    // during the awaits above, and a blind `writeRetryQueue(failed)` would
+    // clobber that best-effort write (a lost-write race). Start from what is
+    // currently persisted, drop the events we delivered this pass, then keep the
+    // ones that failed. Successful events drop out; the cap is re-applied.
+    const remaining = new Map<string, QueuedTelemetryEvent>(
+      readRetryQueue().map((e) => [e.eventId, e]),
+    );
+    const failedIds = new Set(failed.map((e) => e.eventId));
+    for (const event of byId.values()) {
+      if (!failedIds.has(event.eventId)) remaining.delete(event.eventId);
+    }
+    for (const event of failed) remaining.set(event.eventId, event);
+    writeRetryQueue([...remaining.values()]);
   }
 
   function flush(): Promise<void> {

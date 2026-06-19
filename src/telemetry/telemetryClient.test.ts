@@ -351,6 +351,64 @@ describe('transport failure → capped retry queue', () => {
     ]);
   });
 
+  it('does not lose an abandonment failure persisted while a drain is in flight', async () => {
+    // Reproduces the lost-write race: an in-flight `drain` (parked on its
+    // transport await) must not clobber a `persistFailure` write performed by an
+    // abandonment fallback during that await. We gate the drain's transport so it
+    // stays in flight, persist an abandonment failure mid-flight, then release
+    // the drain and assert BOTH events survive.
+    let releaseDrain!: (delivered: boolean) => void;
+    const drainGate = new Promise<boolean>((resolve) => {
+      releaseDrain = resolve;
+    });
+    const transport = vi.fn<TelemetryTransport>(async (_url, body) => {
+      const event = JSON.parse(body) as QueuedTelemetryEvent;
+      // The abandonment fallback resolves immediately (and fails → persists);
+      // the enqueued Card_Resolved drain is held open on the gate.
+      if (event.eventName === TelemetryEventNames.Session_Abandoned) {
+        return false;
+      }
+      return drainGate;
+    });
+    const storage = fakeStorage();
+    const client = createTelemetryClient({
+      beacon: null,
+      transport,
+      storage,
+      generateUuid: sequentialUuids(),
+      now: steppingClock(),
+    });
+
+    // (1) Enqueue a normal event → its flush starts a drain that sends the event
+    // and then parks awaiting `drainGate`. eventId ...0001.
+    client.enqueue(sampleInput({ eventName: TelemetryEventNames.Card_Resolved }));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(transport).toHaveBeenCalledTimes(1); // drain is parked in flight
+
+    // (2) Mid-flight, an abandonment falls back to the transport, fails, and
+    // persists itself to the retry queue. eventId ...0002.
+    client.trackAbandonment(
+      sampleInput({ eventName: TelemetryEventNames.Session_Abandoned }),
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(readQueue(storage).map((e) => e.eventId)).toEqual([
+      '00000000-0000-4000-8000-000000000002',
+    ]);
+
+    // (3) Release the parked drain as a FAILURE so it writes its terminal queue.
+    // The merge must preserve the abandonment write rather than overwrite it.
+    releaseDrain(false);
+    await client.flush();
+
+    const ids = new Set(readQueue(storage).map((e) => e.eventId));
+    // The abandonment event is NOT lost...
+    expect(ids.has('00000000-0000-4000-8000-000000000002')).toBe(true);
+    // ...and the drain's own failed event is still retained too.
+    expect(ids.has('00000000-0000-4000-8000-000000000001')).toBe(true);
+  });
+
   it('bounds growth at DEFAULT_MAX_RETRY_QUEUE_SIZE when no cap is injected', async () => {
     const transport = vi.fn<TelemetryTransport>().mockResolvedValue(false);
     const storage = fakeStorage();
@@ -518,6 +576,42 @@ describe('trackAbandonment', () => {
     });
 
     expect(() => client.trackAbandonment(sampleInput())).not.toThrow();
+  });
+});
+
+describe('default beacon (navigator.sendBeacon) content-type', () => {
+  it('wraps the body in an application/json Blob so the content-type matches the fetch path', () => {
+    // Capture the second argument the DEFAULT beacon hands to sendBeacon. A raw
+    // string would force `text/plain;charset=UTF-8`; we require the JSON Blob.
+    const captured: { url: string; body: unknown }[] = [];
+    const sendBeacon = vi.fn((url: string, body?: BodyInit | null) => {
+      captured.push({ url, body });
+      return true;
+    });
+    vi.stubGlobal('navigator', { sendBeacon });
+    try {
+      // `beacon` omitted → the client resolves the real defaultBeacon(), which
+      // reads the stubbed navigator.sendBeacon.
+      const client = createTelemetryClient({
+        transport: vi.fn<TelemetryTransport>().mockResolvedValue(true),
+        storage: fakeStorage(),
+        generateUuid: sequentialUuids(),
+        now: steppingClock(),
+      });
+
+      client.trackAbandonment(
+        sampleInput({ eventName: TelemetryEventNames.Session_Abandoned }),
+      );
+
+      expect(sendBeacon).toHaveBeenCalledTimes(1);
+      expect(captured).toHaveLength(1);
+      expect(captured[0].url).toBe('/api/event');
+      const body = captured[0].body;
+      expect(body).toBeInstanceOf(Blob);
+      expect((body as Blob).type).toBe('application/json');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 
