@@ -16,7 +16,9 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { TinyLogicCard } from '../cards/types';
+import * as composeSessionModule from '../session/composeSession';
 import { composeSession } from '../session/composeSession';
+import { getAnonymousUserId } from '../telemetry/anonymousUser';
 import { continueSeedUserId } from './continueSeed';
 import SessionRoute, { FeedSession } from './SessionRoute';
 
@@ -63,6 +65,46 @@ describe('SessionRoute', () => {
 
     expect(screen.getByRole('progressbar')).toBeInTheDocument();
     expect(screen.getByText('Card 1 of 3')).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Anonymous-id default (#74): with no `anonymousUserId` prop injected, the feed
+// composes with the real persisted anonymous id (Technical Design §10), not the
+// retired `anon-local-dev` placeholder.
+// ---------------------------------------------------------------------------
+
+describe('FeedSession — anonymous-id default', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('composes with the real persisted anon id when no id prop is injected', () => {
+    const composeSpy = vi.spyOn(composeSessionModule, 'composeSession');
+
+    render(<FeedSession mode="one_minute_rescue" day="2026-06-19" />);
+
+    expect(composeSpy).toHaveBeenCalled();
+    const passedId = composeSpy.mock.calls[0]?.[0].anonymousUserId;
+    // The id fed into composition is the real persisted anonymous id...
+    expect(passedId).toBe(getAnonymousUserId());
+    // ...and NOT the retired placeholder constant.
+    expect(passedId).not.toBe('anon-local-dev');
+  });
+
+  it('still honours an injected fixed anonymousUserId (test seam preserved)', () => {
+    const composeSpy = vi.spyOn(composeSessionModule, 'composeSession');
+    const fixed = 'fixed-anon-id';
+
+    render(
+      <FeedSession
+        mode="one_minute_rescue"
+        day="2026-06-19"
+        anonymousUserId={fixed}
+      />,
+    );
+
+    expect(composeSpy.mock.calls[0]?.[0].anonymousUserId).toBe(fixed);
   });
 });
 

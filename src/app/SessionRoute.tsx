@@ -21,6 +21,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { catalog } from '../cards/catalog';
 import type { ChallengeCategory } from '../cards/types';
 import { composeSession } from '../session/composeSession';
+import { getAnonymousUserId } from '../telemetry/anonymousUser';
 import { continueSeedUserId } from './continueSeed';
 import { computeSessionSummary } from '../session/sessionSummary';
 import type { SessionCardInput } from '../session/useSessionController';
@@ -37,15 +38,6 @@ import StartScreen from '../ui/StartScreen';
 type Phase =
   | { name: 'start' }
   | { name: 'in_progress'; mode: SessionMode };
-
-/**
- * PLACEHOLDER anonymous user id — the SEAM for Azure DevOps #74 (the real
- * anonymous-user identity is NOT built yet). `composeSession` is deterministic
- * per `(anonymousUserId, day, mode)`, so a stable local constant keeps the
- * prototype's composition stable and reproducible until #74 supplies the real
- * id. Do NOT treat this as a user identifier or persist it anywhere.
- */
-const PLACEHOLDER_ANONYMOUS_USER_ID = 'anon-local-dev';
 
 export default function SessionRoute() {
   const [phase, setPhase] = useState<Phase>({ name: 'start' });
@@ -70,6 +62,11 @@ export type FeedSessionProps = {
    */
   registry?: RendererRegistry;
   now?: () => number;
+  /**
+   * Test seam: inject a fixed anonymous id for deterministic composition. When
+   * omitted (real usage), the default resolves to the real persisted anonymous
+   * id from {@link getAnonymousUserId} (Technical Design §10).
+   */
   anonymousUserId?: string;
   day?: string;
   /**
@@ -89,11 +86,21 @@ export function FeedSession({
   mode,
   registry = feedRegistry,
   now,
-  anonymousUserId = PLACEHOLDER_ANONYMOUS_USER_ID,
+  anonymousUserId,
   day,
   cards,
 }: FeedSessionProps) {
   const controller = useSessionController({ registry, now });
+
+  // Resolve the real persisted anonymous id ONCE per mount (Technical Design
+  // §10): a best-effort localStorage identity, generated once. Tests still
+  // inject a fixed `anonymousUserId` to keep composition deterministic — only
+  // the DEFAULT changed, from a constant string to the real persisted id. The
+  // `useState` initializer runs the (best-effort, non-throwing) storage read a
+  // single time, never on every render, so the composed deck stays stable
+  // across renders and the arm-once effect below is not disturbed.
+  const [persistedAnonymousUserId] = useState(getAnonymousUserId);
+  const resolvedAnonymousUserId = anonymousUserId ?? persistedAnonymousUserId;
 
   // How many times the user has chosen to keep playing after completion (#72).
   // Bumped on each intentional continue; folded into the composition seed below
@@ -117,9 +124,9 @@ export function FeedSession({
   // documented "deterministic per (user, day, mode)" contract.
   const deck = useMemo<ReadonlyArray<SessionCardInput>>(() => {
     if (cards) return cards;
-    const seedUserId = continueSeedUserId(anonymousUserId, continueCount);
+    const seedUserId = continueSeedUserId(resolvedAnonymousUserId, continueCount);
     return composeSession({ mode, anonymousUserId: seedUserId, day });
-  }, [cards, mode, anonymousUserId, day, continueCount]);
+  }, [cards, mode, resolvedAnonymousUserId, day, continueCount]);
 
   // cardId -> performance category for the receipt's category mix. Cards passed
   // by value carry their own `category`; cardId-only decks (production
