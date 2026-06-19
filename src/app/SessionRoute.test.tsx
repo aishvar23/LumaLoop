@@ -16,6 +16,8 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { TinyLogicCard } from '../cards/types';
+import { composeSession } from '../session/composeSession';
+import { continueSeedUserId } from './continueSeed';
 import SessionRoute, { FeedSession } from './SessionRoute';
 
 // ---------------------------------------------------------------------------
@@ -194,5 +196,120 @@ describe('FeedSession — in-feed play-through', () => {
     expect(screen.getByTestId('category-row-logical_reasoning')).toBeInTheDocument();
     // Reaching the bounded end earns the exit badge (completedOnTime: true).
     expect(screen.getByTestId('exit-badge')).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Exit + intentional continue (#72; Design §8.3, Technical Design §14).
+// ---------------------------------------------------------------------------
+
+describe('FeedSession — exit + intentional continue', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+  });
+
+  it('offers a clear exit path during the active session, and no skip', () => {
+    const deck = [tinyLogicCard('card-1', 'First explanation')];
+
+    render(<FeedSession mode="one_minute_rescue" cards={deck} />);
+
+    // A card is in play with a visible exit control beneath it...
+    expect(screen.getByTestId('tl-stem')).toHaveTextContent('card-1 stem');
+    expect(screen.getByTestId('exit-control')).toBeInTheDocument();
+    // ...and there is NO skip affordance anywhere in the feed (Tech §14).
+    expect(screen.queryByText(/skip/i)).not.toBeInTheDocument();
+  });
+
+  it('exiting ends the session and shows the receipt with NO exit badge', () => {
+    const deck = [
+      tinyLogicCard('card-1', 'First explanation'),
+      tinyLogicCard('card-2', 'Second explanation'),
+    ];
+
+    render(<FeedSession mode="three_minute_reset" cards={deck} />);
+
+    // Leave mid-session through the deliberate confirm.
+    fireEvent.click(screen.getByTestId('exit-open'));
+    fireEvent.click(screen.getByTestId('exit-confirm-leave'));
+
+    // The exited surface: the receipt, framed as an early exit, with NO on-time
+    // badge (completedOnTime is false for a leave) and no continue control.
+    expect(screen.getByTestId('session-complete-seam')).toBeInTheDocument();
+    expect(screen.getByText('Session ended')).toBeInTheDocument();
+    expect(screen.queryByTestId('exit-badge')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('continue-control')).not.toBeInTheDocument();
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+  });
+
+  it('only continues after completion on an explicit tap, re-arming a new loop', () => {
+    const deck = [
+      tinyLogicCard('card-1', 'First explanation'),
+      tinyLogicCard('card-2', 'Second explanation'),
+    ];
+
+    render(<FeedSession mode="one_minute_rescue" cards={deck} />);
+
+    // Play through to the bounded end.
+    fireEvent.click(screen.getByTestId('tl-option-a'));
+    fireEvent.click(screen.getByTestId('feedback-next'));
+    fireEvent.click(screen.getByTestId('tl-option-a'));
+    fireEvent.click(screen.getByTestId('feedback-next'));
+
+    // Completed receipt: the continue control is present, but the session has
+    // NOT continued on its own — no card is in play (Tech §14: intentional tap).
+    expect(screen.getByTestId('session-complete-seam')).toBeInTheDocument();
+    expect(screen.getByTestId('continue-control')).toBeInTheDocument();
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('tl-stem')).not.toBeInTheDocument();
+
+    // The intentional tap re-arms a fresh active loop: a card is in play again.
+    fireEvent.click(screen.getByTestId('continue-control'));
+    expect(screen.getByRole('progressbar')).toBeInTheDocument();
+    expect(screen.getByTestId('tl-stem')).toBeInTheDocument();
+    expect(screen.queryByTestId('session-complete-seam')).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Continue-deck seed decision (#72): the first window keeps the plain seed; each
+// continue varies the seed so composition reshuffles the same pool.
+// ---------------------------------------------------------------------------
+
+describe('continueSeedUserId', () => {
+  it('keeps the plain id for the first window and suffixes the counter after', () => {
+    expect(continueSeedUserId('anon-local-dev', 0)).toBe('anon-local-dev');
+    expect(continueSeedUserId('anon-local-dev', 1)).toBe(
+      'anon-local-dev#continue-1',
+    );
+    expect(continueSeedUserId('anon-local-dev', 2)).toBe(
+      'anon-local-dev#continue-2',
+    );
+  });
+
+  it('varies the composed deck across continue windows (real composition)', () => {
+    const base = 'anon-local-dev';
+    const day = '2026-06-19';
+    // composeSession returns an ordered list of cardIds (readonly string[]).
+    const first = composeSession({
+      mode: 'three_minute_reset',
+      anonymousUserId: continueSeedUserId(base, 0),
+      day,
+    });
+    const afterContinue = composeSession({
+      mode: 'three_minute_reset',
+      anonymousUserId: continueSeedUserId(base, 1),
+      day,
+    });
+
+    // The first window is the documented plain-seed baseline...
+    expect(
+      composeSession({ mode: 'three_minute_reset', anonymousUserId: base, day }),
+    ).toEqual(first);
+    // ...and a continue produces a different ordered deck (seed actually varied).
+    expect(afterContinue).not.toEqual(first);
   });
 });
