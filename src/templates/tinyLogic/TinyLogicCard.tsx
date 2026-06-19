@@ -163,7 +163,7 @@ export default function TinyLogicCard({
     ? ''
     : selectedId === config.correctOptionId
       ? `Correct: ${selectedLabel}`
-      : `Selected: ${selectedLabel}. See the explanation below.`;
+      : `Incorrect: ${selectedLabel}.`;
 
   return (
     <section aria-label="Tiny logic" style={sectionStyle}>
@@ -194,6 +194,12 @@ export default function TinyLogicCard({
         <aside
           data-testid="tl-explanation"
           aria-label="Explanation"
+          // Announce the post-error corrective feedback itself (not just "see
+          // below"): the explanation is revealed only on a wrong commit, so a
+          // polite live region surfaces it to assistive tech right after the
+          // status region announces the incorrect result (Design §9.4).
+          role="status"
+          aria-live="polite"
           style={explanationStyle}
         >
           <p style={explanationTitleStyle}>{card.explanation.title}</p>

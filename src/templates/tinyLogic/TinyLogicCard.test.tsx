@@ -250,6 +250,8 @@ describe('selecting a wrong option', () => {
     expect(explanation).toHaveTextContent(
       'All A are B, and X is A, so X must be B.',
     );
+    // The corrective feedback is itself announced, not just visually revealed.
+    expect(explanation).toHaveAttribute('aria-live', 'polite');
   });
 
   it('ignores selections after the card has already resolved', () => {
