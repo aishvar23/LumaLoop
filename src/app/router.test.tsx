@@ -23,6 +23,18 @@ describe('AppRoutes', () => {
     ).toBeInTheDocument();
   });
 
+  it('renders the swipe feed preview at `/feed`, leaving `/` untouched', () => {
+    renderAt('/feed');
+    // The endless feed names its landmark with a visually-hidden heading.
+    expect(
+      screen.getByRole('heading', { name: 'Game feed' }),
+    ).toBeInTheDocument();
+    // Preview only (#105): it is NOT the start screen — `/` still owns that.
+    expect(
+      screen.queryByRole('heading', { name: 'LumaLoop' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('renders the deep-link placeholder and exposes the decoded cardId', () => {
     renderAt('/c/card-42');
     expect(

@@ -936,3 +936,22 @@ export const catalog: readonly LiquidCard[] = [
   ...ruleFlipCards,
   ...tinyLogicCards,
 ];
+
+/**
+ * O(1) cardId → card index over the authored {@link catalog}, built once. Both
+ * the session controller and the feed resolve a cardId to its `LiquidCard`
+ * through this single lookup, so neither re-derives the mapping (CLAUDE.md §4 —
+ * the engine/feed stay template-agnostic; this is plain data, not engine logic).
+ */
+const catalogById: ReadonlyMap<string, LiquidCard> = new Map(
+  catalog.map((card) => [card.cardId, card]),
+);
+
+/**
+ * Resolve a `cardId` to its authored {@link LiquidCard}, or `undefined` when the
+ * id is not in the catalog. The shared default for the controller's and feed's
+ * injectable `getCardById` seam.
+ */
+export function getCardById(cardId: string): LiquidCard | undefined {
+  return catalogById.get(cardId);
+}

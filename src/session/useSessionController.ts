@@ -45,7 +45,7 @@ import {
 } from 'react';
 import type { ReactNode } from 'react';
 
-import { catalog } from '../cards/catalog';
+import { getCardById as getCatalogCardById } from '../cards/catalog';
 import type { LiquidCard } from '../cards/types';
 import type { CardResolution, CardStartContext } from '../templates/contract';
 import { initSession, sessionReducer } from './sessionReducer';
@@ -60,16 +60,6 @@ import type { RendererRegistry } from './rendererRegistry';
 // ---------------------------------------------------------------------------
 // Default injectables (all overridable for tests / non-catalog cards).
 // ---------------------------------------------------------------------------
-
-/** Catalog lookup index, built once. Backs the default `getCardById`. */
-const catalogById: ReadonlyMap<string, LiquidCard> = new Map(
-  catalog.map((card) => [card.cardId, card]),
-);
-
-/** Default `getCardById`: resolve a cardId against the authored catalog. */
-function getCatalogCardById(cardId: string): LiquidCard | undefined {
-  return catalogById.get(cardId);
-}
 
 /** Default session-id factory. Prefers `crypto.randomUUID` when available. */
 function defaultGenerateSessionId(): string {
