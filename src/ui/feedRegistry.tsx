@@ -24,7 +24,13 @@
  * one renderer (tiny_logic) that surfaces its own on-error explanation.
  */
 
-import { useState } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from 'react';
 
 import type { LiquidCard, TemplateType } from '../cards/types';
 import type {
@@ -34,6 +40,36 @@ import type {
 import { defaultRendererRegistry } from '../session/rendererRegistry';
 import type { CardResolution, TemplateProps } from '../templates/contract';
 import CardFeedback from './CardFeedback';
+
+/**
+ * Notified once when a card's EXPLANATION step becomes visible — the minimal,
+ * TEMPLATE-AGNOSTIC and TELEMETRY-AGNOSTIC seam for the §10
+ * `Card_Explanation_Viewed` event (#76). It is a plain `(card) => void` callback,
+ * so the feed/UI layer stays decoupled from the telemetry client: `SessionRoute`
+ * supplies a handler through {@link ExplanationViewedProvider} and the gate fires
+ * it. Provided via context (not threaded through the controller's `TemplateProps`)
+ * so the controller stays progression-only and the gate stays generic.
+ */
+export type ExplanationViewedHandler = (card: LiquidCard) => void;
+
+const ExplanationViewedContext = createContext<ExplanationViewedHandler | null>(
+  null,
+);
+
+/** Provide the explanation-viewed handler to the gates rendered beneath it. */
+export function ExplanationViewedProvider({
+  handler,
+  children,
+}: {
+  handler: ExplanationViewedHandler;
+  children: ReactNode;
+}) {
+  return (
+    <ExplanationViewedContext.Provider value={handler}>
+      {children}
+    </ExplanationViewedContext.Provider>
+  );
+}
 
 /**
  * Wraps one renderer so its resolution pauses on the uniform feedback +
@@ -58,6 +94,15 @@ export function withFeedbackGate(
     // per card because the controller keys each card's element by session+index,
     // so every new card mounts a fresh gate.
     const [resolution, setResolution] = useState<CardResolution | null>(null);
+
+    // Fire the explanation-viewed seam exactly once, when the feedback +
+    // explanation step first becomes visible for this card. The gate remounts
+    // per card (keyed by session+index), so `resolution` transitions null→set
+    // a single time per card; the handler is also latched downstream (#76).
+    const onExplanationViewed = useContext(ExplanationViewedContext);
+    useEffect(() => {
+      if (resolution && onExplanationViewed) onExplanationViewed(card);
+    }, [resolution, onExplanationViewed, card]);
 
     if (resolution) {
       // KNOWN TRADEOFF (tracked: ADO #99). Because we delay the controller's
