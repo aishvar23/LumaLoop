@@ -33,6 +33,17 @@ export default tseslint.config(
         'warn',
         { allowConstantExport: true },
       ],
+      // Align eslint with tsc's `noUnusedParameters`: a leading underscore marks
+      // an intentionally-unused binding (e.g. a typed-but-unused mock/callback
+      // parameter), so it must not be flagged as unused.
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+        },
+      ],
     },
   },
   prettier,
