@@ -6,13 +6,16 @@ import {
   assertValidCatalog,
   validateCatalog,
 } from './validation';
-import type {
-  LiquidCard,
-  PuzzleDna,
-  RuleFlipCard,
-  SpotItCard,
-  TinyLogicCard,
-  WhatChangedCard,
+import {
+  templateCategoryMap,
+  type ChallengeCategory,
+  type LiquidCard,
+  type PuzzleDna,
+  type RuleFlipCard,
+  type SpotItCard,
+  type TemplateType,
+  type TinyLogicCard,
+  type WhatChangedCard,
 } from './types';
 
 // ---------------------------------------------------------------------------
@@ -392,6 +395,81 @@ describe('validateCatalog', () => {
     expect(hasRule(result.errors, ValidationRule.NON_EMPTY_PROMPT)).toBe(true);
     expect(hasRule(result.errors, ValidationRule.EVIDENCE_TIER)).toBe(true);
     expect(result.errors.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// templateCategoryMap <-> VALID_CATEGORY_FOR_TEMPLATE consistency (§17 item 7).
+//
+// types.test.ts pins the MAP's shape and catalog.test.ts proves the authored
+// catalog respects it, but nothing proved the validation RULE and the map agree
+// across the full (template x category) cross-product — the existing
+// validateCatalog suite only spot-checks a single invalid pairing. These tests
+// close that loop: every category the map declares valid for a template must be
+// ACCEPTED by validation, and every category it does NOT list must be REJECTED
+// with the VALID_CATEGORY_FOR_TEMPLATE rule. A drift between the map and the
+// validator (in either direction) now fails here.
+// ---------------------------------------------------------------------------
+
+const ALL_TEMPLATE_TYPES: TemplateType[] = [
+  'spot_it',
+  'what_changed',
+  'rule_flip',
+  'tiny_logic',
+];
+
+const ALL_CATEGORIES: ChallengeCategory[] = [
+  'visual_attention',
+  'working_memory',
+  'logical_reasoning',
+  'cognitive_flexibility',
+  'pattern_recognition',
+  'processing_speed',
+];
+
+/** A valid-card factory per template, so only `category` varies under test. */
+const validCardFor: Record<TemplateType, () => LiquidCard> = {
+  spot_it: validSpotIt,
+  what_changed: validWhatChanged,
+  rule_flip: validRuleFlip,
+  tiny_logic: validTinyLogic,
+};
+
+describe('templateCategoryMap <-> validation consistency', () => {
+  for (const templateType of ALL_TEMPLATE_TYPES) {
+    for (const category of ALL_CATEGORIES) {
+      const allowed = templateCategoryMap[templateType].includes(category);
+
+      it(`${allowed ? 'accepts' : 'rejects'} ${templateType} + ${category}`, () => {
+        const card = validCardFor[templateType]();
+        card.category = category;
+        const result = validateCatalog([card]);
+        const flaggedCategory = hasRule(
+          result.errors,
+          ValidationRule.VALID_CATEGORY_FOR_TEMPLATE,
+        );
+
+        if (allowed) {
+          // An allowed pairing must not trip the category rule — and since the
+          // rest of the card is valid, the whole catalog must validate.
+          expect(flaggedCategory).toBe(false);
+          expect(result.valid).toBe(true);
+        } else {
+          // A pairing the map does not list must be rejected by the rule.
+          expect(flaggedCategory).toBe(true);
+        }
+      });
+    }
+  }
+
+  it('every category the map declares is itself a real ChallengeCategory', () => {
+    // Guards against the map listing a category the validator/domain does not
+    // know — which would make the pairing unreachable from any valid catalog.
+    for (const templateType of ALL_TEMPLATE_TYPES) {
+      for (const category of templateCategoryMap[templateType]) {
+        expect(ALL_CATEGORIES).toContain(category);
+      }
+    }
   });
 });
 
