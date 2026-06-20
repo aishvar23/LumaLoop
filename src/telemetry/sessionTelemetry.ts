@@ -157,6 +157,7 @@ export function createSessionTelemetry(
   const resolvedCards = new Set<string>();
   const explanationViewedCards = new Set<string>();
   const completedSessions = new Set<string>();
+  const abandonedSessions = new Set<string>();
   let returnFired = false;
 
   // --- Live context. --------------------------------------------------------
@@ -317,6 +318,14 @@ export function createSessionTelemetry(
 
     buildAbandonmentEvent() {
       if (!inProgress || !currentSessionId) return null;
+      // At-most-once per session (Technical Design §10 "undercount/best-effort").
+      // `registerAbandonmentListeners` binds BOTH `visibilitychange→hidden` and
+      // `pagehide`, so a single page close (and any tab-backgrounding) would
+      // otherwise emit duplicate Session_Abandoned events with distinct eventIds
+      // that the server cannot dedup. Latch on the sessionId so abandonment is
+      // recorded once; a subsequent fire is a no-op.
+      if (abandonedSessions.has(currentSessionId)) return null;
+      abandonedSessions.add(currentSessionId);
       return {
         eventName: TelemetryEventNames.Session_Abandoned,
         anonymousUserId: getAnonymousUserId(),

@@ -319,6 +319,26 @@ describe('createSessionTelemetry', () => {
     expect(telemetry.buildAbandonmentEvent()).toBeNull();
   });
 
+  it('emits Session_Abandoned at most once per session (visibilitychange + pagehide both fire)', () => {
+    const { client } = createCapturingClient();
+    const telemetry = createSessionTelemetry({
+      ...baseDeps,
+      client,
+      routeKind: 'session',
+    });
+
+    telemetry.sessionInitialized('sess-1');
+    // The first unload signal yields the event...
+    expect(telemetry.buildAbandonmentEvent()).toMatchObject({
+      eventName: 'Session_Abandoned',
+      sessionId: 'sess-1',
+    });
+    // ...a second signal for the SAME page close (registerAbandonmentListeners
+    // binds both visibilitychange→hidden and pagehide) is suppressed, so the
+    // server is not handed duplicate, undedupable events.
+    expect(telemetry.buildAbandonmentEvent()).toBeNull();
+  });
+
   it('attaches only the anonymous id — never any PII field', () => {
     const { client, events } = createCapturingClient();
     const telemetry = createSessionTelemetry({ ...baseDeps, client });
