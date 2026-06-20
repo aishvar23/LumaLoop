@@ -13,6 +13,7 @@
 import { Route, Routes } from 'react-router-dom';
 import { ROUTES } from './routes';
 import SessionRoute from './SessionRoute';
+import FeedScreen from '../feed/FeedScreen';
 import {
   CardDeepLinkRoutePlaceholder,
   NotFoundRoutePlaceholder,
@@ -23,6 +24,9 @@ export function AppRoutes() {
   return (
     <Routes>
       <Route path={ROUTES.session} element={<SessionRoute />} />
+      {/* Preview only (#105): the endless swipe feed lives at `/feed` until the
+          default swap (#107). `/` keeps the start-screen/session/receipt. */}
+      <Route path={ROUTES.feed} element={<FeedScreen />} />
       <Route
         path={ROUTES.cardDeepLink}
         element={<CardDeepLinkRoutePlaceholder />}

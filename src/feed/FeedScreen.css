@@ -1,0 +1,90 @@
+/*
+ * FeedScreen — full-screen vertical swipe/snap feed surface (Azure DevOps #105,
+ * docs/FEED_DIRECTION.md §3.1).
+ *
+ * One game fills the viewport; native vertical touch scroll IS the swipe on
+ * mobile. CSS scroll-snap makes each slide settle to the top of the viewport.
+ * Token-driven only (no hardcoded colours/sizes; Design tokens, #51). Motion is
+ * handled by the global prefers-reduced-motion rule in styles/global.css; the
+ * component additionally picks `scrollIntoView` behaviour from that preference.
+ */
+
+.feed-screen {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+/*
+ * The scroll container: the swipe surface. `100dvh` so one slide fills the
+ * dynamic viewport (clear of mobile browser chrome); `scroll-snap-type: y
+ * mandatory` snaps each game to the top.
+ */
+.feed-screen__scroller {
+  flex: 1;
+  min-height: 0;
+  height: 100dvh;
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+  -webkit-overflow-scrolling: touch;
+  background: var(--color-bg);
+  /* Hide the keyboard focus ring on the scroller itself — focus is conveyed by
+   * the active slide; the ring on a full-bleed surface adds no information. */
+  outline: none;
+}
+
+/* One game per viewport slide; snaps to the top edge. */
+.feed-slide {
+  box-sizing: border-box;
+  height: 100dvh;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: calc(var(--space-3) + var(--safe-top)) var(--space-3)
+    calc(var(--space-3) + var(--safe-bottom));
+}
+
+/* The mounted game (or its feedback gate) fills the slide and may scroll if a
+ * single game's content is taller than the viewport. */
+.feed-slide__game {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+/* Lightweight stand-in for out-of-window slides: keeps the slide's height (so
+ * snap geometry stays correct) without mounting a renderer. */
+.feed-slide__placeholder {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+/* The byline naming the card's creator (data already on every card). */
+.feed-slide__byline {
+  margin: 0 0 var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+/* Off-screen but accessible — names landmarks / nav controls without chrome. */
+.feed-screen__visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
