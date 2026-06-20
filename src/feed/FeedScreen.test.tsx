@@ -144,6 +144,46 @@ function StubRenderer({
 
 const stubRegistry: RendererRegistry = { spot_it: StubRenderer };
 
+/**
+ * A SINGLE-TAP renderer: one click ENGAGES and RESOLVES in the same tick (e.g.
+ * `what_changed` / `tiny_logic`). This is the blocker repro — the engaging tap
+ * flips the card's `timeLimitMs` from ∞ to finite, re-arming a fresh timer on an
+ * already-resolved slide. The feed-level dedup must keep `onCardResolved` to a
+ * single `correct` with NO phantom `timeout`.
+ */
+function SingleTapRenderer({
+  card,
+  context,
+  onAttempt,
+  onResolve,
+}: TemplateProps<SpotItCard>) {
+  const timer = useCardTimer({ card, context, onResolve });
+  const resolution: CardResolution = {
+    cardId: card.cardId,
+    resolutionType: 'correct',
+    isCorrect: true,
+    elapsedMs: 1,
+    interactionElapsedMs: 1,
+    attemptCount: 1,
+    signals: {},
+  };
+  return (
+    <button
+      type="button"
+      data-testid={`tap-${card.cardId}`}
+      onClick={() => {
+        onAttempt({ time_to_first_tap: 1 });
+        timer.markAttempt();
+        timer.resolve(resolution);
+      }}
+    >
+      tap:{card.cardId}
+    </button>
+  );
+}
+
+const singleTapRegistry: RendererRegistry = { spot_it: SingleTapRenderer };
+
 type LifecycleHandlers = {
   onCardEngaged?: (i: number, cardId: string) => void;
   onCardSkipped?: (i: number, cardId: string) => void;
@@ -151,12 +191,12 @@ type LifecycleHandlers = {
   onCardResolved?: (i: number, r: CardResolution) => void;
 };
 
-function renderFeed(extra?: LifecycleHandlers) {
+function renderFeed(extra?: LifecycleHandlers, registry: RendererRegistry = stubRegistry) {
   return render(
     <FeedScreen
       anonymousUserId="anon"
       source={fakeSource}
-      registry={stubRegistry}
+      registry={registry}
       getCardById={fakeGetCardById}
       onCardEngaged={extra?.onCardEngaged}
       onCardSkipped={extra?.onCardSkipped}
@@ -345,6 +385,93 @@ describe('FeedScreen', () => {
     fireEvent.keyDown(scroller(), { key: 'ArrowDown' });
     expect(onCardSkipped).not.toHaveBeenCalled();
     expect(onCardAbandoned).not.toHaveBeenCalled();
+  });
+
+  it('single-tap engage+resolve fires onCardResolved EXACTLY once — no phantom timeout (#106 blocker)', () => {
+    vi.useFakeTimers();
+    try {
+      const onCardResolved = vi.fn();
+      renderFeed({ onCardResolved }, singleTapRegistry);
+
+      // One click engages AND resolves the slide in the same tick. Engaging flips
+      // the card's timeLimitMs ∞→1000, re-arming a fresh timer on the now-resolved
+      // slide; the feed-level dedup must drop that phantom timeout.
+      act(() => {
+        fireEvent.click(screen.getByTestId('tap-b0-0'));
+      });
+
+      expect(onCardResolved).toHaveBeenCalledTimes(1);
+      expect(onCardResolved).toHaveBeenCalledWith(
+        0,
+        expect.objectContaining({ cardId: 'b0-0', resolutionType: 'correct' }),
+      );
+
+      // Advancing past the re-armed countdown must NOT produce a second (timeout)
+      // resolution for the same slide.
+      act(() => {
+        vi.advanceTimersByTime(5000);
+      });
+      expect(onCardResolved).toHaveBeenCalledTimes(1);
+      expect(
+        onCardResolved.mock.calls.some(
+          ([, r]) => (r as CardResolution).resolutionType === 'timeout',
+        ),
+      ).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('an engaged-then-abandoned game never resolves later via its still-armed timer (#106 major)', () => {
+    vi.useFakeTimers();
+    try {
+      const onCardAbandoned = vi.fn();
+      const onCardResolved = vi.fn();
+      renderFeed({ onCardAbandoned, onCardResolved });
+
+      // Engage game 0 (arms its 1000ms timer), then leave before it resolves. The
+      // left slide stays mounted within WINDOW_RADIUS so its timer keeps running.
+      act(() => {
+        fireEvent.click(screen.getByTestId('engage-b0-0'));
+      });
+      fireEvent.keyDown(scroller(), { key: 'ArrowDown' });
+      expect(onCardAbandoned).toHaveBeenCalledTimes(1);
+      expect(onCardAbandoned).toHaveBeenCalledWith(0, 'b0-0');
+
+      // Push past the time limit: the abandoned game must NOT now resolve.
+      act(() => {
+        vi.advanceTimersByTime(5000);
+      });
+      expect(onCardResolved).not.toHaveBeenCalled();
+      expect(onCardAbandoned).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('skip → revisit → engage → leave still emits onCardAbandoned once (#108 independent latching)', () => {
+    const onCardSkipped = vi.fn();
+    const onCardAbandoned = vi.fn();
+    renderFeed({ onCardSkipped, onCardAbandoned });
+
+    // 0 → 1: skip 0 (never engaged).
+    fireEvent.keyDown(scroller(), { key: 'ArrowDown' });
+    expect(onCardSkipped).toHaveBeenCalledTimes(1);
+    expect(onCardSkipped).toHaveBeenCalledWith(0, 'b0-0');
+
+    // 1 → 0: revisit the previously-skipped game, then engage it.
+    fireEvent.keyDown(scroller(), { key: 'ArrowUp' });
+    fireEvent.click(screen.getByTestId('engage-b0-0'));
+
+    // 0 → 1: leaving an engaged game is an honest ABANDON even though it was
+    // skipped earlier — skip and abandon latch independently.
+    fireEvent.keyDown(scroller(), { key: 'ArrowDown' });
+    expect(onCardAbandoned).toHaveBeenCalledTimes(1);
+    expect(onCardAbandoned).toHaveBeenCalledWith(0, 'b0-0');
+    // The earlier skip never re-fires for index 0.
+    expect(
+      onCardSkipped.mock.calls.filter(([index]) => index === 0),
+    ).toHaveLength(1);
   });
 
   it('latches skip per index — revisiting an un-engaged game never re-fires (#106)', () => {

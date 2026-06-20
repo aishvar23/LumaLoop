@@ -107,6 +107,15 @@ export type FeedScreenProps = {
  * sound escape hatch documented in `rendererRegistry.ts`: the override preserves
  * the card's discriminant and every other field, so the result is the same card
  * variant with a swapped time limit.
+ *
+ * Known telemetry-only caveat (NOT a correctness bug): on multi-tap templates
+ * (e.g. Spot It), the engaging tap's `markAttempt()` runs just before this ∞→
+ * finite flip re-runs `useCardTimer`'s arm effect, which resets its attempt
+ * counter to 0. A subsequent genuine `timeout` therefore reports one fewer
+ * attempt than the player actually made. The double-resolve it could otherwise
+ * cause is fully handled by `handleResolve`'s idempotency; only the timeout's
+ * `attemptCount` signal is affected. Left as-is to keep this fix surgical — the
+ * counter lives in the shared hook and resetting semantics there is out of scope.
  */
 function timerGatedCard(card: LiquidCard, engaged: boolean): LiquidCard {
   if (engaged) return card;
@@ -258,11 +267,14 @@ export default function FeedScreen({
   // each transition latches exactly once per game instance:
   //   - `engagedRef`: indices the player has interacted with (≥1 `onAttempt`).
   //   - `resolutionsRef`: indices that have resolved (played to completion).
-  //   - `leftFiredRef`: indices for which a skip/abandon was already classified
-  //     on leave, so returning to a game never re-fires it.
+  //   - `skippedRef` / `abandonedRef`: indices already classified on leave. They
+  //     latch INDEPENDENTLY (#108): a game skipped, then revisited + engaged +
+  //     left again must still emit the honest `onCardAbandoned` even though it was
+  //     previously skipped — while neither classification ever fires twice.
   const engagedRef = useRef<Set<number>>(new Set());
   const resolutionsRef = useRef<Map<number, CardResolution>>(new Map());
-  const leftFiredRef = useRef<Set<number>>(new Set());
+  const skippedRef = useRef<Set<number>>(new Set());
+  const abandonedRef = useRef<Set<number>>(new Set());
 
   // Stable refs for the long-lived leave effect + the per-slide engage callback,
   // so neither re-creates as the parent's props/deck change (file convention).
@@ -286,8 +298,25 @@ export default function FeedScreen({
   // Record the resolution locally and do NOT advance — the user swipes on; the
   // gate keeps the feedback/explanation visible. A resolved game is "played", so
   // leaving it is neither a skip nor an abandon.
+  //
+  // Idempotent per game instance — a given slide resolves AT MOST ONCE:
+  //   - BLOCKER guard: the engaging tap on a single-tap template flips this card's
+  //     `timeLimitMs` from ∞ (timer-gated off) to finite in the SAME tick it
+  //     resolves, which re-runs `useCardTimer`'s arm effect, resets its
+  //     `resolvedRef`, and arms a fresh countdown on an already-resolved slide.
+  //     That phantom timer later forwards a second ['timeout'] resolution. The
+  //     `resolutionsRef.has` short-circuit drops it so we never double-signal.
+  //   - MAJOR guard: an engaged-then-abandoned slide stays mounted within
+  //     `WINDOW_RADIUS`, so its armed timer keeps running and would later fire a
+  //     `timeout` for a game we already classified as abandoned on leave. Once a
+  //     slide has been classified (skip OR abandon) we ignore any later resolution
+  //     for that index.
   const handleResolve = useCallback(
     (index: number, resolution: CardResolution) => {
+      if (resolutionsRef.current.has(index)) return; // already resolved once.
+      if (skippedRef.current.has(index) || abandonedRef.current.has(index)) {
+        return; // already classified on leave — not a live resolution.
+      }
       resolutionsRef.current.set(index, resolution);
       onCardResolved?.(index, resolution);
     },
@@ -302,14 +331,19 @@ export default function FeedScreen({
     const left = prevActiveRef.current;
     if (left === activeIndex) return;
     prevActiveRef.current = activeIndex;
-    if (leftFiredRef.current.has(left)) return;
-    leftFiredRef.current.add(left);
     if (resolutionsRef.current.has(left)) return; // played → not skip/abandon.
     const cardId = cardsRef.current[left];
     if (cardId === undefined) return;
     if (engagedRef.current.has(left)) {
+      // Engaged-then-left → an ABANDONED attempt. Latched independently of skip
+      // so a previously-skipped, then-engaged game can still emit it once (#108).
+      if (abandonedRef.current.has(left)) return;
+      abandonedRef.current.add(left);
       onCardAbandonedRef.current?.(left, cardId);
     } else {
+      // Left without engaging → a clean SKIP, at most once per instance.
+      if (skippedRef.current.has(left)) return;
+      skippedRef.current.add(left);
       onCardSkippedRef.current?.(left, cardId);
     }
   }, [activeIndex]);
