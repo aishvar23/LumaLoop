@@ -462,9 +462,12 @@ describe('templateCategoryMap <-> validation consistency', () => {
     }
   }
 
-  it('every category the map declares is itself a real ChallengeCategory', () => {
-    // Guards against the map listing a category the validator/domain does not
-    // know — which would make the pairing unreachable from any valid catalog.
+  it("declares only categories present in this suite's ALL_CATEGORIES list", () => {
+    // The map's value type already guarantees `ChallengeCategory` at compile
+    // time, so this is NOT a type check. It is a drift-guard on the hand-
+    // maintained `ALL_CATEGORIES` list that builds the negative-pairing
+    // cross-product below: if the map referenced a category missing from that
+    // list, the negative coverage would silently skip it. Keeps the list honest.
     for (const templateType of ALL_TEMPLATE_TYPES) {
       for (const category of templateCategoryMap[templateType]) {
         expect(ALL_CATEGORIES).toContain(category);

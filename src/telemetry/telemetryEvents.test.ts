@@ -11,11 +11,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import {
-  TelemetryEventNames,
-  type TelemetryEvent,
-  type TelemetryEventName,
-} from './telemetryEvents';
+import { TelemetryEventNames, type TelemetryEvent } from './telemetryEvents';
 
 /**
  * The eleven §10 events, listed independently of the source object so this test
@@ -116,20 +112,23 @@ describe('TelemetryEvent payload shape (§10)', () => {
     for (const key of Object.keys(maximal)) {
       expect(ALLOWED_FIELDS.has(key as keyof TelemetryEvent)).toBe(true);
     }
-
-    // The only identity carried is the anonymous id (Technical Design §16).
-    const PII_FIELDS = ['name', 'email', 'phone', 'deviceId', 'ip', 'userAgent'];
-    for (const banned of PII_FIELDS) {
-      expect(maximal).not.toHaveProperty(banned);
-    }
   });
 
-  it('keys the eventName off the canonical name union', () => {
-    // Round-trip every canonical name through the `TelemetryEventName` type to
-    // prove the union and the runtime map stay in lockstep.
-    for (const name of Object.values(TelemetryEventNames)) {
-      const typed: TelemetryEventName = name;
-      expect(EXPECTED_EVENT_NAMES).toContain(typed);
-    }
+  it('rejects PII fields at the type level (Technical Design §16)', () => {
+    // The real enforcement of "no PII in the payload" is the TYPE, not a runtime
+    // key check (a hand-built literal that omits a key passes regardless). Assert
+    // the contract itself: adding a PII field must be a compile error. If
+    // `TelemetryEvent` ever gained `email?: string`, the `@ts-expect-error` would
+    // become unused and tsc (and the typecheck gate) would fail this file.
+    const withPii: TelemetryEvent = {
+      eventName: TelemetryEventNames.Session_Initialized,
+      anonymousUserId: 'anon-1',
+      sessionId: 'sess-1',
+      timestampMs: 1_700_000_000_000,
+      // @ts-expect-error — `email` is not part of the §16-compliant contract.
+      email: 'should-not-compile@example.com',
+    };
+    // Touch the value so it isn't flagged unused; the assertion above is the test.
+    expect(withPii.anonymousUserId).toBe('anon-1');
   });
 });
