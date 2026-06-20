@@ -7,7 +7,9 @@ import tseslint from 'typescript-eslint';
 import prettier from 'eslint-config-prettier';
 
 export default tseslint.config(
-  { ignores: ['dist', 'coverage', 'node_modules'] },
+  // `mobile/` is a self-contained Expo/React Native sub-project with its own
+  // toolchain (eslint/tsconfig/jest); the root web gate must not lint it.
+  { ignores: ['dist', 'coverage', 'node_modules', 'mobile'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
