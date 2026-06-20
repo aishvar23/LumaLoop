@@ -17,9 +17,15 @@
  *
  * Scope guard: resolve handling here is intentionally SIMPLE. A resolved game is
  * recorded locally and its feedback/explanation step stays visible (via the feed
- * registry's gate); the feed does NOT auto-advance — the user swipes on. Full
- * skip / engage-then-abandon / timer-arms-on-engagement semantics are #106; the
- * SEAMs are marked below rather than implemented here.
+ * registry's gate); the feed does NOT auto-advance — the user swipes on.
+ *
+ * Free-scroll semantics (#106, docs/FEED_DIRECTION.md §3.2): each game runs a
+ * local lifecycle — not-engaged → engaged → resolved — and the per-game timer
+ * arms on ENGAGEMENT (first interaction), not on becoming active. Swiping past an
+ * un-engaged game is a SKIP (no resolution); engaging then leaving before resolve
+ * is an ABANDONED attempt; a played game still resolves correct/incorrect/timeout
+ * unchanged. The lifecycle callbacks below are the telemetry seam for #108 — this
+ * file emits the signals but does NOT post telemetry.
  */
 
 import {
@@ -65,11 +71,59 @@ export type FeedScreenProps = {
   /** Test seam: wall clock for the per-card start context. Defaults to `Date.now`. */
   now?: () => number;
   /**
-   * SEAM (#106 / telemetry): notified once per local resolution. The feed itself
-   * never advances on resolve; this is where skip/abandon/telemetry wiring lands.
+   * Notified once per game when the player first ENGAGES it (first `onAttempt`).
+   * Engagement arms the per-game timer and distinguishes a skip from an abandon.
+   * Seam for #108 telemetry (`Card_Attempted`); fires at most once per index.
+   */
+  onCardEngaged?: (index: number, cardId: string) => void;
+  /**
+   * Notified once per game that is swiped past WITHOUT engaging it — a SKIP (no
+   * score, no resolution). Seam for #108 telemetry (`Card_Skipped`).
+   */
+  onCardSkipped?: (index: number, cardId: string) => void;
+  /**
+   * Notified once per game that was engaged but left BEFORE it resolved — an
+   * ABANDONED attempt (distinct from a clean skip). Seam for #108 telemetry
+   * (`Card_Abandoned`).
+   */
+  onCardAbandoned?: (index: number, cardId: string) => void;
+  /**
+   * Notified once per local resolution (correct/incorrect/timeout). The feed
+   * itself never advances on resolve; seam for #108 telemetry (`Card_Resolved`).
    */
   onCardResolved?: (index: number, resolution: CardResolution) => void;
 };
+
+/**
+ * #106: gate the per-game timer on ENGAGEMENT. Until the player interacts with a
+ * game we hand the renderer a card whose `timeLimitMs` is non-finite, so the
+ * shared {@link useCardTimer} skips arming its countdown (the hook bails on a
+ * non-finite limit). On the first interaction the real card flows through and the
+ * timer arms a fresh, full-duration countdown from the engage instant.
+ *
+ * This is template-AGNOSTIC: `timeLimitMs` is the one timing primitive common to
+ * every {@link LiquidCard} config, so a single override works for all four
+ * renderers with NO switch on `templateType`. The cast mirrors the one localized,
+ * sound escape hatch documented in `rendererRegistry.ts`: the override preserves
+ * the card's discriminant and every other field, so the result is the same card
+ * variant with a swapped time limit.
+ *
+ * Known telemetry-only caveat (NOT a correctness bug): on multi-tap templates
+ * (e.g. Spot It), the engaging tap's `markAttempt()` runs just before this ∞→
+ * finite flip re-runs `useCardTimer`'s arm effect, which resets its attempt
+ * counter to 0. A subsequent genuine `timeout` therefore reports one fewer
+ * attempt than the player actually made. The double-resolve it could otherwise
+ * cause is fully handled by `handleResolve`'s idempotency; only the timeout's
+ * `attemptCount` signal is affected. Left as-is to keep this fix surgical — the
+ * counter lives in the shared hook and resetting semantics there is out of scope.
+ */
+function timerGatedCard(card: LiquidCard, engaged: boolean): LiquidCard {
+  if (engaged) return card;
+  return {
+    ...card,
+    config: { ...card.config, timeLimitMs: Number.POSITIVE_INFINITY },
+  } as LiquidCard;
+}
 
 /** True when motion should be reduced; safe in non-DOM/test environments. */
 function prefersReducedMotion(): boolean {
@@ -100,6 +154,9 @@ export default function FeedScreen({
   anonymousUserId,
   getCardById = getCatalogCardById,
   now,
+  onCardEngaged,
+  onCardSkipped,
+  onCardAbandoned,
   onCardResolved,
 }: FeedScreenProps) {
   // Resolve the real persisted anonymous id ONCE per mount (Technical Design
@@ -107,8 +164,9 @@ export default function FeedScreen({
   const [resolvedAnonymousUserId] = useState(
     () => anonymousUserId ?? getAnonymousUserId(),
   );
-  // A per-mount feed instance id + a single "active at" stamp for the card start
-  // context. Real arm-on-engagement timing is #106; here the context is static.
+  // A per-mount feed instance id + a single "active at" stamp: the `elapsedMs`
+  // origin for the card start context. The interaction timer no longer arms from
+  // here — each slide arms it from its own engage instant (#106, see FeedSlide).
   const nowFn = now ?? Date.now;
   const [feedId] = useState(
     () => globalThis.crypto?.randomUUID?.() ?? `feed-${resolvedAnonymousUserId}`,
@@ -205,21 +263,90 @@ export default function FeedScreen({
     if (el) scrollSlideIntoView(el, prefersReducedMotion());
   }, [activeIndex]);
 
-  // SEAM (#106): first interaction will arm the per-game timer + engagement
-  // signal. Today it is a no-op forwarded to the renderers' `onAttempt`.
-  const handleAttempt = useCallback(() => {}, []);
-
-  // SEAM (#106): record the resolution locally and do NOT advance — the user
-  // swipes on. The gate keeps the feedback/explanation visible. Skip /
-  // engage-then-abandon semantics + telemetry wiring land in #106.
+  // Per-game lifecycle (#106), tracked in refs so it never triggers a render and
+  // each transition latches exactly once per game instance:
+  //   - `engagedRef`: indices the player has interacted with (≥1 `onAttempt`).
+  //   - `resolutionsRef`: indices that have resolved (played to completion).
+  //   - `skippedRef` / `abandonedRef`: indices already classified on leave. They
+  //     latch INDEPENDENTLY (#108): a game skipped, then revisited + engaged +
+  //     left again must still emit the honest `onCardAbandoned` even though it was
+  //     previously skipped — while neither classification ever fires twice.
+  const engagedRef = useRef<Set<number>>(new Set());
   const resolutionsRef = useRef<Map<number, CardResolution>>(new Map());
+  const skippedRef = useRef<Set<number>>(new Set());
+  const abandonedRef = useRef<Set<number>>(new Set());
+
+  // Stable refs for the long-lived leave effect + the per-slide engage callback,
+  // so neither re-creates as the parent's props/deck change (file convention).
+  const cardsRef = useRef(cards);
+  cardsRef.current = cards;
+  const onCardSkippedRef = useRef(onCardSkipped);
+  onCardSkippedRef.current = onCardSkipped;
+  const onCardAbandonedRef = useRef(onCardAbandoned);
+  onCardAbandonedRef.current = onCardAbandoned;
+
+  // First interaction ENGAGES a game: record it and fire the engage seam once.
+  const handleEngage = useCallback(
+    (index: number, cardId: string) => {
+      if (engagedRef.current.has(index)) return;
+      engagedRef.current.add(index);
+      onCardEngaged?.(index, cardId);
+    },
+    [onCardEngaged],
+  );
+
+  // Record the resolution locally and do NOT advance — the user swipes on; the
+  // gate keeps the feedback/explanation visible. A resolved game is "played", so
+  // leaving it is neither a skip nor an abandon.
+  //
+  // Idempotent per game instance — a given slide resolves AT MOST ONCE:
+  //   - BLOCKER guard: the engaging tap on a single-tap template flips this card's
+  //     `timeLimitMs` from ∞ (timer-gated off) to finite in the SAME tick it
+  //     resolves, which re-runs `useCardTimer`'s arm effect, resets its
+  //     `resolvedRef`, and arms a fresh countdown on an already-resolved slide.
+  //     That phantom timer later forwards a second ['timeout'] resolution. The
+  //     `resolutionsRef.has` short-circuit drops it so we never double-signal.
+  //   - MAJOR guard: an engaged-then-abandoned slide stays mounted within
+  //     `WINDOW_RADIUS`, so its armed timer keeps running and would later fire a
+  //     `timeout` for a game we already classified as abandoned on leave. Once a
+  //     slide has been classified (skip OR abandon) we ignore any later resolution
+  //     for that index.
   const handleResolve = useCallback(
     (index: number, resolution: CardResolution) => {
+      if (resolutionsRef.current.has(index)) return; // already resolved once.
+      if (skippedRef.current.has(index) || abandonedRef.current.has(index)) {
+        return; // already classified on leave — not a live resolution.
+      }
       resolutionsRef.current.set(index, resolution);
       onCardResolved?.(index, resolution);
     },
     [onCardResolved],
   );
+
+  // When the active game changes, classify the game we LEFT (#106): a resolved
+  // game is done; an engaged-but-unresolved game is an ABANDONED attempt; an
+  // un-engaged game is a clean SKIP. Latched per index so it fires at most once.
+  const prevActiveRef = useRef(activeIndex);
+  useEffect(() => {
+    const left = prevActiveRef.current;
+    if (left === activeIndex) return;
+    prevActiveRef.current = activeIndex;
+    if (resolutionsRef.current.has(left)) return; // played → not skip/abandon.
+    const cardId = cardsRef.current[left];
+    if (cardId === undefined) return;
+    if (engagedRef.current.has(left)) {
+      // Engaged-then-left → an ABANDONED attempt. Latched independently of skip
+      // so a previously-skipped, then-engaged game can still emit it once (#108).
+      if (abandonedRef.current.has(left)) return;
+      abandonedRef.current.add(left);
+      onCardAbandonedRef.current?.(left, cardId);
+    } else {
+      // Left without engaging → a clean SKIP, at most once per instance.
+      if (skippedRef.current.has(left)) return;
+      skippedRef.current.add(left);
+      onCardSkippedRef.current?.(left, cardId);
+    }
+  }, [activeIndex]);
 
   return (
     <section className="feed-screen" aria-labelledby="feed-screen-heading">
@@ -247,8 +374,9 @@ export default function FeedScreen({
             getCardById={getCardById}
             feedId={feedId}
             activeAtMs={activeAtMs}
+            now={nowFn}
             registerSlide={registerSlide}
-            onAttempt={handleAttempt}
+            onEngage={handleEngage}
             onResolve={handleResolve}
           />
         ))}
@@ -266,8 +394,11 @@ type FeedSlideProps = {
   getCardById: (cardId: string) => LiquidCard | undefined;
   feedId: string;
   activeAtMs: number;
+  /** Wall clock for stamping this slide's engage instant (#106). */
+  now: () => number;
   registerSlide: (el: HTMLElement | null) => void;
-  onAttempt: (signals?: Record<string, number | string | boolean>) => void;
+  /** Notify the feed that this game was engaged (first interaction). */
+  onEngage: (index: number, cardId: string) => void;
   onResolve: (index: number, resolution: CardResolution) => void;
 };
 
@@ -286,22 +417,42 @@ const FeedSlide = memo(function FeedSlide({
   getCardById,
   feedId,
   activeAtMs,
+  now,
   registerSlide,
-  onAttempt,
+  onEngage,
   onResolve,
 }: FeedSlideProps) {
   const card = windowed ? getCardById(cardId) : undefined;
   const Renderer = card ? resolveRenderer(registry, card) : undefined;
 
+  // #106: the engage instant — null until the player first interacts with this
+  // game. Local to the slide so engagement (and thus timer-arming) is per-game.
+  // A ref guards the one-time engage notification independently of render timing.
+  const [engageAtMs, setEngageAtMs] = useState<number | null>(null);
+  const engagedOnceRef = useRef(false);
+  const handleAttempt = useCallback(
+    (_signals?: Record<string, number | string | boolean>) => {
+      if (engagedOnceRef.current) return;
+      engagedOnceRef.current = true;
+      setEngageAtMs(now());
+      onEngage(index, cardId);
+    },
+    [now, onEngage, index, cardId],
+  );
+
   // Mount the game only inside the window AND when the card + renderer resolve;
   // a missing card/renderer falls back to the placeholder (fail-safe, never a
   // crash — mirrors the controller's missing-renderer guard).
   if (card && Renderer) {
+    const engaged = engageAtMs !== null;
     const context: CardStartContext = {
       sessionId: feedId,
       cardIndex: index,
       activeAtMs,
-      interactionEnabledAtMs: activeAtMs,
+      // #106: timing origin is the engage instant. Before engagement it falls
+      // back to `activeAtMs`, but the timer is gated off anyway (`timerGatedCard`
+      // hands the renderer a non-finite limit until the player interacts).
+      interactionEnabledAtMs: engageAtMs ?? activeAtMs,
     };
     return (
       <div className="feed-slide" data-index={index} data-testid="feed-slide" ref={registerSlide}>
@@ -310,9 +461,10 @@ const FeedSlide = memo(function FeedSlide({
         <div className="feed-slide__game" data-testid={`feed-game-${index}`}>
           {createElement(Renderer as TemplateRenderer<LiquidCard>, {
             key: `${feedId}:${index}`,
-            card,
+            // #106: until engaged, the renderer's timer stays disarmed.
+            card: timerGatedCard(card, engaged),
             context,
-            onAttempt,
+            onAttempt: handleAttempt,
             onResolve: (resolution: CardResolution) => onResolve(index, resolution),
           })}
         </div>
