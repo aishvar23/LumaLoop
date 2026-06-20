@@ -22,6 +22,13 @@ import { catalog } from '../cards/catalog';
 import type { ChallengeCategory } from '../cards/types';
 import { composeSession } from '../session/composeSession';
 import { getAnonymousUserId } from '../telemetry/anonymousUser';
+import {
+  createTelemetryClient,
+  type TelemetryClient,
+} from '../telemetry/telemetryClient';
+import { parseTelemetrySource } from '../telemetry/sessionTelemetry';
+import type { TelemetrySource } from '../telemetry/telemetryEvents';
+import { useSessionTelemetry } from '../telemetry/useSessionTelemetry';
 import { continueSeedUserId } from './continueSeed';
 import { computeSessionSummary } from '../session/sessionSummary';
 import type { SessionCardInput } from '../session/useSessionController';
@@ -31,9 +38,44 @@ import { type SessionMode } from '../session/sessionTypes';
 import Button from '../ui/Button';
 import ExitControl from '../ui/ExitControl';
 import FeedFrame from '../ui/FeedFrame';
-import { feedRegistry } from '../ui/feedRegistry';
+import { ExplanationViewedProvider, feedRegistry } from '../ui/feedRegistry';
 import SessionReceipt from '../ui/SessionReceipt';
 import StartScreen from '../ui/StartScreen';
+
+/** Read `window.location.search` defensively (SSR/test-safe). Never throws. */
+function safeLocationSearch(): string {
+  try {
+    return globalThis.location?.search ?? '';
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Best-effort native share of the just-finished session (#76). Non-throwing: a
+ * missing `navigator.share`, a user cancel, or any failure degrades silently —
+ * the `Receipt_Shared` telemetry has already fired on the tap. Copy stays within
+ * the positioning guardrails (Design §7): a session record, never an ability
+ * claim.
+ */
+function shareSessionReceipt(): void {
+  try {
+    const nav = globalThis.navigator;
+    if (nav && typeof nav.share === 'function') {
+      void nav
+        .share({
+          title: 'LumaLoop',
+          text: 'I just finished a LumaLoop session.',
+          url: globalThis.location?.href ?? '',
+        })
+        .catch(() => {
+          // User cancelled or share unavailable — best-effort.
+        });
+    }
+  } catch {
+    // Best-effort: never let sharing throw into the receipt.
+  }
+}
 
 type Phase =
   | { name: 'start' }
@@ -75,6 +117,17 @@ export type FeedSessionProps = {
    * from the catalog.
    */
   cards?: ReadonlyArray<SessionCardInput>;
+  /**
+   * Test seam: inject a FAKE telemetry client so a test can assert the exact
+   * §10 events fired with NO real network/transport. Real usage passes none —
+   * one {@link createTelemetryClient} instance is created once per mount.
+   */
+  telemetryClient?: TelemetryClient;
+  /**
+   * Test seam: pin the §10 attribution `source`. Defaults to the parsed
+   * `?source=` query param (→ `'direct'` when absent/invalid).
+   */
+  source?: TelemetrySource;
 };
 
 /**
@@ -89,9 +142,9 @@ export function FeedSession({
   anonymousUserId,
   day,
   cards,
+  telemetryClient,
+  source,
 }: FeedSessionProps) {
-  const controller = useSessionController({ registry, now });
-
   // Resolve the real persisted anonymous id ONCE per mount (Technical Design
   // §10): a best-effort localStorage identity, generated once. Tests still
   // inject a fixed `anonymousUserId` to keep composition deterministic — only
@@ -101,6 +154,36 @@ export function FeedSession({
   // across renders and the arm-once effect below is not disturbed.
   const [persistedAnonymousUserId] = useState(getAnonymousUserId);
   const resolvedAnonymousUserId = anonymousUserId ?? persistedAnonymousUserId;
+
+  // ONE telemetry client per FeedSession mount (#76). Tests inject a FAKE
+  // client; real usage lazily creates a single real client whose once-latches
+  // and retry queue live for the session's lifetime. The `useState` initializer
+  // builds it exactly once, never per render.
+  const [client] = useState<TelemetryClient>(
+    () => telemetryClient ?? createTelemetryClient({}),
+  );
+
+  // The §10 instrumentation handle (#76): turns the controller's card/session
+  // lifecycle callbacks + the UI actions into the eleven events,
+  // TEMPLATE-AGNOSTICALLY. `source`/`routeKind` are captured once at mount; the
+  // anon id and `now` reuse the existing seams.
+  const telemetry = useSessionTelemetry({
+    client,
+    getAnonymousUserId: () => resolvedAnonymousUserId,
+    now,
+    routeKind: 'session',
+    source: source ?? parseTelemetrySource(safeLocationSearch()),
+  });
+
+  // The controller OWNS progression; the telemetry handle merely SUBSCRIBES to
+  // its lifecycle callbacks (the controller imports no telemetry — CLAUDE.md §4).
+  const controller = useSessionController({
+    registry,
+    now,
+    onAttempt: telemetry.onAttempt,
+    onCardResolved: telemetry.onCardResolved,
+    onSessionCompleted: telemetry.onSessionCompleted,
+  });
 
   // How many times the user has chosen to keep playing after completion (#72).
   // Bumped on each intentional continue; folded into the composition seed below
@@ -157,6 +240,28 @@ export function FeedSession({
   // `continueCount` — the value that uniquely identifies an armable window
   // (0 = first/idle, N = the Nth continue) — so the idle→active and
   // intentional_continue→active transitions each arm once with their own deck.
+  // Session_Initialized (#76, §10): fire once the session id is known. The
+  // factory latches per sessionId, so each armed window (including every
+  // intentional continue, which mints a fresh id) emits exactly one
+  // Session_Initialized; Return_Session_Started fires only for the first window.
+  const sessionId = controller.state.sessionId;
+  const { observeSession, observeActiveCard } = telemetry;
+  useEffect(() => {
+    observeSession(sessionId);
+  }, [sessionId, observeSession]);
+
+  // Card_Rendered (#76, §10): fire when a card becomes the ACTIVE card — NOT on
+  // mount, NOT on unrelated re-renders. Keyed on the active card identity +
+  // index so a re-render during the feedback step does not re-fire while
+  // advancing to the next card does; the factory additionally latches per
+  // (sessionId:cardIndex). `observeActiveCard` no-ops on a null card (the gap
+  // between cards). Template-agnostic — no switch on templateType.
+  const activeCard = controller.currentCard;
+  const activeCardIndex = controller.index;
+  useEffect(() => {
+    observeActiveCard(activeCard, activeCardIndex, sessionId);
+  }, [activeCard, activeCardIndex, sessionId, observeActiveCard]);
+
   const armedForRef = useRef<number | null>(null);
   const { start, status } = controller;
   useEffect(() => {
@@ -173,9 +278,28 @@ export function FeedSession({
   // (the only status `start` will then re-arm from).
   const { continueSession } = controller;
   const handleContinue = useCallback(() => {
+    // Intentional_Continue_Clicked (#76): fire on the tap, THEN re-arm. The
+    // event carries the just-completed session's context (continue mints a new
+    // id on the next arm).
+    telemetry.continueClicked();
     continueSession();
     setContinueCount((count) => count + 1);
-  }, [continueSession]);
+  }, [telemetry, continueSession]);
+
+  // Exit_Clicked (#76): emit on the deliberate confirm, THEN end the session, so
+  // the event carries the still-live session context.
+  const { exitSession } = controller;
+  const handleExit = useCallback(() => {
+    telemetry.exitClicked();
+    exitSession();
+  }, [telemetry, exitSession]);
+
+  // Receipt_Shared (#76): fire on the tap, then best-effort native share. The
+  // event fires regardless of whether the platform share succeeds.
+  const handleShare = useCallback(() => {
+    telemetry.receiptShared();
+    shareSessionReceipt();
+  }, [telemetry]);
 
   // The session reached its bounded end: render the real receipt (#71) WITH the
   // intentional-continue control (#72). The summary is computed by the pure
@@ -196,6 +320,7 @@ export function FeedSession({
       <SessionReceipt
         summary={summary}
         outcome="completed"
+        onShare={handleShare}
         footer={
           <Button
             variant="ghost"
@@ -222,18 +347,22 @@ export function FeedSession({
       categoryOf,
       completedOnTime: false,
     });
-    return <SessionReceipt summary={summary} outcome="exited" />;
+    return (
+      <SessionReceipt summary={summary} outcome="exited" onShare={handleShare} />
+    );
   }
 
   // Active feed: the card plays in-flow with a clear exit path beneath it (#72).
   // There is NO skip affordance anywhere (Tech §14) — leaving ends the session,
   // it never advances past a card.
   return (
-    <FeedFrame
-      activeCardElement={controller.activeCardElement}
-      index={controller.index}
-      total={controller.total}
-      exitSlot={<ExitControl onExit={controller.exitSession} />}
-    />
+    <ExplanationViewedProvider handler={telemetry.onExplanationViewed}>
+      <FeedFrame
+        activeCardElement={controller.activeCardElement}
+        index={controller.index}
+        total={controller.total}
+        exitSlot={<ExitControl onExit={handleExit} />}
+      />
+    </ExplanationViewedProvider>
   );
 }

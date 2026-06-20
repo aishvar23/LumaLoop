@@ -22,6 +22,7 @@ import type { ReactNode } from 'react';
 import type { ChallengeCategory } from '../cards/types';
 import { MODE_LABELS } from '../session/sessionTypes';
 import type { SessionSummary } from '../session/sessionSummary';
+import Button from './Button';
 import Cluster from './Cluster';
 import Screen from './Screen';
 import Stack from './Stack';
@@ -98,12 +99,21 @@ export type SessionReceiptProps = {
    * slot so the receipt stays presentational and template-agnostic.
    */
   footer?: ReactNode;
+  /**
+   * Optional share handler — when provided, a minimal "Share" control renders so
+   * the user can share their session from the receipt (the #76 `Receipt_Shared`
+   * seam). Kept a callback so the receipt stays presentational: the actual share
+   * action + telemetry live in the caller. Copy stays within the positioning
+   * guardrails (Design §7) — a record of a session, never an ability claim.
+   */
+  onShare?: () => void;
 };
 
 export default function SessionReceipt({
   summary,
   outcome = 'completed',
   footer,
+  onShare,
 }: SessionReceiptProps) {
   const {
     mode,
@@ -221,6 +231,20 @@ export default function SessionReceipt({
               ))}
             </Stack>
           </Stack>
+        )}
+
+        {/* Minimal share affordance (#76). Modest copy — sharing a session, not
+            an ability/score (Design §7). Rendered above the footer so it never
+            overshadows the primary continue control. */}
+        {onShare && (
+          <Button
+            variant="ghost"
+            data-testid="share-control"
+            style={{ width: '100%' }}
+            onClick={onShare}
+          >
+            Share
+          </Button>
         )}
 
         {/* Optional controls (e.g. the #72 intentional continue). Rendered as a

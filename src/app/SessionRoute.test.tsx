@@ -19,6 +19,8 @@ import type { TinyLogicCard } from '../cards/types';
 import * as composeSessionModule from '../session/composeSession';
 import { composeSession } from '../session/composeSession';
 import { getAnonymousUserId } from '../telemetry/anonymousUser';
+import type { TelemetryClient } from '../telemetry/telemetryClient';
+import type { TelemetryEventInput } from '../telemetry/telemetryEvents';
 import { continueSeedUserId } from './continueSeed';
 import SessionRoute, { FeedSession } from './SessionRoute';
 
@@ -320,6 +322,278 @@ describe('FeedSession — exit + intentional continue', () => {
 // Continue-deck seed decision (#72): the first window keeps the plain seed; each
 // continue varies the seed so composition reshuffles the same pool.
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Telemetry wiring (#76; Technical Design §10, §17.1). A FAKE telemetry client
+// is injected into FeedSession so the eleven §10 events are asserted end-to-end
+// through the real controller + feed registry, with NO network/transport.
+// ---------------------------------------------------------------------------
+
+function captureClient(): {
+  client: TelemetryClient;
+  events: TelemetryEventInput[];
+  abandonments: TelemetryEventInput[];
+} {
+  const events: TelemetryEventInput[] = [];
+  const abandonments: TelemetryEventInput[] = [];
+  const client: TelemetryClient = {
+    enqueue: (event) => {
+      events.push(event);
+    },
+    flush: async () => {},
+    trackAbandonment: (event) => {
+      abandonments.push(event);
+    },
+  };
+  return { client, events, abandonments };
+}
+
+const namesOf = (events: TelemetryEventInput[]): string[] =>
+  events.map((e) => e.eventName);
+const countOf = (events: TelemetryEventInput[], name: string): number =>
+  namesOf(events).filter((n) => n === name).length;
+
+describe('FeedSession — telemetry wiring (#76)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+  });
+
+  function twoCardDeck() {
+    return [
+      tinyLogicCard('card-1', 'First explanation'),
+      tinyLogicCard('card-2', 'Second explanation'),
+    ];
+  }
+
+  it('fires the full §10 flow through a play-through, each event exactly once', () => {
+    const { client, events } = captureClient();
+
+    render(
+      <FeedSession
+        mode="one_minute_rescue"
+        cards={twoCardDeck()}
+        telemetryClient={client}
+        now={() => 1_000}
+        anonymousUserId="anon-test"
+        source="reminder"
+      />,
+    );
+
+    // Play both cards to the bounded end.
+    fireEvent.click(screen.getByTestId('tl-option-a'));
+    fireEvent.click(screen.getByTestId('feedback-next'));
+    fireEvent.click(screen.getByTestId('tl-option-a'));
+    fireEvent.click(screen.getByTestId('feedback-next'));
+    expect(screen.getByTestId('session-complete-seam')).toBeInTheDocument();
+
+    // Exactly-once session lifecycle (§17.1).
+    expect(countOf(events, 'Session_Initialized')).toBe(1);
+    expect(countOf(events, 'Return_Session_Started')).toBe(1);
+    expect(countOf(events, 'Session_Completed')).toBe(1);
+
+    // One Card_Rendered per ACTIVATION — N cards yield N events, in order.
+    const rendered = events.filter((e) => e.eventName === 'Card_Rendered');
+    expect(rendered.map((e) => e.cardId)).toEqual(['card-1', 'card-2']);
+    expect(rendered.map((e) => e.cardIndex)).toEqual([0, 1]);
+    expect(rendered[0]).toMatchObject({
+      templateType: 'tiny_logic',
+      category: 'logical_reasoning',
+    });
+
+    // One attempt / explanation / resolution per card.
+    expect(countOf(events, 'Card_Attempted')).toBe(2);
+    expect(countOf(events, 'Card_Explanation_Viewed')).toBe(2);
+    expect(countOf(events, 'Card_Resolved')).toBe(2);
+
+    // Card_Resolved carries the resolution detail + key fields.
+    const resolved = events.filter((e) => e.eventName === 'Card_Resolved');
+    expect(resolved[0]).toMatchObject({
+      cardId: 'card-1',
+      cardIndex: 0,
+      templateType: 'tiny_logic',
+      category: 'logical_reasoning',
+      resolutionType: 'correct',
+      isCorrect: true,
+    });
+    expect(Array.isArray(resolved[0].measuredSignals)).toBe(true);
+    expect(typeof resolved[0].interactionElapsedMs).toBe('number');
+
+    // Attribution: source on the entry event, routeKind on the lifecycle events.
+    const ret = events.find((e) => e.eventName === 'Return_Session_Started');
+    expect(ret).toMatchObject({ source: 'reminder', routeKind: 'session' });
+    expect(
+      events.find((e) => e.eventName === 'Session_Completed')?.routeKind,
+    ).toBe('session');
+
+    // The anonymous id is stamped on every event — and nothing else identifying.
+    expect(events.every((e) => e.anonymousUserId === 'anon-test')).toBe(true);
+  });
+
+  it('does not re-fire Card_Rendered when a card re-renders into its feedback step', () => {
+    const { client, events } = captureClient();
+
+    render(
+      <FeedSession
+        mode="one_minute_rescue"
+        cards={twoCardDeck()}
+        telemetryClient={client}
+        now={() => 1_000}
+        anonymousUserId="anon-test"
+      />,
+    );
+
+    // Card 1 activated exactly once on mount.
+    expect(countOf(events, 'Card_Rendered')).toBe(1);
+
+    // Resolving re-renders the SAME activation into its feedback step — that is
+    // not a new activation, so Card_Rendered must not fire again.
+    fireEvent.click(screen.getByTestId('tl-option-a'));
+    expect(screen.getByTestId('card-feedback')).toBeInTheDocument();
+    expect(countOf(events, 'Card_Rendered')).toBe(1);
+
+    // Advancing to card 2 is a new activation → the second (and only second).
+    fireEvent.click(screen.getByTestId('feedback-next'));
+    expect(countOf(events, 'Card_Rendered')).toBe(2);
+  });
+
+  it('fires Exit_Clicked on the deliberate confirm, then shows the exited receipt', () => {
+    const { client, events } = captureClient();
+
+    render(
+      <FeedSession
+        mode="three_minute_reset"
+        cards={twoCardDeck()}
+        telemetryClient={client}
+        now={() => 1_000}
+        anonymousUserId="anon-test"
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('exit-open'));
+    fireEvent.click(screen.getByTestId('exit-confirm-leave'));
+
+    expect(screen.getByText('Session ended')).toBeInTheDocument();
+    const exit = events.filter((e) => e.eventName === 'Exit_Clicked');
+    expect(exit).toHaveLength(1);
+    expect(exit[0]).toMatchObject({
+      routeKind: 'session',
+      anonymousUserId: 'anon-test',
+    });
+    // No Session_Completed for an early leave (that is the on-time terminal only).
+    expect(countOf(events, 'Session_Completed')).toBe(0);
+  });
+
+  it('fires Intentional_Continue_Clicked on continue, re-arming a fresh session', () => {
+    const { client, events } = captureClient();
+
+    render(
+      <FeedSession
+        mode="one_minute_rescue"
+        cards={twoCardDeck()}
+        telemetryClient={client}
+        now={() => 1_000}
+        anonymousUserId="anon-test"
+      />,
+    );
+
+    // Play to completion.
+    fireEvent.click(screen.getByTestId('tl-option-a'));
+    fireEvent.click(screen.getByTestId('feedback-next'));
+    fireEvent.click(screen.getByTestId('tl-option-a'));
+    fireEvent.click(screen.getByTestId('feedback-next'));
+    expect(screen.getByTestId('continue-control')).toBeInTheDocument();
+
+    const initializedBefore = countOf(events, 'Session_Initialized');
+    fireEvent.click(screen.getByTestId('continue-control'));
+
+    expect(namesOf(events)).toContain('Intentional_Continue_Clicked');
+    // A fresh window armed → exactly one MORE Session_Initialized.
+    expect(countOf(events, 'Session_Initialized')).toBe(initializedBefore + 1);
+    // ...but Return_Session_Started stays once — a continue is not a re-entry.
+    expect(countOf(events, 'Return_Session_Started')).toBe(1);
+  });
+
+  it('fires Receipt_Shared when the receipt share control is tapped', () => {
+    const { client, events } = captureClient();
+
+    render(
+      <FeedSession
+        mode="one_minute_rescue"
+        cards={twoCardDeck()}
+        telemetryClient={client}
+        now={() => 1_000}
+        anonymousUserId="anon-test"
+      />,
+    );
+
+    // Play to completion, then share from the receipt.
+    fireEvent.click(screen.getByTestId('tl-option-a'));
+    fireEvent.click(screen.getByTestId('feedback-next'));
+    fireEvent.click(screen.getByTestId('tl-option-a'));
+    fireEvent.click(screen.getByTestId('feedback-next'));
+    fireEvent.click(screen.getByTestId('share-control'));
+
+    const shared = events.filter((e) => e.eventName === 'Receipt_Shared');
+    expect(shared).toHaveLength(1);
+    expect(shared[0]).toMatchObject({
+      routeKind: 'session',
+      anonymousUserId: 'anon-test',
+    });
+  });
+
+  it('delivers a best-effort Session_Abandoned via the unload listener while in progress', () => {
+    const { client, abandonments } = captureClient();
+
+    render(
+      <FeedSession
+        mode="one_minute_rescue"
+        cards={twoCardDeck()}
+        telemetryClient={client}
+        now={() => 1_000}
+        anonymousUserId="anon-test"
+      />,
+    );
+
+    // A card is in play → the session is in progress.
+    expect(screen.getByTestId('tl-stem')).toBeInTheDocument();
+
+    // Simulate the page being unloaded (the §10 abandonment seam).
+    act(() => {
+      window.dispatchEvent(new Event('pagehide'));
+    });
+
+    expect(namesOf(abandonments)).toContain('Session_Abandoned');
+    expect(abandonments[0]).toMatchObject({
+      routeKind: 'session',
+      anonymousUserId: 'anon-test',
+    });
+    expect(typeof abandonments[0].sessionId).toBe('string');
+    expect(abandonments[0].sessionId).not.toBe('');
+  });
+
+  it('defaults the §10 source to direct from the query param when none is injected', () => {
+    const { client, events } = captureClient();
+
+    render(
+      <FeedSession
+        mode="one_minute_rescue"
+        cards={twoCardDeck()}
+        telemetryClient={client}
+        now={() => 1_000}
+        anonymousUserId="anon-test"
+      />,
+    );
+
+    // No `?source=` in the jsdom URL and no injected source → 'direct'.
+    expect(
+      events.find((e) => e.eventName === 'Return_Session_Started')?.source,
+    ).toBe('direct');
+  });
+});
 
 describe('continueSeedUserId', () => {
   it('keeps the plain id for the first window and suffixes the counter after', () => {
