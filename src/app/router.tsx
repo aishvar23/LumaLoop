@@ -12,8 +12,7 @@
  */
 import { Route, Routes } from 'react-router-dom';
 import { ROUTES } from './routes';
-import SessionRoute from './SessionRoute';
-import FeedScreen from '../feed/FeedScreen';
+import FeedRoute from '../feed/FeedRoute';
 import {
   CardDeepLinkRoutePlaceholder,
   NotFoundRoutePlaceholder,
@@ -23,10 +22,10 @@ import {
 export function AppRoutes() {
   return (
     <Routes>
-      <Route path={ROUTES.session} element={<SessionRoute />} />
-      {/* Preview only (#105): the endless swipe feed lives at `/feed` until the
-          default swap (#107). `/` keeps the start-screen/session/receipt. */}
-      <Route path={ROUTES.feed} element={<FeedScreen />} />
+      {/* `/` is now the endless swipe feed (#107) — the default surface, with the
+          one-time first-run data notice over it. The former `/feed` preview route
+          (#105) is retired: `/` is the single source of truth for the feed. */}
+      <Route path={ROUTES.session} element={<FeedRoute />} />
       <Route
         path={ROUTES.cardDeepLink}
         element={<CardDeepLinkRoutePlaceholder />}

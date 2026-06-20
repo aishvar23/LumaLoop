@@ -13,26 +13,28 @@ function renderAt(path: string) {
 }
 
 describe('AppRoutes', () => {
-  it('renders the session placeholder at `/`, keeping the disclaimer', () => {
+  it('renders the endless feed at `/` with the one-time data notice over it', () => {
     renderAt('/');
-    expect(
-      screen.getByRole('heading', { name: 'LumaLoop' }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/not a cognitive, medical, school, or employment/i),
-    ).toBeInTheDocument();
-  });
-
-  it('renders the swipe feed preview at `/feed`, leaving `/` untouched', () => {
-    renderAt('/feed');
-    // The endless feed names its landmark with a visually-hidden heading.
+    // `/` is now the feed surface (#107), named by a visually-hidden heading.
     expect(
       screen.getByRole('heading', { name: 'Game feed' }),
     ).toBeInTheDocument();
-    // Preview only (#105): it is NOT the start screen — `/` still owns that.
+    // The §21.8 non-assessment notice is preserved as a first-run gate.
     expect(
-      screen.queryByRole('heading', { name: 'LumaLoop' }),
+      screen.getByText(/not a cognitive, medical, school, or employment/i),
+    ).toBeInTheDocument();
+    // The retired start-screen mode chooser is gone.
+    expect(
+      screen.queryByRole('heading', { name: 'Choose a session' }),
     ).not.toBeInTheDocument();
+  });
+
+  it('no longer serves the standalone `/feed` preview route (folded into `/`)', () => {
+    renderAt('/feed');
+    // `/feed` is retired (#107): it falls through to the not-found surface.
+    expect(
+      screen.getByRole('heading', { name: 'Page not found' }),
+    ).toBeInTheDocument();
   });
 
   it('renders the deep-link placeholder and exposes the decoded cardId', () => {
@@ -56,15 +58,15 @@ describe('AppRoutes', () => {
     expect(
       screen.getByRole('heading', { name: 'Page not found' }),
     ).toBeInTheDocument();
-    // It is not the session or deep-link surface.
+    // It is not the feed or deep-link surface.
     expect(
-      screen.queryByRole('heading', { name: 'LumaLoop' }),
+      screen.queryByRole('heading', { name: 'Game feed' }),
     ).not.toBeInTheDocument();
   });
 
-  it('routes "Back to start" through a client-side link to `/`', () => {
+  it('routes "Back to the feed" through a client-side link to `/`', () => {
     renderAt('/totally/unknown');
-    const back = screen.getByRole('link', { name: 'Back to start' });
+    const back = screen.getByRole('link', { name: 'Back to the feed' });
     // React Router `Link` resolves to the session route and renders an anchor
     // with the in-app href, so navigation stays client-side (no full reload).
     expect(back).toHaveAttribute('href', '/');

@@ -30,8 +30,8 @@ export type FeedFrameProps = {
   /**
    * Optional exit affordance pinned below the feed (Design §8.3 / Tech §14 —
    * the exit path must be visually clear). Kept a slot so the frame stays
-   * presentational and owns no session progression (CLAUDE.md §4): the control
-   * itself (#72's {@link ExitControl}) carries the leave action.
+   * presentational and owns no session progression (CLAUDE.md §4): the injected
+   * control carries the leave action.
    */
   exitSlot?: ReactNode;
 };

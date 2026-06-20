@@ -4,10 +4,9 @@
  * These are deliberately minimal stand-ins so `/c/:cardId` and unknown paths
  * resolve today. The REAL screens are other tasks and must replace these here:
  *   - Single-card (deep-link) render → #69-72 (share arrival surface)
- * The `/` session route now mounts the real {@link SessionRoute} container
- * (#69) — its scaffold placeholder has been retired. Routing only selects which
- * element renders; it must never own session progression (CLAUDE.md §4). Keep
- * that boundary when swapping these out.
+ * The `/` route now mounts the endless feed (#107). Routing only selects which
+ * element renders; it must never own feed/session progression (CLAUDE.md §4).
+ * Keep that boundary when swapping these out.
  */
 import { Link, useParams } from 'react-router-dom';
 import Screen from '../ui/Screen';
@@ -58,7 +57,7 @@ export function NotFoundRoutePlaceholder() {
           That link doesn’t lead anywhere in LumaLoop.
         </p>
         {/* Client-side nav: `Link` keeps SPA state instead of full reload. */}
-        <Link to={ROUTES.session}>Back to start</Link>
+        <Link to={ROUTES.session}>Back to the feed</Link>
       </Stack>
     </Screen>
   );
