@@ -10,8 +10,9 @@
  * paging, and which card is active. {@link useFeedController} owns the endless deck
  * + active index; the per-template renderers own card interaction. FeedScreen
  * resolves a renderer for each card via the injected {@link RendererRegistry} only
- * — there is NO switch on `templateType` anywhere, so adding a new game (M4) never
- * touches this file (CLAUDE.md §6). M3 injects a template-agnostic STUB registry.
+ * — there is NO switch on `templateType` anywhere, so adding a new game never
+ * touches this file (CLAUDE.md §6). It defaults to the {@link defaultRendererRegistry}
+ * of the four real native renderers (M4); tests inject a stub/fake registry.
  *
  * Active-card detection: a game becomes ACTIVE when it snaps into view, detected
  * via `onViewableItemsChanged`; FeedScreen calls `setActiveIndex`, which
@@ -47,9 +48,8 @@ import {
 import { getCardById as getCatalogCardById } from '../core/cards/catalog';
 import type { LiquidCard } from '../core/cards/types';
 import type { CardResolution, CardStartContext } from '../core/templates/contract';
-import { resolveRenderer } from './rendererRegistry';
+import { defaultRendererRegistry, resolveRenderer } from './rendererRegistry';
 import type { RendererRegistry, TemplateRenderer } from './rendererRegistry';
-import { stubRendererRegistry } from './stubRenderer';
 import type { FeedBatchSource } from '../core/feed/feedDeck';
 import { useFeedController } from './useFeedController';
 
@@ -74,8 +74,8 @@ const DEFAULT_ANONYMOUS_USER_ID = 'anonymous';
 export type FeedScreenProps = {
   /**
    * Test/wiring seam: maps each `templateType` to its renderer (dependency
-   * inversion). Defaults to the M3 {@link stubRendererRegistry}; M4 swaps in the
-   * real renderers. Must be referentially stable.
+   * inversion). Defaults to the {@link defaultRendererRegistry} of the four real
+   * native renderers (M4); tests inject a stub/fake. Must be referentially stable.
    */
   registry?: RendererRegistry;
   /** Test seam: deterministic feed batch source. Defaults to seeded catalog. */
@@ -150,7 +150,7 @@ function makeFeedId(anonymousUserId: string, stamp: number): string {
 }
 
 export default function FeedScreen({
-  registry = stubRendererRegistry,
+  registry = defaultRendererRegistry,
   source,
   anonymousUserId = DEFAULT_ANONYMOUS_USER_ID,
   getCardById = getCatalogCardById,

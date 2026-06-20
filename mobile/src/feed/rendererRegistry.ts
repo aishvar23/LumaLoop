@@ -11,11 +11,11 @@
  * anywhere in the feed, so adding a new game is a single localized registry slot,
  * never a feed edit (CLAUDE.md §6).
  *
- * Unlike the web module, this one ships NO `defaultRendererRegistry` of real
- * renderers: the four native game renderers are M4. M3 ships a template-agnostic
- * STUB registry (see `stubRenderer.tsx`) behind this same seam, mirroring how the
- * web feed shell shipped with a stub before the renderers landed. When M4 adds
- * the real renderers it registers them here with no change to the feed.
+ * M4 (ADO #128) lands the four real native renderers and registers them here as
+ * {@link defaultRendererRegistry} — the feed's new default — with no change to
+ * `FeedScreen`. The template-agnostic STUB registry (see `stubRenderer.tsx`)
+ * remains for the feed-lifecycle tests, which need a renderer with deterministic,
+ * synchronous engage/resolve affordances; it is no longer the app default.
  *
  * Entries are OPTIONAL on purpose. A partial registry is legal — the feed must
  * fail safe (render a placeholder) when the active card's template has no
@@ -26,6 +26,10 @@ import type { ComponentType } from 'react';
 
 import type { LiquidCard, TemplateType } from '../core/cards/types';
 import type { TemplateProps } from '../core/templates/contract';
+import SpotItCard from './templates/SpotItCard';
+import WhatChangedCard from './templates/WhatChangedCard';
+import RuleFlipCard from './templates/RuleFlipCard';
+import TinyLogicCard from './templates/TinyLogicCard';
 
 /**
  * A template renderer: a component that accepts {@link TemplateProps} for its
@@ -69,3 +73,20 @@ export function resolveRenderer(
     | TemplateRenderer<LiquidCard>
     | undefined;
 }
+
+/**
+ * The app's default feed registry: every template mapped to its real native
+ * renderer (ADO #128). This is what {@link FeedScreen} injects by default; the
+ * stub registry is now test-only.
+ *
+ * Adding a future game stays a single localized slot here (CLAUDE.md §6): author a
+ * renderer that implements the shared `TemplateProps` contract and add one entry —
+ * no feed/controller/telemetry edits. Each renderer is typed at its precise
+ * per-template card variant, so the map is fully type-checked with no cast.
+ */
+export const defaultRendererRegistry: RendererRegistry = {
+  spot_it: SpotItCard,
+  what_changed: WhatChangedCard,
+  rule_flip: RuleFlipCard,
+  tiny_logic: TinyLogicCard,
+};

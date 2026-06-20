@@ -14,6 +14,7 @@ import {
   fireEvent,
   render,
   screen,
+  within,
 } from '@testing-library/react-native';
 import { FlatList, type ViewToken } from 'react-native';
 
@@ -23,6 +24,7 @@ import { useCardTimer } from '../core/templates/useCardTimer';
 import type { FeedBatchSource } from '../core/feed/feedDeck';
 import FeedScreen from './FeedScreen';
 import type { RendererRegistry } from './rendererRegistry';
+import { defaultRendererRegistry } from './rendererRegistry';
 import { StubRenderer, stubRendererRegistry } from './stubRenderer';
 
 // --- Deterministic feed source + cards ----------------------------------------
@@ -362,6 +364,41 @@ describe('FeedScreen (native)', () => {
     expect(onCardAbandoned).toHaveBeenCalledWith(0, 'b0-0');
     // The earlier skip never re-fires for index 0.
     expect(onCardSkipped.mock.calls.filter(([i]) => i === 0)).toHaveLength(1);
+  });
+
+  it('plays a REAL game (spot_it) end-to-end through the default registry, firing the lifecycle seams (#128)', () => {
+    // The default registry wires the four real native renderers. `fakeGetCardById`
+    // yields a 1×1 spot_it card whose only cell IS the anomaly, so the real
+    // SpotItCard renders a tappable grid and the engaging tap also resolves it.
+    const onCardEngaged = jest.fn();
+    const onCardResolved = jest.fn();
+    render(
+      <FeedScreen
+        anonymousUserId="anon"
+        source={fakeSource}
+        registry={defaultRendererRegistry}
+        getCardById={fakeGetCardById}
+        onCardEngaged={onCardEngaged}
+        onCardResolved={onCardResolved}
+      />,
+    );
+
+    // The real renderer is mounted (its grid cell, not the stub affordances).
+    // Scope to the active slide — windowed neighbours mount their own grids too.
+    const activeGame = within(screen.getByTestId('feed-game-0'));
+    expect(activeGame.getByTestId('spot-cell-0-0')).toBeOnTheScreen();
+    expect(screen.queryByTestId('engage-b0-0')).toBeNull();
+
+    // Tapping the anomaly engages (first interaction) AND resolves the game.
+    fireEvent.press(activeGame.getByTestId('spot-cell-0-0'));
+
+    expect(onCardEngaged).toHaveBeenCalledTimes(1);
+    expect(onCardEngaged).toHaveBeenCalledWith(0, 'b0-0');
+    expect(onCardResolved).toHaveBeenCalledTimes(1);
+    expect(onCardResolved).toHaveBeenCalledWith(
+      0,
+      expect.objectContaining({ cardId: 'b0-0', resolutionType: 'correct', isCorrect: true }),
+    );
   });
 
   it('latches skip per index — revisiting an un-engaged game never re-fires (#106)', () => {
