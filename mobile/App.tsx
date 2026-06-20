@@ -1,39 +1,37 @@
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { StyleSheet } from 'react-native';
+
+import FeedScreen from './src/feed/FeedScreen';
 
 /**
- * LumaLoop mobile (React Native + Expo) — Phase M scaffold (ADO #125).
+ * LumaLoop mobile (React Native + Expo).
  *
- * Minimal entry screen for now: the endless full-screen swipe feed of mini-games
- * is built in M3 (feed) + M4 (the four game renderers), driven by the pure logic
- * ported in M2 and instrumented by the telemetry client in M5. This placeholder
- * just proves the app boots in Expo Go / the iOS Simulator.
+ * The app opens straight into the endless, full-screen vertical swipe feed of
+ * mini-games (M3, docs/FEED_DIRECTION.md §3.1), driven by the pure logic ported
+ * in M2. M3 renders games through a template-agnostic STUB behind the renderer
+ * registry seam; M4 swaps in the four real game renderers with no feed change, and
+ * M5 wires the telemetry client onto the feed's lifecycle callbacks.
+ *
+ * SEAM (M6): the one-time first-run anonymous-data notice (FEED_DIRECTION.md §3.6)
+ * is shown once before/over the first feed view. It is intentionally NOT built
+ * here yet — it will wrap or precede `<FeedScreen />` without changing the feed.
+ *
+ * `GestureHandlerRootView` wraps the tree so native gesture handlers work app-wide
+ * (gesture-handler docs); it must be the root view and fill the screen.
  */
 export default function App() {
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>LumaLoop</Text>
-      <Text style={styles.subtitle}>Feed coming up next.</Text>
-      <StatusBar style="auto" />
-    </View>
+    <GestureHandlerRootView style={styles.root}>
+      <FeedScreen />
+      <StatusBar style="light" />
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
     backgroundColor: '#0b0b0f',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  title: {
-    color: '#ffffff',
-    fontSize: 32,
-    fontWeight: '700',
-  },
-  subtitle: {
-    color: '#9aa0aa',
-    fontSize: 15,
   },
 });
