@@ -1,12 +1,22 @@
 /**
- * Telemetry event names and payload type (Technical Design §10).
+ * Telemetry event names and payload type (Technical Design §10; reworked for the
+ * endless feed per docs/FEED_DIRECTION.md §6).
  *
  * This module is the single source of truth for the telemetry contract:
- *   - the eleven event NAMES (as symbolic constants + a typed union), so call
- *     sites reference names symbolically rather than as bare string literals;
+ *   - the event NAMES (as symbolic constants + a typed union), so call sites
+ *     reference names symbolically rather than as bare string literals;
  *   - the on-the-wire {@link TelemetryEvent} payload shape, mirroring §10 exactly;
  *   - {@link QueuedTelemetryEvent}, the payload as actually transmitted, carrying
  *     the client-generated `eventId` used for idempotent retry de-duplication.
+ *
+ * Feed rework (FEED_DIRECTION §6): the bounded-session ceremony events
+ * (`Session_Completed`, `Exit_Clicked`, `Intentional_Continue_Clicked`) and the
+ * receipt's `Receipt_Shared` were RETIRED with the session flow (#107). The kept
+ * envelope events were REMAPPED to feed semantics (see each constant's comment)
+ * and the feed's free-scroll signals (`Card_Skipped`, `Card_Abandoned`) were
+ * ADDED. The DB columns are intentionally TEXT and `event_name` is free-form, so
+ * this change needs NO migration — and `ingest.ts`'s ingest whitelist DERIVES
+ * from `Object.values(TelemetryEventNames)`, so it tracks this set automatically.
  *
  * NO PII (Technical Design §16): the payload intentionally has no field for
  * names, email, contacts, or device identifiers. IP/user-agent stripping happens
@@ -23,9 +33,30 @@ import type {
 import type { ResolutionType } from '../templates/contract';
 
 /**
- * The eleven telemetry events (Technical Design §10). Exposed as a frozen map so
- * downstream code (e.g. session instrumentation, #76) references names
- * symbolically — `TelemetryEventNames.Card_Resolved` — never as raw strings.
+ * The feed telemetry events (Technical Design §10, reworked per FEED_DIRECTION
+ * §6). Exposed as a frozen map so downstream code (feed instrumentation, #108;
+ * ingest whitelist) references names symbolically — `TelemetryEventNames.
+ * Card_Resolved` — never as raw strings.
+ *
+ * Semantics under the endless feed (FEED_DIRECTION §6); the NAMES are unchanged
+ * for the kept events so no migration/analytics break, only the meaning shifts:
+ *   - `Session_Initialized`     — the feed was opened (once per feed mount/visit).
+ *   - `Return_Session_Started`  — a return visit; HEADLINE organic-return metric,
+ *                                 filtered on `source: 'direct'`.
+ *   - `Session_Abandoned`       — the user left the app/feed (best-effort via
+ *                                 `visibilitychange`/`pagehide`; at-most-once).
+ *   - `Card_Rendered`           — a game became ACTIVE/focused (snapped into view),
+ *                                 NOT merely mounted.
+ *   - `Card_Attempted`          — first interaction with the active game (engage).
+ *   - `Card_Resolved`           — the active game resolved (correct/incorrect/timeout).
+ *   - `Card_Explanation_Viewed` — the explanation step became visible for a game.
+ *   - `Card_Skipped`            — a game was swiped past WITHOUT being engaged.
+ *   - `Card_Abandoned`          — a game was engaged then left BEFORE it resolved.
+ *
+ * RETIRED with the bounded session (#107), intentionally absent here:
+ * `Session_Completed`, `Exit_Clicked`, `Intentional_Continue_Clicked` (no session
+ * ceremony), and `Receipt_Shared` (the receipt was deleted in #107). A share
+ * event returns in Phase 2 (FEED_DIRECTION §10) IF/when sharing is added.
  */
 export const TelemetryEventNames = Object.freeze({
   Session_Initialized: 'Session_Initialized',
@@ -33,11 +64,9 @@ export const TelemetryEventNames = Object.freeze({
   Card_Attempted: 'Card_Attempted',
   Card_Resolved: 'Card_Resolved',
   Card_Explanation_Viewed: 'Card_Explanation_Viewed',
-  Session_Completed: 'Session_Completed',
+  Card_Skipped: 'Card_Skipped',
+  Card_Abandoned: 'Card_Abandoned',
   Session_Abandoned: 'Session_Abandoned',
-  Receipt_Shared: 'Receipt_Shared',
-  Exit_Clicked: 'Exit_Clicked',
-  Intentional_Continue_Clicked: 'Intentional_Continue_Clicked',
   Return_Session_Started: 'Return_Session_Started',
 } as const);
 
