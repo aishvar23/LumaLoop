@@ -9,14 +9,12 @@
  * the other direction.
  */
 export const ROUTES = {
-  /** `/` — starts a normal bounded session. */
-  session: '/',
   /**
-   * `/feed` — PREVIEW of the endless full-screen swipe feed (#105). Additive
-   * only: it does not replace `/` until the default swap (#107). Telemetry-wise
-   * it is a `session` surface (it plays the same games), so it reuses that kind.
+   * `/` — the endless full-screen swipe feed (#107), the DEFAULT app surface.
+   * The bounded start-screen/session/receipt flow it replaced is retired; the
+   * former `/feed` preview route (#105) is folded into this single entry.
    */
-  feed: '/feed',
+  session: '/',
   /** `/c/:cardId` — opens a single creator-attributed card from the catalog. */
   cardDeepLink: '/c/:cardId',
 } as const;
@@ -34,7 +32,6 @@ export type RouteKind = 'session' | 'card_deep_link';
 /** Maps an internal {@link RouteKey} to its telemetry {@link RouteKind}. */
 export const routeKindFor: Record<RouteKey, RouteKind> = {
   session: 'session',
-  feed: 'session',
   cardDeepLink: 'card_deep_link',
 } as const;
 
