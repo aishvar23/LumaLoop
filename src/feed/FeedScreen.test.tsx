@@ -67,7 +67,8 @@ const fakeSource: FeedBatchSource = (seed) => {
 function makeCard(cardId: string): LiquidCard {
   const card: SpotItCard = {
     cardId,
-    creatorHandle: `creator_${cardId}`,
+    // Mirror the catalog convention: the handle already carries the leading `@`.
+    creatorHandle: `@creator_${cardId}`,
     templateType: 'spot_it',
     category: 'visual_attention',
     difficulty: 'easy',
@@ -148,6 +149,13 @@ describe('FeedScreen', () => {
     ).toBeInTheDocument();
     // The active game (index 0) is mounted with the first deck card.
     expect(screen.getByTestId('feed-game-0')).toHaveTextContent('game:b0-0');
+  });
+
+  it('renders the creator byline exactly once with no doubled @', () => {
+    renderFeed();
+    // creatorHandle already carries the `@`; the byline must not add another.
+    expect(screen.getAllByText('@creator_b0-0').length).toBeGreaterThan(0);
+    expect(screen.queryByText('@@creator_b0-0')).not.toBeInTheDocument();
   });
 
   it('only mounts games inside the active window; others are placeholders', () => {

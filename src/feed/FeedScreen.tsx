@@ -305,7 +305,8 @@ const FeedSlide = memo(function FeedSlide({
     };
     return (
       <div className="feed-slide" data-index={index} data-testid="feed-slide" ref={registerSlide}>
-        <p className="feed-slide__byline">@{card.creatorHandle}</p>
+        {/* creatorHandle already includes the leading `@` (catalog convention). */}
+        <p className="feed-slide__byline">{card.creatorHandle}</p>
         <div className="feed-slide__game" data-testid={`feed-game-${index}`}>
           {createElement(Renderer as TemplateRenderer<LiquidCard>, {
             key: `${feedId}:${index}`,
