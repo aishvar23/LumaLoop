@@ -156,6 +156,66 @@ it('resolves INCORRECT on a wrong option, recording it as the error type', () =>
   }
 });
 
+it('holds the preview while INACTIVE (pre-mounted off-screen) and starts it only on activation; TTI still excludes the preview (#128)', () => {
+  jest.useFakeTimers();
+  try {
+    const onAttempt = jest.fn();
+    const onResolve = jest.fn<void, [CardResolution]>();
+    let t = ACTIVE_AT;
+    const props = (isActive: boolean) => (
+      <WhatChangedCard
+        card={makeCard()}
+        context={context()}
+        isActive={isActive}
+        onAttempt={onAttempt}
+        onResolve={onResolve}
+        now={() => t}
+      />
+    );
+
+    // Mounted but NOT active: the slide sits in preview. Advancing the clock well
+    // past previewMs must NOT advance to the answer phase — `beforePattern` is still
+    // shown and the answer options are never mounted.
+    const { rerender } = render(props(false));
+    expect(screen.getByTestId('wc-before-0')).toBeOnTheScreen();
+
+    t = ACTIVE_AT + PREVIEW_MS * 3;
+    act(() => jest.advanceTimersByTime(PREVIEW_MS * 3));
+    expect(screen.getByTestId('wc-before-0')).toBeOnTheScreen();
+    expect(screen.queryByTestId('wc-option-opt-b')).toBeNull();
+
+    // Becomes ACTIVE: the preview countdown starts now, from this instant.
+    const activatedAt = t;
+    rerender(props(true));
+    // Immediately after activation we are still in preview (countdown just armed).
+    expect(screen.queryByTestId('wc-option-opt-b')).toBeNull();
+
+    // After previewMs FROM ACTIVATION, the answer phase begins.
+    const answerStart = activatedAt + PREVIEW_MS;
+    t = answerStart;
+    act(() => jest.advanceTimersByTime(PREVIEW_MS));
+    expect(screen.getByTestId('wc-after-1')).toBeOnTheScreen();
+    expect(screen.getByTestId('wc-option-opt-b')).toBeOnTheScreen();
+
+    // Select 350ms into the answer phase: TTI is measured from answer-phase start,
+    // excluding BOTH the preview and the long inactive hold before it.
+    t = answerStart + 350;
+    fireEvent.press(screen.getByTestId('wc-option-opt-b'));
+    expect(onAttempt).toHaveBeenCalledTimes(1);
+    expect(onAttempt).toHaveBeenCalledWith({ time_to_interaction: 350 });
+
+    expect(onResolve).toHaveBeenCalledTimes(1);
+    const resolution = onResolve.mock.calls[0][0];
+    expect(resolution).toMatchObject({
+      resolutionType: 'correct',
+      isCorrect: true,
+      interactionElapsedMs: 350,
+    });
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
 it('resolves TIMEOUT when the answer-phase time limit elapses with no selection', () => {
   jest.useFakeTimers();
   try {

@@ -124,6 +124,39 @@ it('flips the rule at flipAtStimulusIndex and resolves via the evaluator', () =>
   }
 });
 
+it('does not start its stimulus stream while INACTIVE (pre-mounted off-screen) (#128)', () => {
+  jest.useFakeTimers();
+  try {
+    const onResolve = jest.fn<void, [CardResolution]>();
+    let t = ACTIVE_AT;
+    render(
+      <RuleFlipCard
+        card={makeCard()}
+        context={context()}
+        isActive={false}
+        onAttempt={jest.fn()}
+        onResolve={onResolve}
+        now={() => t}
+      />,
+    );
+
+    // Rule Flip is already activation-safe: its measured stream begins only on the
+    // user's intentional "Start" tap (the comprehension gate), which is unreachable
+    // on an off-screen slide. So while inactive — even as the clock runs far past
+    // any stimulus/limit — it holds on the gate: no stimulus streams, nothing
+    // resolves.
+    expect(screen.getByTestId('rf-start')).toBeOnTheScreen();
+    expect(screen.queryByTestId('rf-stimulus')).toBeNull();
+
+    t = ACTIVE_AT + SHOW_MS * 10;
+    act(() => jest.advanceTimersByTime(SHOW_MS * 10));
+    expect(screen.queryByTestId('rf-stimulus')).toBeNull();
+    expect(onResolve).not.toHaveBeenCalled();
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
 it('resolves INCORRECT when responses are wrong under the active rule', () => {
   jest.useFakeTimers();
   try {

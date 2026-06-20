@@ -307,6 +307,7 @@ export default function FeedScreen({
         cardId={cardId}
         height={slideHeight}
         windowed={Math.abs(index - activeIndex) <= WINDOW_RADIUS}
+        active={index === activeIndex}
         registry={registry}
         getCardById={getCardById}
         feedId={feedId}
@@ -365,6 +366,13 @@ type FeedSlideProps = {
   height: number;
   /** Whether this slide is close enough to the active card to mount its game. */
   windowed: boolean;
+  /**
+   * Whether this slide is THE active/focused card (snapped into view), as opposed
+   * to a windowed-but-pre-mounted neighbour. Threaded to the renderer as `isActive`
+   * so timed PRE-phases (e.g. `what_changed`'s preview) hold until activation rather
+   * than elapsing off-screen. Template-agnostic — the feed never branches on type.
+   */
+  active: boolean;
   registry: RendererRegistry;
   getCardById: (cardId: string) => LiquidCard | undefined;
   feedId: string;
@@ -388,6 +396,7 @@ const FeedSlide = memo(function FeedSlide({
   cardId,
   height,
   windowed,
+  active,
   registry,
   getCardById,
   feedId,
@@ -440,6 +449,11 @@ const FeedSlide = memo(function FeedSlide({
             key={`${feedId}:${index}`}
             card={timerGatedCard(card, engaged)}
             context={context}
+            // Activation signal (#128 review fix): only the focused slide is
+            // active. Renderers with a timed PRE-phase (what_changed's preview)
+            // hold until this is true, so a pre-mounted slide's preview cannot
+            // elapse off-screen. Template-agnostic; most renderers ignore it.
+            isActive={active}
             onAttempt={handleAttempt}
             onResolve={(resolution: CardResolution) => onResolve(index, resolution)}
           />
