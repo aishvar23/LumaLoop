@@ -159,7 +159,7 @@ export function createFeedTelemetry(deps: FeedTelemetryDeps): FeedTelemetry {
   const resolvedCards = new Set<number>();
   const skippedCards = new Set<number>();
   const abandonedCards = new Set<number>();
-  const explanationViewedCards = new Set<string>();
+  const explanationViewedCards = new Set<number>();
   let abandonmentFired = false;
 
   // --- Live context. --------------------------------------------------------
@@ -253,15 +253,22 @@ export function createFeedTelemetry(deps: FeedTelemetryDeps): FeedTelemetry {
 
     explanationViewed(card) {
       if (!card) return;
-      const key = `${feedId}:${card.cardId}`;
-      if (explanationViewedCards.has(key)) return;
-      explanationViewedCards.add(key);
       // Index from the active card when it matches (it does during the gate's
       // feedback step); omitted otherwise rather than guessed.
       const cardIndex =
         activeCard && activeCard.card.cardId === card.cardId
           ? activeCard.cardIndex
           : undefined;
+      // Latch PER ACTIVATION (by cardIndex), consistent with Card_Rendered/
+      // Resolved/Skipped/Abandoned: the endless feed replays the same cardId at
+      // new indices, so a cardId-keyed latch would suppress the explanation view
+      // of a repeat play and undercount it relative to its Card_Resolved. When
+      // the index is unknown (no active match — not expected during the gate), we
+      // cannot per-activation dedup, so emit without latching rather than drop it.
+      if (cardIndex !== undefined) {
+        if (explanationViewedCards.has(cardIndex)) return;
+        explanationViewedCards.add(cardIndex);
+      }
       emit(TelemetryEventNames.Card_Explanation_Viewed, {
         cardId: card.cardId,
         cardIndex,

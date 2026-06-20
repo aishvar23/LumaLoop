@@ -286,6 +286,26 @@ describe('createFeedTelemetry', () => {
     });
   });
 
+  it('re-fires Card_Explanation_Viewed when the same card replays at a new index (per-activation)', () => {
+    // The endless feed cycles the catalog, so the same cardId reappears at a new
+    // index. Explanation views latch per cardIndex (like the other card events),
+    // so a replay's explanation is counted, not suppressed — keeping it
+    // consistent with the replay's Card_Resolved.
+    const { client, events } = createCapturingClient();
+    const telemetry = createFeedTelemetry({ ...baseDeps, client });
+
+    telemetry.feedOpened();
+    telemetry.cardActivated(makeCard('card-1'), 0);
+    telemetry.explanationViewed(makeCard('card-1'));
+    // Same card replays at index 7 (a later batch).
+    telemetry.cardActivated(makeCard('card-1'), 7);
+    telemetry.explanationViewed(makeCard('card-1'));
+
+    const viewed = events.filter((e) => e.eventName === 'Card_Explanation_Viewed');
+    expect(viewed).toHaveLength(2);
+    expect(viewed.map((e) => e.cardIndex)).toEqual([0, 7]);
+  });
+
   it('builds an abandonment event only after the feed has been opened', () => {
     const { client } = createCapturingClient();
     const telemetry = createFeedTelemetry({
