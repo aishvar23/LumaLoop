@@ -71,6 +71,19 @@ export type FeedScreenProps = {
   /** Test seam: wall clock for the per-card start context. Defaults to `Date.now`. */
   now?: () => number;
   /**
+   * Wiring seam: the feed instance id used as the per-card start `context.
+   * sessionId` AND (in `FeedRoute`) as telemetry's `sessionId` envelope, so both
+   * agree on one id per feed visit. Defaults to a fresh per-mount UUID.
+   */
+  feedId?: string;
+  /**
+   * Notified once per game when it becomes the ACTIVE/focused card (snaps into
+   * view), NOT when merely mounted. Fires for the first card on mount and once
+   * per index thereafter (no refire on revisit). Seam for #108 telemetry
+   * (`Card_Rendered`).
+   */
+  onCardActive?: (index: number, cardId: string) => void;
+  /**
    * Notified once per game when the player first ENGAGES it (first `onAttempt`).
    * Engagement arms the per-game timer and distinguishes a skip from an abandon.
    * Seam for #108 telemetry (`Card_Attempted`); fires at most once per index.
@@ -154,6 +167,8 @@ export default function FeedScreen({
   anonymousUserId,
   getCardById = getCatalogCardById,
   now,
+  feedId: feedIdProp,
+  onCardActive,
   onCardEngaged,
   onCardSkipped,
   onCardAbandoned,
@@ -169,7 +184,10 @@ export default function FeedScreen({
   // here — each slide arms it from its own engage instant (#106, see FeedSlide).
   const nowFn = now ?? Date.now;
   const [feedId] = useState(
-    () => globalThis.crypto?.randomUUID?.() ?? `feed-${resolvedAnonymousUserId}`,
+    () =>
+      feedIdProp ??
+      globalThis.crypto?.randomUUID?.() ??
+      `feed-${resolvedAnonymousUserId}`,
   );
   const [activeAtMs] = useState(() => nowFn());
 
@@ -284,6 +302,22 @@ export default function FeedScreen({
   onCardSkippedRef.current = onCardSkipped;
   const onCardAbandonedRef = useRef(onCardAbandoned);
   onCardAbandonedRef.current = onCardAbandoned;
+  const onCardActiveRef = useRef(onCardActive);
+  onCardActiveRef.current = onCardActive;
+
+  // A game becoming ACTIVE (snapping into view) is its `Card_Rendered` moment
+  // (#108, docs/FEED_DIRECTION.md §3.1) — distinct from mounting. Fire the
+  // activation seam for the first card on mount and once per index thereafter;
+  // latched per index so revisiting a game never refires (matches the telemetry
+  // factory's per-index Card_Rendered latch).
+  const activatedRef = useRef<Set<number>>(new Set());
+  useEffect(() => {
+    if (activatedRef.current.has(activeIndex)) return;
+    const cardId = cardsRef.current[activeIndex];
+    if (cardId === undefined) return;
+    activatedRef.current.add(activeIndex);
+    onCardActiveRef.current?.(activeIndex, cardId);
+  }, [activeIndex]);
 
   // First interaction ENGAGES a game: record it and fire the engage seam once.
   const handleEngage = useCallback(

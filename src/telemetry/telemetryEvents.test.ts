@@ -1,12 +1,15 @@
 /**
- * Telemetry event-name contract (Technical Design §10, §17 item 6).
+ * Telemetry event-name contract (Technical Design §10, §17 item 6; reworked for
+ * the endless feed per docs/FEED_DIRECTION.md §6).
  *
- * `telemetryEvents.ts` is the single source of truth for the eleven §10 event
- * names and the on-the-wire payload shape, yet it had no dedicated test: the
- * client and session-instrumentation suites only reference specific names
- * symbolically, so a drift in the canonical set (a renamed event, a 12th event,
- * an un-frozen map) would slip through. These tests pin the contract itself so
- * the §17 telemetry-shape assurance is reproducible, not incidental.
+ * `telemetryEvents.ts` is the single source of truth for the feed event names and
+ * the on-the-wire payload shape, yet it had no dedicated test: the client and
+ * feed-instrumentation suites only reference specific names symbolically, so a
+ * drift in the canonical set (a renamed event, an extra event, an un-frozen map)
+ * would slip through. These tests pin the contract itself so the §17 telemetry-
+ * shape assurance is reproducible, not incidental — including that the retired
+ * session-ceremony events are GONE so `ingest.ts` (whose whitelist derives from
+ * this set) rejects them.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -14,9 +17,10 @@ import { describe, expect, it } from 'vitest';
 import { TelemetryEventNames, type TelemetryEvent } from './telemetryEvents';
 
 /**
- * The eleven §10 events, listed independently of the source object so this test
- * fails loudly if the canonical set changes rather than tautologically tracking
- * it. Order is irrelevant; the set comparison below is order-insensitive.
+ * The nine feed events (FEED_DIRECTION §6), listed independently of the source
+ * object so this test fails loudly if the canonical set changes rather than
+ * tautologically tracking it. Order is irrelevant; the comparison below is
+ * order-insensitive.
  */
 const EXPECTED_EVENT_NAMES = [
   'Session_Initialized',
@@ -24,20 +28,42 @@ const EXPECTED_EVENT_NAMES = [
   'Card_Attempted',
   'Card_Resolved',
   'Card_Explanation_Viewed',
-  'Session_Completed',
+  'Card_Skipped',
+  'Card_Abandoned',
   'Session_Abandoned',
-  'Receipt_Shared',
-  'Exit_Clicked',
-  'Intentional_Continue_Clicked',
   'Return_Session_Started',
 ] as const;
 
-describe('TelemetryEventNames (§10 contract)', () => {
-  it('declares exactly the eleven §10 events and no more', () => {
+/**
+ * The bounded-session ceremony events retired with the session flow (#107,
+ * FEED_DIRECTION §6). They must NOT reappear in the canonical set, so the ingest
+ * whitelist (derived from it) rejects any straggler POST using these names.
+ */
+const RETIRED_EVENT_NAMES = [
+  'Session_Completed',
+  'Exit_Clicked',
+  'Intentional_Continue_Clicked',
+  'Receipt_Shared',
+] as const;
+
+describe('TelemetryEventNames (FEED_DIRECTION §6 contract)', () => {
+  it('declares exactly the nine feed events and no more', () => {
     expect(Object.values(TelemetryEventNames).sort()).toEqual(
       [...EXPECTED_EVENT_NAMES].sort(),
     );
-    expect(Object.keys(TelemetryEventNames)).toHaveLength(11);
+    expect(Object.keys(TelemetryEventNames)).toHaveLength(9);
+  });
+
+  it('no longer declares any retired session-ceremony event', () => {
+    const names = new Set<string>(Object.values(TelemetryEventNames));
+    for (const retired of RETIRED_EVENT_NAMES) {
+      expect(names.has(retired)).toBe(false);
+    }
+  });
+
+  it('declares the feed free-scroll events added for the endless feed', () => {
+    expect(TelemetryEventNames.Card_Skipped).toBe('Card_Skipped');
+    expect(TelemetryEventNames.Card_Abandoned).toBe('Card_Abandoned');
   });
 
   it('maps each key to its own string literal (no typo drift between key and value)', () => {
@@ -53,7 +79,7 @@ describe('TelemetryEventNames (§10 contract)', () => {
       // module is strict). A silent no-op would mean the freeze is ineffective.
       (TelemetryEventNames as Record<string, string>).New_Event = 'New_Event';
     }).toThrow();
-    expect(Object.keys(TelemetryEventNames)).toHaveLength(11);
+    expect(Object.keys(TelemetryEventNames)).toHaveLength(9);
   });
 });
 
