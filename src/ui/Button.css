@@ -19,10 +19,13 @@
   font-weight: var(--font-weight-semibold);
   font-family: inherit;
   cursor: pointer;
+  /* Phase 5: token-driven press micro-motion. The fast duration keeps taps
+   * feeling instant; the global prefers-reduced-motion rule collapses these
+   * transitions to ~0 so the button never visibly moves for reduced-motion. */
   transition:
-    transform 120ms ease,
-    box-shadow 120ms ease,
-    filter 120ms ease;
+    transform var(--motion-fast) var(--ease-out),
+    box-shadow var(--motion-fast) var(--ease-out),
+    filter var(--motion-fast) var(--ease-out);
 }
 
 .btn--primary {
@@ -41,10 +44,13 @@
 }
 
 .btn--primary:active {
-  /* Pressed: settle down + dim slightly so the press reads physically. */
-  transform: translateY(1px);
+  /* Pressed: settle down + scale in slightly + dim so the press reads
+   * physically (Phase 5 micro-motion). The accent glow blooms from the slide
+   * accent so the tap feels reactive on the colored feed. */
+  transform: translateY(1px) scale(0.97);
   filter: brightness(0.94);
-  box-shadow: none;
+  box-shadow: 0 0 0 4px
+    color-mix(in srgb, var(--accent, var(--color-accent)) 30%, transparent);
 }
 
 .btn--ghost {
@@ -58,6 +64,8 @@
 }
 
 .btn--ghost:active {
-  transform: translateY(1px);
+  transform: translateY(1px) scale(0.97);
   background: var(--color-surface-raised);
+  box-shadow: 0 0 0 4px
+    color-mix(in srgb, var(--accent, var(--color-accent)) 20%, transparent);
 }

@@ -195,6 +195,34 @@ direction). PRs on GitHub `aishvar23/LumaLoop`.
   cumulative points persist best-effort (localStorage / AsyncStorage), no PII, reset-
   safe. NO new telemetry events. **GAME-POINTS framing only** (Design §7/§21.8).
 
+**G. Motion polish — Phase 5 (ANIMATION & TRANSITIONS)**
+- A restrained, token-first motion language (TikTok/Reels-snappy, not bouncy) added
+  on top of the colored-but-static feed. Web tokens in `src/styles/tokens.css`
+  (`--motion-fast 120ms` / `--motion-base 200ms` / `--motion-slow 320ms`;
+  `--ease-out`, `--ease-pop`, `--ease-standard`); native parallels in
+  `mobile/src/feed/templates/tokens.ts` (`motion.fast/base/slow`). What animates:
+  (1) **active-card entrance** — fade + lift + slight scale when a slide becomes the
+  focused card, gated on ACTIVATION not mount (web: `data-active` on
+  `.feed-slide__game` + a keyframe; mobile: an `ActiveEntrance` `Animated` wrapper),
+  so pre-mounted neighbours never animate off-screen; (2) **interaction micro-motion**
+  — press scale + accent glow on every game control (web: one
+  `.feed-slide__game button:active` rule + the shared `Button`; mobile: existing
+  Pressable `pressed` states); (3) **tile-flash / reveal polish** — eased lit↔unlit
+  colour + a faint lit-cell scale for memory_sequence, and a per-item reveal pop +
+  flip-banner pop for rule_flip (visual easing only — flash/cadence timing unchanged);
+  (4) **result-card pop** — the result card pops in (scale + fade) with its points
+  chip popping just behind it (web keyframes in `global.css`; mobile `Animated.spring`);
+  (5) **streak flourish** — the 🔥 pill pulses once whenever the streak INCREASES
+  (web: a remount-keyed `--pulse` class; mobile: a one-shot `Animated` scale pulse).
+- **Reduced-motion:** every animation degrades fully — web extends the existing
+  `prefers-reduced-motion` rule in `global.css` (collapses all durations to ~0, which
+  also neutralises the inline-style keyframes); mobile reuses `useReducedMotion`
+  (AccessibilityInfo) to snap each `Animated` value to its final state.
+- **Pitfalls avoided:** motion is gated on the `isActive`/`active` ACTIVATION signal,
+  never on mount and never coupled to `useCardTimer` / resolution latching, so a
+  re-activating off-screen slide cannot fire phantom animations or timers. No game
+  logic, evaluator, timing, or telemetry changed; core stayed in lock-step (UI-only).
+
 Every task shipped via a worker-driven loop (implement → code-review → fix → squash-
 merge → ADO Done). Review caught & fixed real bugs throughout (toolchain coupling,
 double-resolve / timer re-arm on off-screen slides, reproduce-phase timing, `@@`

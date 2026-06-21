@@ -56,16 +56,72 @@ button {
   outline-offset: var(--focus-ring-offset);
 }
 
+/* ── Shared motion keyframes (Phase 5) ───────────────────────────────────────
+ * Keyframes referenced by inline-styled components (the result card + its
+ * points chip, the HUD/result streak flourish) live here because those
+ * components have no own stylesheet — keeping the animation NAMES global lets
+ * them stay token-driven (durations/easings from tokens.css) without a per-
+ * component CSS file. Every one of these is gated off by the reduced-motion
+ * rule below, which collapses animation-duration to ~0 for ALL elements, so
+ * nothing animates when the user asks for less motion. */
+
+/* Result card: pop + fade in when it mounts (the rewarding resolution moment). */
+@keyframes card-feedback-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Points chip: a slightly punchier pop, sequenced just behind the card. */
+@keyframes card-score-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Streak/combo flourish: a brief, subtle pulse when the streak increases. A
+ * single non-looping pulse (the JS re-applies it on each increment via a key),
+ * so it celebrates the moment without distracting afterwards. */
+@keyframes streak-pulse {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.16);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 /* Respect users who ask for less motion: disable non-essential animation and
  * transitions, and make programmatic scrolling instant. Essential motion (if
- * any) should opt back in explicitly. */
+ * any) should opt back in explicitly. This also neutralises every Phase 5
+ * animation above (the duration override stops them visibly running). */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    /* Also zero any animation/transition DELAY: a delayed animation with
+     * `fill-mode: both` would otherwise hold its `from` (e.g. opacity:0) state
+     * for the full delay even at ~0 duration — a brief flash of the hidden
+     * state. Zeroing the delay makes such elements simply appear (Phase 5: the
+     * result-card points chip uses an 80ms delay). */
+    animation-delay: 0ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
     scroll-behavior: auto !important;
   }
 }

@@ -52,3 +52,11 @@
   font-weight: var(--font-weight-bold);
   font-variant-numeric: tabular-nums;
 }
+
+/* Phase 5 flourish: a brief celebratory pulse when the streak INCREASES. The
+ * component bumps a `key` on each increment so React remounts this element and
+ * the one-shot keyframe replays — a quiet "🔥 grew" beat, then it rests. Gated
+ * off under prefers-reduced-motion (global.css collapses the duration). */
+.feed-hud__streak--pulse {
+  animation: streak-pulse var(--motion-slow) var(--ease-pop) both;
+}

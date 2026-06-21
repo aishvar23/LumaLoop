@@ -393,16 +393,27 @@ const cellStyle = {
   fontSize: 'var(--font-size-lg)',
   fontFamily: 'var(--font-sans)',
   cursor: 'pointer',
+  // Phase 5: ease the lit↔unlit colour change so the WATCH flash glides in/out
+  // instead of hard-snapping, and the reproduce tap feels reactive. Purely
+  // visual easing layered on top — the flash TIMING (`flashMs`/`gapMs`, set by
+  // the JS schedule above) is unchanged; this only smooths the colour
+  // transition. Kept to the fast token so the flash stays crisp. Collapses to
+  // ~0 under prefers-reduced-motion (global.css), so the flash becomes an
+  // instant on/off for users who ask for less motion.
+  transition:
+    'background-color var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out), transform var(--motion-fast) var(--ease-out)',
 } as const;
 
 // The lit cell during WATCH: a stronger surface + accent border so the flash is
 // visible. Pairs with `data-lit` / the "lit" aria-label so it is never conveyed
-// by colour alone.
+// by colour alone. A faint scale-up gives the flash a subtle "pulse" (Phase 5)
+// without affecting layout (the grid track is fixed).
 const litCellStyle = {
   ...cellStyle,
   cursor: 'default',
-  background: 'var(--color-accent)',
-  borderColor: 'var(--color-accent)',
+  background: 'var(--accent, var(--color-accent))',
+  borderColor: 'var(--accent, var(--color-accent))',
+  transform: 'scale(1.04)',
 } as const;
 
 const liveRegionStyle = {

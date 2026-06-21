@@ -329,6 +329,33 @@ describe('FeedScreen', () => {
     expect(screen.getByTestId('active-b0-0')).toHaveTextContent('inactive');
   });
 
+  it('gates the entrance animation on ACTIVATION via data-active (Phase 5)', () => {
+    // The game container exposes `data-active` so the activation-gated entrance
+    // animation (FeedScreen.css) runs only for the FOCUSED slide — a pre-mounted
+    // neighbour stays `data-active="false"` until it actually snaps into view, so
+    // motion is gated on activation, not mount.
+    renderFeed();
+    expect(screen.getByTestId('feed-game-0')).toHaveAttribute(
+      'data-active',
+      'true',
+    );
+    expect(screen.getByTestId('feed-game-1')).toHaveAttribute(
+      'data-active',
+      'false',
+    );
+
+    // Advancing flips the focus → index 1 becomes the active (animating) slide.
+    fireEvent.keyDown(scroller(), { key: 'ArrowDown' });
+    expect(screen.getByTestId('feed-game-1')).toHaveAttribute(
+      'data-active',
+      'true',
+    );
+    expect(screen.getByTestId('feed-game-0')).toHaveAttribute(
+      'data-active',
+      'false',
+    );
+  });
+
   it('records a resolution locally without auto-advancing (#106 seam)', () => {
     const onCardResolved = vi.fn();
     renderFeed({ onCardResolved });

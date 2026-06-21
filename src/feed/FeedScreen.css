@@ -79,6 +79,59 @@
   overflow-y: auto;
 }
 
+/* ── Active-card entrance (Phase 5) ─────────────────────────────────────────
+ * When a slide becomes the focused card it fades + lifts + scales in, so the
+ * feed feels alive as you swipe rather than snapping flat. CRITICAL: the
+ * animation is gated on ACTIVATION, not mount — only `[data-active="true"]`
+ * runs it. The feed pre-mounts neighbouring slides (WINDOW_RADIUS) with
+ * `data-active="false"`; those stay still until they actually snap into view
+ * and the attribute flips to true, at which point the keyframe fires exactly
+ * once. This avoids the documented pre-mounted-neighbour pitfall: motion is
+ * purely visual and never coupled to the timer / isActive game logic.
+ *
+ * Disabled entirely under prefers-reduced-motion (global.css forces the
+ * duration to ~0), so the card simply appears for users who ask for less
+ * motion — no transform left applied. */
+.feed-slide__game[data-active='true'] {
+  animation: feed-card-enter var(--motion-base) var(--ease-out) both;
+}
+
+@keyframes feed-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ── Interaction micro-motion (Phase 5) ─────────────────────────────────────
+ * Give EVERY tappable control inside a game a snappy press response — a slight
+ * scale-down + an accent glow ring — without editing each renderer. Targeting
+ * `.feed-slide__game button` keeps this template-agnostic (the feed never
+ * branches on `templateType`): a new game's buttons inherit the press feel for
+ * free. The renderers' own `:active`/selected styling still applies on top; this
+ * only adds the transition + a transform/glow the inline styles don't set.
+ *
+ * Renderers that opt out (or set their own transform on press) can override via
+ * their inline styles, which win for the properties they declare. Reduced-motion
+ * collapses the transition to ~0 (global.css), so the press never visibly moves
+ * for users who ask for less motion. */
+.feed-slide__game button {
+  transition:
+    transform var(--motion-fast) var(--ease-out),
+    box-shadow var(--motion-fast) var(--ease-out),
+    filter var(--motion-fast) var(--ease-out);
+}
+
+.feed-slide__game button:active {
+  transform: scale(0.96);
+  box-shadow: 0 0 0 4px
+    color-mix(in srgb, var(--accent, var(--color-accent)) 26%, transparent);
+}
+
 /* Lightweight stand-in for out-of-window slides: keeps the slide's height (so
  * snap geometry stays correct) without mounting a renderer. */
 .feed-slide__placeholder {

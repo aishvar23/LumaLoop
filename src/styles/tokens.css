@@ -183,4 +183,28 @@
   --safe-right: env(safe-area-inset-right, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
+
+  /* ── Motion (Phase 5) ──────────────────────────────────────────────────────
+   * A single, restrained motion language for the feed — snappy and brief
+   * (TikTok/Reels-style), never bouncy-cartoonish. Tuning lives here so every
+   * animation reads from ONE place rather than scattered magic numbers. Every
+   * animation that consumes these MUST still degrade fully under
+   * `prefers-reduced-motion` (see styles/global.css), which forces near-zero
+   * durations so nothing visibly moves for users who ask for less motion.
+   *
+   * Durations:
+   *   --motion-fast   micro-interactions (button/option press, tap feedback)
+   *   --motion-base   entrances & the result-card pop (the workhorse)
+   *   --motion-slow   the brief streak/combo flourish
+   * Easings:
+   *   --ease-standard  general transitions (symmetric in/out)
+   *   --ease-out       decelerate-to-rest — snappy entrances (no overshoot)
+   *   --ease-pop       a slight, controlled overshoot — result card + streak
+   *                    pulse only; kept subtle so it never feels cartoonish. */
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --motion-slow: 320ms;
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-pop: cubic-bezier(0.34, 1.4, 0.64, 1);
 }

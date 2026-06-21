@@ -11,7 +11,8 @@
  * streak pill only appears once a streak builds (≥1) so the HUD stays quiet at rest.
  */
 
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Animated, StyleSheet, Text, View } from 'react-native';
 
 import {
   colors,
@@ -20,6 +21,7 @@ import {
   radius,
   space,
 } from './templates/tokens';
+import { useReducedMotion } from './useReducedMotion';
 
 export type FeedScoreHudProps = {
   /** Total points earned this feed visit. */
@@ -35,6 +37,36 @@ export default function FeedScoreHud({
   currentStreak,
   topInset,
 }: FeedScoreHudProps) {
+  // Phase 5 streak flourish: a brief celebratory pulse whenever the streak GROWS
+  // (not on reset/decrease). We track the previous value and drive a one-shot
+  // scale pulse only on an increase. Visual-only; snaps to no-motion under the OS
+  // "reduce motion" preference. The first build (0→1) counts as an increase, so
+  // the pill pulses as it first appears.
+  const reducedMotion = useReducedMotion();
+  const pulse = useRef(new Animated.Value(1)).current;
+  const prevStreakRef = useRef(currentStreak);
+  useEffect(() => {
+    const increased = currentStreak > prevStreakRef.current;
+    prevStreakRef.current = currentStreak;
+    if (!increased || reducedMotion) return undefined;
+    pulse.setValue(1);
+    const animation = Animated.sequence([
+      Animated.timing(pulse, {
+        toValue: 1.16,
+        duration: 130,
+        useNativeDriver: true,
+      }),
+      Animated.spring(pulse, {
+        toValue: 1,
+        friction: 5,
+        tension: 120,
+        useNativeDriver: true,
+      }),
+    ]);
+    animation.start();
+    return () => animation.stop();
+  }, [currentStreak, reducedMotion, pulse]);
+
   return (
     <View
       style={[styles.hud, { top: topInset + space.md }]}
@@ -50,9 +82,12 @@ export default function FeedScoreHud({
         <Text style={styles.label}>pts</Text>
       </View>
       {currentStreak >= 1 ? (
-        <View style={styles.streak} testID="feed-hud-streak">
+        <Animated.View
+          style={[styles.streak, { transform: [{ scale: pulse }] }]}
+          testID="feed-hud-streak"
+        >
           <Text style={styles.streakText}>{`🔥 ${currentStreak}`}</Text>
-        </View>
+        </Animated.View>
       ) : null}
     </View>
   );

@@ -30,4 +30,36 @@ describe('FeedScoreHud (RN)', () => {
     render(<FeedScoreHud totalPoints={500} currentStreak={4} topInset={0} />);
     expect(screen.getByTestId('feed-hud-streak', opts)).toBeTruthy();
   });
+
+  // Phase 5: the streak flourish runs a one-shot pulse on each increase. The pulse
+  // is presentational (an Animated transform), so these assert the logic path is
+  // robust — the pill keeps rendering correctly across increases, resets, and
+  // decreases without throwing.
+  it('updates the streak pill across increases (flourish path)', () => {
+    const { rerender } = render(
+      <FeedScoreHud totalPoints={100} currentStreak={1} topInset={0} />,
+    );
+    expect(screen.getByText('🔥 1', opts)).toBeTruthy();
+    rerender(<FeedScoreHud totalPoints={150} currentStreak={2} topInset={0} />);
+    expect(screen.getByText('🔥 2', opts)).toBeTruthy();
+    rerender(<FeedScoreHud totalPoints={210} currentStreak={3} topInset={0} />);
+    expect(screen.getByText('🔥 3', opts)).toBeTruthy();
+  });
+
+  it('hides the streak pill on a reset to 0', () => {
+    const { rerender } = render(
+      <FeedScoreHud totalPoints={210} currentStreak={3} topInset={0} />,
+    );
+    rerender(<FeedScoreHud totalPoints={210} currentStreak={0} topInset={0} />);
+    expect(screen.queryByTestId('feed-hud-streak', opts)).toBeNull();
+  });
+
+  it('keeps rendering the pill on a decrease (no pulse, no error)', () => {
+    const { rerender } = render(
+      <FeedScoreHud totalPoints={260} currentStreak={5} topInset={0} />,
+    );
+    // A decrease that stays ≥1: the pill persists and the flourish does not fire.
+    rerender(<FeedScoreHud totalPoints={260} currentStreak={4} topInset={0} />);
+    expect(screen.getByText('🔥 4', opts)).toBeTruthy();
+  });
 });

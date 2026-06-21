@@ -37,8 +37,10 @@ import {
   useEffect,
   useRef,
   useState,
+  type ReactNode,
 } from 'react';
 import {
+  Animated,
   FlatList,
   Pressable,
   StyleSheet,
@@ -63,7 +65,9 @@ import {
   PAGE_BACKGROUND,
   slideGradient,
   categoryAccent,
+  motion,
 } from './templates/tokens';
+import { useReducedMotion } from './useReducedMotion';
 import { getCardById as getCatalogCardById } from '../core/cards/catalog';
 import type { LiquidCard } from '../core/cards/types';
 import type { CardResolution, CardStartContext } from '../core/templates/contract';
@@ -552,7 +556,12 @@ const FeedSlide = memo(function FeedSlide({
             keeps games spanning the padded content box rather than collapsing to
             their intrinsic width under `alignItems: 'center'`. */}
         <View style={styles.game} testID={`feed-game-${index}`}>
-          <View style={styles.gameContent}>
+          {/* Phase 5: animate the game in when its slide becomes ACTIVE (fade +
+              lift + slight scale). Gated on activation, NOT mount, so a pre-
+              mounted neighbour stays still until it snaps into view — avoiding
+              the documented pre-mounted-neighbour pitfall. Visual-only: it never
+              feeds back into timing/`isActive` game logic. */}
+          <ActiveEntrance active={active} style={styles.gameContent}>
             <Game
               // #106: until engaged, the renderer's timer stays disarmed.
               key={`${feedId}:${index}`}
@@ -567,7 +576,7 @@ const FeedSlide = memo(function FeedSlide({
               onResolve={(resolution: CardResolution) => onResolve(index, resolution)}
               onExplanationViewed={() => onExplanationViewed(index, cardId)}
             />
-          </View>
+          </ActiveEntrance>
         </View>
         {/* MP3 (#135): the social-feed author byline as a bottom-left overlay
             (avatar monogram + @handle) plus a subtle swipe-up affordance — so each
@@ -601,6 +610,85 @@ const FeedSlide = memo(function FeedSlide({
     </View>
   );
 });
+
+/**
+ * Active-card entrance (Phase 5). Fades + lifts + slightly scales its children
+ * in when the slide becomes the ACTIVE/focused card. The animation is gated on
+ * ACTIVATION, not mount: the driver only runs on the inactive→active transition
+ * (tracked via a ref), so a pre-mounted neighbour (which mounts with
+ * `active={false}`) stays still until it actually snaps into view — the same
+ * activation gating the renderers' timed pre-phases use. Purely visual: it never
+ * touches the timer / `isActive` game logic.
+ *
+ * Reduced-motion: when the OS "reduce motion" preference is on, it snaps to the
+ * final value (no movement), honouring the accessibility requirement
+ * (AccessibilityInfo via {@link useReducedMotion}). The first card is active on
+ * mount, so it also animates in once on first paint (parity with web).
+ */
+function ActiveEntrance({
+  active,
+  style,
+  children,
+}: {
+  active: boolean;
+  style?: object;
+  children: ReactNode;
+}) {
+  const reducedMotion = useReducedMotion();
+  // Start hidden if this slide mounts already-active (first card) so the entrance
+  // plays once on first paint; an inactive pre-mounted neighbour starts shown so
+  // swiping to it never reveals a half-faded card before the driver kicks in.
+  const anim = useRef(new Animated.Value(active ? 0 : 1)).current;
+
+  useEffect(() => {
+    if (reducedMotion || !active) {
+      // Reduced-motion → snap to final (no movement). Inactive → stay settled so
+      // the card is fully shown the instant it becomes the focused slide's
+      // neighbour, and the entrance drives only on the next activation.
+      anim.setValue(1);
+      return undefined;
+    }
+    // Active (either mounted-active or just transitioned in): reset to hidden and
+    // animate in. The reset is the activation gate — it only runs while active,
+    // so a pre-mounted neighbour never animates until it snaps into view.
+    anim.setValue(0);
+    const animation = Animated.timing(anim, {
+      toValue: 1,
+      duration: motion.base,
+      useNativeDriver: true,
+    });
+    animation.start();
+    return () => animation.stop();
+    // `anim` is stable (useRef); intentionally keyed on activation + preference.
+  }, [active, reducedMotion, anim]);
+
+  return (
+    <Animated.View
+      style={[
+        style,
+        {
+          opacity: anim,
+          transform: [
+            {
+              translateY: anim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [12, 0],
+              }),
+            },
+            {
+              scale: anim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.985, 1],
+              }),
+            },
+          ],
+        },
+      ]}
+    >
+      {children}
+    </Animated.View>
+  );
+}
 
 /**
  * The full-bleed slide background: a subtle vertical dark gradient over the page

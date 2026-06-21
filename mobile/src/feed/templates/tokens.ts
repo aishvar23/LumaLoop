@@ -193,3 +193,21 @@ export const elevation = {
  * interactive cell/option/button in the renderers is at least this tall/wide.
  */
 export const TAP_TARGET_MIN = 48;
+
+/**
+ * Motion language (Phase 5) — the native parallel of web's `--motion-*` /
+ * `--ease-*` tokens (src/styles/tokens.css). Durations in ms; one restrained,
+ * snappy set tuned to the feed (TikTok/Reels-style, never bouncy-cartoonish) so
+ * every animation reads from ONE place. EVERY animation that consumes these MUST
+ * still degrade to no-motion under the OS "reduce motion" preference (see
+ * {@link useReducedMotion}); the renderers snap to the final value when it's on.
+ *
+ *   fast  micro-interactions (press feedback — mostly via Pressable `pressed`)
+ *   base  entrances & the result-card pop (the workhorse)
+ *   slow  the brief streak/combo flourish
+ */
+export const motion = {
+  fast: 120,
+  base: 200,
+  slow: 320,
+} as const;

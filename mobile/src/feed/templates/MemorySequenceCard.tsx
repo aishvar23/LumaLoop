@@ -430,10 +430,14 @@ const styles = StyleSheet.create({
     ...elevation.tile,
   },
   // The lit cell during WATCH: a stronger accent surface + border so the flash
-  // is visible. Pairs with the ● glyph / "lit" label, never colour alone.
+  // is visible. Pairs with the ● glyph / "lit" label, never colour alone. Phase 5:
+  // a faint scale-up gives the flash a subtle "pulse" (parity with web's lit
+  // cell). Transform-only, so it never affects the grid layout or the flash
+  // TIMING (`flashMs`/`gapMs`, scheduled in the watch effect above).
   cellLit: {
     backgroundColor: colors.accent,
     borderColor: colors.accent,
+    transform: [{ scale: 1.04 }],
   },
   cellPressed: {
     backgroundColor: colors.surfacePressed,
