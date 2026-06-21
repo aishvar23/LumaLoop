@@ -24,8 +24,8 @@ rely on the ported unit tests below to catch behavioural drift.
 
 | Area | Ported here | NOT ported (rebuilt later) |
 | --- | --- | --- |
-| Cards | `cards/types.ts` (incl. `templateCategoryMap`), `cards/catalog.ts` (all 26 cards + `getCardById`), `cards/validation.ts` | — |
-| Templates | `templates/contract.ts` (types), the 4 pure evaluators, `templates/timeoutResolution.ts` | React renderers, `useCardTimer` (RN timing → M4) |
+| Cards | `cards/types.ts` (incl. `templateCategoryMap`), `cards/catalog.ts` (the full authored catalog + `getCardById`), `cards/validation.ts` | — |
+| Templates | `templates/contract.ts` (types), the 8 pure evaluators (incl. `codeBreak`), `templates/timeoutResolution.ts`, `templates/useCardTimer.ts` | React renderers (rebuilt natively under `mobile/src/feed/templates/`) |
 | Session | `session/sessionTypes.ts` (dependency of the composer) | session reducer / controller / summary |
 | Composition | `session/composeSession.ts`, `feed/feedDeck.ts` | `useFeedController` (RN feed → M3) |
 | Scoring (Phase 4) | `feed/scoring.ts` (pure game-points + streak/combo core) | `useFeedScore` hook + `scoreStore` (RN, in `mobile/src/feed/`) |

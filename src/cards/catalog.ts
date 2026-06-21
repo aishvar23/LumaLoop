@@ -26,6 +26,7 @@
  */
 
 import type {
+  CodeBreakCard,
   LiquidCard,
   MemorySequenceCard,
   PatternChainCard,
@@ -3062,6 +3063,186 @@ const stepLogicCards: StepLogicCard[] = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// code_break — crack a hidden code from per-guess peg feedback (Mastermind /
+// Bulls-and-Cows). Deductive elimination; the single biggest step-change in
+// challenge. Categories allowed: logical_reasoning.
+//
+// Palette symbols are distinct emoji/letters that read by SHAPE/GLYPH (never
+// colour alone), so feedback stays solvable for colour-blind players. Difficulty
+// scales by code length, palette size, and the guess/timer budget: easy = short
+// code + small palette + generous guesses; hard = longer code, bigger palette,
+// fewer guesses, tighter clock. Secrets stay within the palette and match the
+// configured length (enforced by validation).
+// ---------------------------------------------------------------------------
+
+const codeBreakCards: CodeBreakCard[] = [
+  {
+    cardId: 'codebreak-001',
+    creatorHandle: '@ciphercat',
+    templateType: 'code_break',
+    category: 'logical_reasoning',
+    difficulty: 'easy',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 30,
+    prompt: 'Crack the 3-symbol code. Each guess shows how close you got.',
+    puzzleDna: {
+      mechanic: 'deductive-code-breaking',
+      inputMode: 'tap',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'Read the pegs',
+      body: 'An "exact" peg means right symbol AND right slot; a "partial" means the symbol is in the code but somewhere else. Combine the rows to pin every slot down.',
+    },
+    shareText: 'Cracked a hidden code from the peg clues alone.',
+    config: {
+      palette: ['🔺', '⬛', '⬤', '★'],
+      codeLength: 3,
+      secret: ['⬛', '🔺', '★'],
+      maxGuesses: 10,
+      timeLimitMs: 30000,
+    },
+  },
+  {
+    cardId: 'codebreak-002',
+    creatorHandle: '@deducedaily',
+    templateType: 'code_break',
+    category: 'logical_reasoning',
+    difficulty: 'easy',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 28,
+    prompt: 'Three slots, four symbols. Deduce the secret order.',
+    puzzleDna: {
+      mechanic: 'deductive-code-breaking',
+      inputMode: 'tap',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'Eliminate and place',
+      body: 'A guess with zero pegs rules every one of its symbols out of those slots. Use a low-peg row to shrink the options fast, then place the survivors.',
+    },
+    config: {
+      palette: ['A', 'B', 'C', 'D'],
+      codeLength: 3,
+      secret: ['C', 'A', 'D'],
+      maxGuesses: 9,
+      timeLimitMs: 28000,
+    },
+  },
+  {
+    cardId: 'codebreak-003',
+    creatorHandle: '@logicloom',
+    templateType: 'code_break',
+    category: 'logical_reasoning',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 30,
+    prompt: 'Four slots now. The code can repeat a symbol.',
+    puzzleDna: {
+      mechanic: 'deductive-code-breaking',
+      inputMode: 'tap',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'Watch for repeats',
+      body: 'Pegs count each symbol only once, so a high peg total can hint a repeated symbol. Test a doubled symbol on purpose to confirm it.',
+    },
+    config: {
+      palette: ['🍎', '🍋', '🍇', '🍐'],
+      codeLength: 4,
+      secret: ['🍋', '🍎', '🍋', '🍇'],
+      maxGuesses: 9,
+      timeLimitMs: 30000,
+    },
+  },
+  {
+    cardId: 'codebreak-004',
+    creatorHandle: '@ciphercat',
+    templateType: 'code_break',
+    category: 'logical_reasoning',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 30,
+    prompt: 'Four slots, five symbols. Fewer guesses this time.',
+    puzzleDna: {
+      mechanic: 'deductive-code-breaking',
+      inputMode: 'tap',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'Spend guesses wisely',
+      body: 'With more symbols than slots, an early scouting guess that covers fresh symbols tells you which ones are even in play before you start placing them.',
+    },
+    config: {
+      palette: ['◆', '●', '■', '▲', '✚'],
+      codeLength: 4,
+      secret: ['▲', '◆', '✚', '●'],
+      maxGuesses: 8,
+      timeLimitMs: 30000,
+    },
+  },
+  {
+    cardId: 'codebreak-005',
+    creatorHandle: '@deducedaily',
+    templateType: 'code_break',
+    category: 'logical_reasoning',
+    difficulty: 'hard',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 30,
+    prompt: 'Five slots, six symbols, six guesses. Crack it fast.',
+    puzzleDna: {
+      mechanic: 'deductive-code-breaking',
+      inputMode: 'tap',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'Tight deduction',
+      body: 'Six guesses for five slots leaves no room to waste. Lead with rows that split the symbol set in half, then resolve positions from the peg deltas.',
+    },
+    shareText: 'Solved a five-slot code with guesses to spare.',
+    config: {
+      palette: ['Q', 'W', 'E', 'R', 'T', 'Y'],
+      codeLength: 5,
+      secret: ['T', 'Q', 'Y', 'W', 'E'],
+      maxGuesses: 7,
+      timeLimitMs: 30000,
+    },
+  },
+  {
+    cardId: 'codebreak-006',
+    creatorHandle: '@logicloom',
+    templateType: 'code_break',
+    category: 'logical_reasoning',
+    difficulty: 'hard',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 30,
+    prompt: 'Five slots with a sneaky repeat. Trust the peg math.',
+    puzzleDna: {
+      mechanic: 'deductive-code-breaking',
+      inputMode: 'tap',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'Repeats under pressure',
+      body: 'A repeated symbol caps how many pegs it can earn — if a symbol you placed twice scores only one peg total, only one copy belongs in the code. Let the counts guide you.',
+    },
+    config: {
+      palette: ['🌙', '☀', '⭐', '☁', '⚡', '❄'],
+      codeLength: 5,
+      secret: ['⭐', '🌙', '⭐', '⚡', '☁'],
+      maxGuesses: 8,
+      timeLimitMs: 30000,
+    },
+  },
+];
+
 /**
  * The complete authored catalog. Order groups cards by template for
  * readability; session selection / shuffling is the engine's concern, not the
@@ -3076,6 +3257,7 @@ export const catalog: readonly LiquidCard[] = [
   ...memorySequenceCards,
   ...patternChainCards,
   ...stepLogicCards,
+  ...codeBreakCards,
 ];
 
 /**

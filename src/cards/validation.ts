@@ -19,6 +19,7 @@
 
 import {
   templateCategoryMap,
+  type CodeBreakCard,
   type EvidenceTier,
   type LiquidCard,
   type MemorySequenceCard,
@@ -101,6 +102,7 @@ const templateAnswerValidators: {
   memory_sequence: validateMemorySequenceAnswer,
   pattern_chain: validatePatternChainAnswer,
   step_logic: validateStepLogicAnswer,
+  code_break: validateCodeBreakAnswer,
 };
 
 /**
@@ -381,6 +383,91 @@ function validateStepLogicAnswer(card: StepLogicCard): ValidationError[] {
         answerError(
           card.cardId,
           `step_logic step ${index} has duplicate option ids`,
+        ),
+      );
+    }
+  });
+
+  return errors;
+}
+
+/** Inclusive bounds for a code_break's code length, in slots (Tech #143). */
+export const MIN_CODE_LENGTH = 3;
+export const MAX_CODE_LENGTH = 6;
+/** Inclusive lower bound for a code_break's palette size (Tech #143). */
+export const MIN_CODE_PALETTE = 2;
+/** Inclusive bounds for a code_break's allowed number of guesses (Tech #143). */
+export const MIN_CODE_GUESSES = 4;
+export const MAX_CODE_GUESSES = 12;
+
+function validateCodeBreakAnswer(card: CodeBreakCard): ValidationError[] {
+  const { palette, codeLength, secret, maxGuesses } = card.config;
+  const errors: ValidationError[] = [];
+
+  // Palette: a non-trivial set of UNIQUE symbols (duplicates would make the
+  // symbol set ambiguous and waste a slot).
+  if (!Array.isArray(palette) || palette.length < MIN_CODE_PALETTE) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `code_break palette must have at least ${MIN_CODE_PALETTE} symbols, got ${palette?.length ?? 0}`,
+      ),
+    );
+  } else if (new Set(palette).size !== palette.length) {
+    errors.push(
+      answerError(card.cardId, 'code_break palette has duplicate symbols'),
+    );
+  }
+
+  // Code length within sensible bounds.
+  if (
+    !Number.isInteger(codeLength) ||
+    codeLength < MIN_CODE_LENGTH ||
+    codeLength > MAX_CODE_LENGTH
+  ) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `code_break codeLength ${codeLength} is outside [${MIN_CODE_LENGTH}, ${MAX_CODE_LENGTH}]`,
+      ),
+    );
+  }
+
+  // Allowed-guesses count within sensible bounds.
+  if (
+    !Number.isInteger(maxGuesses) ||
+    maxGuesses < MIN_CODE_GUESSES ||
+    maxGuesses > MAX_CODE_GUESSES
+  ) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `code_break maxGuesses ${maxGuesses} is outside [${MIN_CODE_GUESSES}, ${MAX_CODE_GUESSES}]`,
+      ),
+    );
+  }
+
+  // The secret (answer key) must be present, match the configured length, and
+  // draw every symbol from the palette.
+  if (!Array.isArray(secret) || secret.length === 0) {
+    errors.push(answerError(card.cardId, 'code_break has an empty secret'));
+    return errors;
+  }
+  if (secret.length !== codeLength) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `code_break secret length ${secret.length} does not match codeLength ${codeLength}`,
+      ),
+    );
+  }
+  const paletteSet = new Set(palette);
+  secret.forEach((symbol, index) => {
+    if (!paletteSet.has(symbol)) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `code_break secret symbol "${symbol}" at slot ${index} is not in the palette`,
         ),
       );
     }
