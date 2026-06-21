@@ -38,6 +38,7 @@ import type {
   TemplateRenderer,
 } from '../session/rendererRegistry';
 import { defaultRendererRegistry } from '../session/rendererRegistry';
+import { useCardScoreLookup } from '../feed/cardScoreContext';
 import type { CardResolution, TemplateProps } from '../templates/contract';
 import CardFeedback from './CardFeedback';
 
@@ -105,6 +106,12 @@ export function withFeedbackGate(
       if (resolution && onExplanationViewed) onExplanationViewed(card);
     }, [resolution, onExplanationViewed, card]);
 
+    // Phase 4: look up this slide's GAME-POINTS by its feed index (the score
+    // accumulator records it when the resolution fires). Null when no provider
+    // (standalone renders) → the result card omits the chip.
+    const scoreLookup = useCardScoreLookup();
+    const cardScore = scoreLookup ? scoreLookup(context.cardIndex) : null;
+
     if (resolution) {
       // KNOWN TRADEOFF (tracked: ADO #99). Because we delay the controller's
       // `onResolve` until "Next", the controller still considers this card
@@ -119,6 +126,7 @@ export function withFeedbackGate(
         <CardFeedback
           resolution={resolution}
           explanation={card.explanation}
+          cardScore={cardScore}
           // Advancing is the controller's job: only now do we fire its real
           // `onResolve`, which records the result and auto-advances the feed.
           onContinue={() => onResolve(resolution)}

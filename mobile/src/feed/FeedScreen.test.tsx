@@ -153,6 +153,9 @@ function renderFeed(
       onCardAbandoned={extra?.onCardAbandoned}
       onCardResolved={extra?.onCardResolved}
       onCardExplanationViewed={extra?.onCardExplanationViewed}
+      // Phase 4: disable best-run persistence so tests don't race an async store
+      // read/write (no AsyncStorage side effects across cases).
+      scoreStore={null}
     />,
   );
 }
@@ -442,6 +445,7 @@ describe('FeedScreen (native)', () => {
         getCardById={fakeGetCardById}
         onCardEngaged={onCardEngaged}
         onCardResolved={onCardResolved}
+        scoreStore={null}
       />,
     );
 
@@ -484,6 +488,7 @@ describe('FeedScreen (native)', () => {
         getCardById={fakeGetCardById}
         onCardResolved={onCardResolved}
         onCardExplanationViewed={onCardExplanationViewed}
+        scoreStore={null}
       />,
     );
 
@@ -517,6 +522,7 @@ describe('FeedScreen (native)', () => {
         registry={feedRegistry}
         getCardById={fakeGetCardById}
         onCardExplanationViewed={onCardExplanationViewed}
+        scoreStore={null}
       />,
     );
 

@@ -1,0 +1,54 @@
+/*
+ * Feed game-points HUD (Phase 4). A small, unobtrusive overlay pinned to the
+ * top-right of the feed surface, clear of the safe-area inset. Token-driven only
+ * (Design tokens, #51); non-interactive so it never intercepts a swipe.
+ */
+
+.feed-hud {
+  position: absolute;
+  top: calc(var(--space-3) + var(--safe-top));
+  right: var(--space-3);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  pointer-events: none;
+}
+
+/* The points readout — a translucent dark pill so it reads over any slide. */
+.feed-hud__points {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-overlay);
+  border: 1px solid var(--color-border);
+}
+
+.feed-hud__points-value {
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+.feed-hud__label {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* The streak pill — accent-tinted, only shown once a streak builds. */
+.feed-hud__streak {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--accent-tint, var(--color-surface-overlay));
+  border: 1px solid var(--accent, var(--color-accent));
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+}

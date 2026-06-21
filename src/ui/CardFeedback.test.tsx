@@ -87,4 +87,56 @@ describe('CardFeedback', () => {
     fireEvent.click(screen.getByTestId('feedback-next'));
     expect(onContinue).toHaveBeenCalledTimes(1);
   });
+
+  // ── Phase 4: the GAME-POINTS chip ──────────────────────────────────────────
+  it('omits the score chip when no score is supplied (standalone render)', () => {
+    render(
+      <CardFeedback
+        resolution={makeResolution('correct')}
+        explanation={explanation}
+        onContinue={() => {}}
+      />,
+    );
+    expect(screen.queryByTestId('card-score')).not.toBeInTheDocument();
+  });
+
+  it('shows points earned and the streak on a correct resolution', () => {
+    render(
+      <CardFeedback
+        resolution={makeResolution('correct')}
+        explanation={explanation}
+        cardScore={{ points: 132, correct: true, streak: 3, combo: 1.2 }}
+        onContinue={() => {}}
+      />,
+    );
+    expect(screen.getByText('+132 pts')).toBeInTheDocument();
+    expect(screen.getByTestId('card-score-streak')).toHaveTextContent('3 streak');
+    expect(screen.getByTestId('card-score-streak')).toHaveTextContent('×1.2 combo');
+  });
+
+  it('does not show a streak/combo line at streak 1', () => {
+    render(
+      <CardFeedback
+        resolution={makeResolution('correct')}
+        explanation={explanation}
+        cardScore={{ points: 100, correct: true, streak: 1, combo: 1 }}
+        onContinue={() => {}}
+      />,
+    );
+    expect(screen.getByText('+100 pts')).toBeInTheDocument();
+    expect(screen.queryByTestId('card-score-streak')).not.toBeInTheDocument();
+  });
+
+  it('shows a neutral "Streak reset" on a miss, with no points (guardrail-safe)', () => {
+    render(
+      <CardFeedback
+        resolution={makeResolution('incorrect')}
+        explanation={explanation}
+        cardScore={{ points: 0, correct: false, streak: 0, combo: 1 }}
+        onContinue={() => {}}
+      />,
+    );
+    expect(screen.getByTestId('card-score-reset')).toHaveTextContent('Streak reset');
+    expect(screen.queryByText(/pts/)).not.toBeInTheDocument();
+  });
 });

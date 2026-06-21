@@ -71,7 +71,11 @@ import { resolveRenderer } from './rendererRegistry';
 import type { RendererRegistry, TemplateRenderer } from './rendererRegistry';
 import { feedRegistry } from './FeedbackGate';
 import type { FeedBatchSource } from '../core/feed/feedDeck';
+import { CardScoreProvider } from './cardScoreContext';
+import FeedScoreHud from './FeedScoreHud';
+import type { ScoreStore } from './scoreStore';
 import { useFeedController } from './useFeedController';
+import { useFeedScore } from './useFeedScore';
 
 /** Slides within this many of the active index mount their real renderer. */
 const WINDOW_RADIUS = 1;
@@ -153,6 +157,11 @@ export type FeedScreenProps = {
    * (`Card_Explanation_Viewed`).
    */
   onCardExplanationViewed?: (index: number, cardId: string) => void;
+  /**
+   * Test seam: the Phase-4 best-run persistence store. Defaults to the real
+   * best-effort AsyncStorage store; pass `null` to disable persistence (tests).
+   */
+  scoreStore?: ScoreStore | null;
 };
 
 /**
@@ -193,6 +202,7 @@ export default function FeedScreen({
   onCardAbandoned,
   onCardResolved,
   onCardExplanationViewed,
+  scoreStore,
 }: FeedScreenProps) {
   const { height: windowHeight } = useWindowDimensions();
   // Fallback keeps per-item layout non-zero in headless test envs where the
@@ -218,6 +228,14 @@ export default function FeedScreen({
     anonymousUserId,
     source,
   });
+
+  // Phase 4: the GAME-POINTS accumulator. It folds each resolution through the
+  // shared pure scoring core (template-agnostic), drives the HUD, and exposes the
+  // per-card score the result card reads via context. It hooks the SAME resolution
+  // path the feed already uses (see `handleResolve`), not a parallel observer.
+  const score = useFeedScore({ getCardById, store: scoreStore });
+  const scoreOnResolvedRef = useRef(score.onCardResolved);
+  scoreOnResolvedRef.current = score.onCardResolved;
 
   // Stable handle to `setActiveIndex` for the once-created viewability callback
   // (`VirtualizedList` does not support changing `onViewableItemsChanged` on the
@@ -310,6 +328,10 @@ export default function FeedScreen({
         return; // already classified on leave — not a live resolution.
       }
       resolutionsRef.current.set(index, resolution);
+      // Phase 4: fold into the GAME-POINTS accumulator (idempotent per index in
+      // the hook too) BEFORE the telemetry seam, so the per-card score is recorded
+      // by the time the result card renders via the feedback gate.
+      scoreOnResolvedRef.current(index, resolution);
       onCardResolved?.(index, resolution);
     },
     [onCardResolved],
@@ -382,27 +404,39 @@ export default function FeedScreen({
   );
 
   return (
-    <FlatList
-      testID="feed-list"
-      style={styles.list}
-      data={cards}
-      keyExtractor={keyForIndex}
-      renderItem={renderItem}
-      getItemLayout={(_, index) => ({
-        length: slideHeight,
-        offset: slideHeight * index,
-        index,
-      })}
-      pagingEnabled
-      snapToInterval={slideHeight}
-      snapToAlignment="start"
-      decelerationRate="fast"
-      disableIntervalMomentum
-      showsVerticalScrollIndicator={false}
-      onViewableItemsChanged={onViewableItemsChangedRef.current}
-      viewabilityConfig={VIEWABILITY_CONFIG}
-      accessibilityLabel="Game feed. Swipe up for the next game, down for the previous."
-    />
+    <CardScoreProvider value={score.getCardScore}>
+      <View style={styles.root}>
+        <FlatList
+          testID="feed-list"
+          style={styles.list}
+          data={cards}
+          keyExtractor={keyForIndex}
+          renderItem={renderItem}
+          getItemLayout={(_, index) => ({
+            length: slideHeight,
+            offset: slideHeight * index,
+            index,
+          })}
+          pagingEnabled
+          snapToInterval={slideHeight}
+          snapToAlignment="start"
+          decelerationRate="fast"
+          disableIntervalMomentum
+          showsVerticalScrollIndicator={false}
+          onViewableItemsChanged={onViewableItemsChangedRef.current}
+          viewabilityConfig={VIEWABILITY_CONFIG}
+          accessibilityLabel="Game feed. Swipe up for the next game, down for the previous."
+        />
+        {/* Phase 4: the small, unobtrusive game-points HUD (points + current
+            streak), overlaid clear of the device notch. Accent-aware,
+            guardrail-safe copy. */}
+        <FeedScoreHud
+          totalPoints={score.state.totalPoints}
+          currentStreak={score.state.currentStreak}
+          topInset={insets.top}
+        />
+      </View>
+    </CardScoreProvider>
   );
 }
 
@@ -687,6 +721,10 @@ function slideInsetStyle(insets: EdgeInsets) {
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: PAGE_BACKGROUND,
+  },
   list: {
     flex: 1,
     backgroundColor: PAGE_BACKGROUND,

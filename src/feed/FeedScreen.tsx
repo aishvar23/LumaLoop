@@ -47,8 +47,12 @@ import type { CardResolution, CardStartContext } from '../templates/contract';
 import { getAnonymousUserId } from '../telemetry/anonymousUser';
 import { resolveCategoryTheme } from '../ui/categoryTheme';
 import { feedRegistry } from '../ui/feedRegistry';
+import { CardScoreProvider } from './cardScoreContext';
 import type { FeedBatchSource } from './feedDeck';
+import FeedScoreHud from './FeedScoreHud';
+import type { ScoreStore } from './scoreStore';
 import { useFeedController } from './useFeedController';
+import { useFeedScore } from './useFeedScore';
 import './FeedScreen.css';
 
 /** Slides within this many of the active index mount their real renderer. */
@@ -107,6 +111,11 @@ export type FeedScreenProps = {
    * itself never advances on resolve; seam for #108 telemetry (`Card_Resolved`).
    */
   onCardResolved?: (index: number, resolution: CardResolution) => void;
+  /**
+   * Test seam: the Phase-4 best-run persistence store. Defaults to the real
+   * best-effort `localStorage` store; pass `null` to disable persistence (tests).
+   */
+  scoreStore?: ScoreStore | null;
 };
 
 /**
@@ -175,6 +184,7 @@ export default function FeedScreen({
   onCardSkipped,
   onCardAbandoned,
   onCardResolved,
+  scoreStore,
 }: FeedScreenProps) {
   // Resolve the real persisted anonymous id ONCE per mount (Technical Design
   // §10); tests inject a fixed id for deterministic composition.
@@ -197,6 +207,12 @@ export default function FeedScreen({
     anonymousUserId: resolvedAnonymousUserId,
     source,
   });
+
+  // Phase 4: the GAME-POINTS accumulator. It folds each resolution through the
+  // pure scoring core (template-agnostic), drives the HUD, and exposes the per-
+  // card score the result card reads via context. It hooks the SAME resolution
+  // path the feed already uses (see `handleResolve`), not a parallel observer.
+  const score = useFeedScore({ getCardById, store: scoreStore });
 
   // Stable handle to `setActiveIndex` for the long-lived IntersectionObserver
   // callback (the controller's callbacks are already stable, but capturing via a
@@ -354,10 +370,18 @@ export default function FeedScreen({
         return; // already classified on leave — not a live resolution.
       }
       resolutionsRef.current.set(index, resolution);
+      // Phase 4: fold into the GAME-POINTS accumulator (idempotent per index in
+      // the hook too) BEFORE the telemetry seam, so the per-card score is recorded
+      // by the time the result card mounts via the feedback gate.
+      scoreOnResolvedRef.current(index, resolution);
       onCardResolved?.(index, resolution);
     },
     [onCardResolved],
   );
+
+  // Stable handle to the score hook's resolution folder for `handleResolve`.
+  const scoreOnResolvedRef = useRef(score.onCardResolved);
+  scoreOnResolvedRef.current = score.onCardResolved;
 
   // When the active game changes, classify the game we LEFT (#106): a resolved
   // game is done; an engaged-but-unresolved game is an ABANDONED attempt; an
@@ -384,41 +408,54 @@ export default function FeedScreen({
     }
   }, [activeIndex]);
 
+  // The per-card score lookup handed to the feedback gate via context. Stable
+  // identity (the hook's `getCardScore` is stable); the gate re-reads on the
+  // hook's `version` bump, which re-renders the tree on each resolution.
+  const getCardScore = score.getCardScore;
+
   return (
-    <section className="feed-screen" aria-labelledby="feed-screen-heading">
-      <h1 id="feed-screen-heading" className="feed-screen__visually-hidden">
-        Game feed
-      </h1>
-      <p className="feed-screen__visually-hidden">
-        Swipe up for the next game and down for the previous, or use the Down and
-        Up arrow keys.
-      </p>
-      <div
-        className="feed-screen__scroller"
-        data-testid="feed-scroller"
-        tabIndex={0}
-        onKeyDown={handleKeyDown}
-        aria-labelledby="feed-screen-heading"
-      >
-        {cards.map((cardId, index) => (
-          <FeedSlide
-            key={index}
-            index={index}
-            cardId={cardId}
-            windowed={Math.abs(index - activeIndex) <= WINDOW_RADIUS}
-            active={index === activeIndex}
-            registry={registry}
-            getCardById={getCardById}
-            feedId={feedId}
-            activeAtMs={activeAtMs}
-            now={nowFn}
-            registerSlide={registerSlide}
-            onEngage={handleEngage}
-            onResolve={handleResolve}
-          />
-        ))}
-      </div>
-    </section>
+    <CardScoreProvider value={getCardScore}>
+      <section className="feed-screen" aria-labelledby="feed-screen-heading">
+        <h1 id="feed-screen-heading" className="feed-screen__visually-hidden">
+          Game feed
+        </h1>
+        <p className="feed-screen__visually-hidden">
+          Swipe up for the next game and down for the previous, or use the Down
+          and Up arrow keys.
+        </p>
+        {/* Phase 4: a small, unobtrusive game-points HUD (points + current
+            streak). Accent-aware, guardrail-safe copy. */}
+        <FeedScoreHud
+          totalPoints={score.state.totalPoints}
+          currentStreak={score.state.currentStreak}
+        />
+        <div
+          className="feed-screen__scroller"
+          data-testid="feed-scroller"
+          tabIndex={0}
+          onKeyDown={handleKeyDown}
+          aria-labelledby="feed-screen-heading"
+        >
+          {cards.map((cardId, index) => (
+            <FeedSlide
+              key={index}
+              index={index}
+              cardId={cardId}
+              windowed={Math.abs(index - activeIndex) <= WINDOW_RADIUS}
+              active={index === activeIndex}
+              registry={registry}
+              getCardById={getCardById}
+              feedId={feedId}
+              activeAtMs={activeAtMs}
+              now={nowFn}
+              registerSlide={registerSlide}
+              onEngage={handleEngage}
+              onResolve={handleResolve}
+            />
+          ))}
+        </div>
+      </section>
+    </CardScoreProvider>
   );
 }
 

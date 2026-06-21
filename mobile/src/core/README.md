@@ -28,6 +28,7 @@ rely on the ported unit tests below to catch behavioural drift.
 | Templates | `templates/contract.ts` (types), the 4 pure evaluators, `templates/timeoutResolution.ts` | React renderers, `useCardTimer` (RN timing → M4) |
 | Session | `session/sessionTypes.ts` (dependency of the composer) | session reducer / controller / summary |
 | Composition | `session/composeSession.ts`, `feed/feedDeck.ts` | `useFeedController` (RN feed → M3) |
+| Scoring (Phase 4) | `feed/scoring.ts` (pure game-points + streak/combo core) | `useFeedScore` hook + `scoreStore` (RN, in `mobile/src/feed/`) |
 | Telemetry | `telemetry/telemetryEvents.ts` (names + payload types) | telemetry client, `anonymousUser` (RN client → M5) |
 
 The layout mirrors the web `src/` so internal relative imports are unchanged.
