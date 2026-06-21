@@ -52,21 +52,21 @@ import { useCardTimer } from '../useCardTimer';
 import { evaluateMemorySequence } from './memorySequenceEvaluator';
 
 /**
- * The renderer accepts the shared {@link TemplateProps} plus two optional extra
- * props, so it stays assignable to the registry's
- * `ComponentType<TemplateProps<MemorySequenceCard>>` slot:
+ * The renderer accepts the shared {@link TemplateProps} plus an optional
+ * injectable `now` clock (defaults to `Date.now`) for testability under fake
+ * timers without a real wall-clock dependency; the optional prop keeps it
+ * assignable to the registry's `ComponentType<TemplateProps<MemorySequenceCard>>`
+ * slot.
  *
- *  - `now` — an injectable clock (defaults to `Date.now`) for testability under
- *    fake timers without a real wall-clock dependency.
- *  - `isActive` — whether the card is the active/on-screen card (defaults to
- *    `true`). The watch animation only runs while active. In production the
- *    controller mounts only the active card, so this is `true`; the prop exists
- *    so the off-screen-gating behaviour is expressible and testable WITHOUT
- *    changing the shared {@link TemplateProps} contract or the engine.
+ * `isActive` is the shared {@link TemplateProps} ACTIVATION signal (the feed
+ * passes `isActive={index === activeIndex}`): the WATCH flash only runs while the
+ * card is the focused slide, so a pre-mounted off-screen card does not flash its
+ * sequence — and then drop the player onto a blank reproduce grid — before they
+ * swipe to it. Omitted ≡ active, so a standalone render (tests, `/c/:cardId`)
+ * behaves exactly as before.
  */
 export type MemorySequenceCardProps = TemplateProps<MemorySequenceCardType> & {
   now?: () => number;
-  isActive?: boolean;
 };
 
 type Phase = 'watch' | 'reproduce';

@@ -177,6 +177,49 @@ describe('isActive gating', () => {
     // …and the card never transitioned to the reproduce phase.
     expect(screen.queryByTestId('ms-tile-0-0')).not.toBeInTheDocument();
   });
+
+  it('starts the watch ONLY on activation, then reproduce works (no blank grid)', () => {
+    // The feed BLOCKER repro: a slide pre-mounted off-screen (isActive=false)
+    // must hold in the watch state. If it ran the sequence early, the user would
+    // swipe to a blank, unsolvable reproduce grid.
+    let clock = 1_000;
+    const onAttempt = vi.fn();
+    const onResolve = vi.fn();
+    const card = memorySequenceCard();
+    const props = {
+      card,
+      context: startContext(),
+      onAttempt,
+      onResolve,
+      now: () => clock,
+    };
+    const { rerender } = render(<MemorySequenceCard {...props} isActive={false} />);
+
+    // Pre-mounted off-screen: even past the full watch window the sequence has
+    // not flashed and the card has NOT advanced to reproduce.
+    act(() => void vi.advanceTimersByTime(WATCH_MS * 5));
+    expect(screen.queryByTestId('ms-tile-0-0')).not.toBeInTheDocument();
+    expect(screen.getByTestId('ms-watch-tile-0-0')).not.toHaveAttribute('data-lit');
+
+    // Becomes the active slide: the watch animation now runs from this instant.
+    rerender(<MemorySequenceCard {...props} isActive />);
+    act(() => void vi.advanceTimersByTime(FLASH_MS / 2));
+    expect(screen.getByTestId('ms-watch-tile-0-0')).toHaveAttribute('data-lit', 'true');
+
+    // Run the rest of the watch window → reproduce grid appears (NOT blank).
+    clock = 3_000;
+    act(() => void vi.advanceTimersByTime(WATCH_MS));
+    expect(screen.getByTestId('ms-tile-0-0')).toBeInTheDocument();
+    expect(screen.queryAllByRole('button')).toHaveLength(4); // 2×2 grid
+
+    // And the player can actually solve it after activation.
+    clock = 3_500;
+    tapTile(0, 0);
+    clock = 4_000;
+    tapTile(1, 1);
+    expect(onResolve).toHaveBeenCalledTimes(1);
+    expect(lastResolution(onResolve).resolutionType).toBe('correct');
+  });
 });
 
 // ---------------------------------------------------------------------------

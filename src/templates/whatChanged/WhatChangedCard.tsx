@@ -60,6 +60,7 @@ type Phase = 'preview' | 'answer';
 export default function WhatChangedCard({
   card,
   context,
+  isActive = true,
   onAttempt,
   onResolve,
   now = Date.now,
@@ -76,15 +77,24 @@ export default function WhatChangedCard({
   const nowRef = useRef(now);
   nowRef.current = now;
 
-  // Preview → answer transition after `previewMs`. Interaction is enabled only
-  // when this fires; that instant becomes the answer-phase timing origin.
+  // Preview → answer transition after `previewMs`. The countdown is gated on
+  // ACTIVATION (#137 review fix): the feed PRE-MOUNTS off-screen slides, so if the
+  // preview started on mount it could fully elapse before the user swipes here —
+  // they would land on the answer phase and never see `beforePattern`, defeating
+  // the working-memory mechanic. So while `isActive` is false we HOLD in the
+  // preview state and schedule nothing; the timer arms only once the card becomes
+  // active. `phase === 'preview'` keeps the effect inert after the transition (and
+  // on any later activation toggle). Interaction is enabled only when this fires;
+  // that instant becomes the answer-phase timing origin, so TTI /
+  // `interactionElapsedMs` still exclude the preview (parity preserved).
   useEffect(() => {
+    if (!isActive || phase !== 'preview') return undefined;
     const id = setTimeout(() => {
       answerStartRef.current = nowRef.current();
       setPhase('answer');
     }, Math.max(0, config.previewMs));
     return () => clearTimeout(id);
-  }, [config.previewMs]);
+  }, [isActive, phase, config.previewMs]);
 
   return (
     <section aria-label="What changed" style={sectionStyle}>

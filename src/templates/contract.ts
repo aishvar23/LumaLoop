@@ -51,10 +51,22 @@ export type CardResolution = {
  * Props every template renderer accepts, generic over its concrete card type.
  * The renderer must not advance the feed; it calls `onAttempt` on the first
  * meaningful input and `onResolve` exactly once.
+ *
+ * `isActive` is the feed's ACTIVATION signal: true only for the focused/active
+ * slide, false for slides the feed has PRE-MOUNTED off-screen (windowing). It is
+ * template-AGNOSTIC — the feed passes the same flag to every renderer regardless
+ * of `templateType`, and most renderers ignore it. Renderers with a timed
+ * PRE-phase (e.g. `memory_sequence`'s watch flash, `what_changed`'s memorize
+ * preview) MUST NOT start that phase's countdown until `isActive` is true,
+ * otherwise a pre-mounted slide's pre-phase could elapse before the user ever
+ * swipes to it — leaving e.g. a blank, unsolvable reproduce grid. Omitted ≡
+ * active, so a renderer rendered standalone (tests, isolation, `/c/:cardId`)
+ * behaves exactly as before.
  */
 export type TemplateProps<TCard extends LiquidCard> = {
   card: TCard;
   context: CardStartContext;
+  isActive?: boolean;
   onAttempt: (signals?: Record<string, number | string | boolean>) => void;
   onResolve: (resolution: CardResolution) => void;
 };

@@ -184,6 +184,21 @@ function SingleTapRenderer({
 
 const singleTapRegistry: RendererRegistry = { spot_it: SingleTapRenderer };
 
+/**
+ * A probe renderer that surfaces the template-agnostic `isActive` activation
+ * signal (#137) so a test can assert the feed passes it to the focused slide
+ * only. Renders `active` / `inactive` text for each mounted (windowed) slide.
+ */
+function IsActiveProbe({ card, isActive }: TemplateProps<SpotItCard>) {
+  return (
+    <span data-testid={`active-${card.cardId}`}>
+      {isActive ? 'active' : 'inactive'}
+    </span>
+  );
+}
+
+const isActiveRegistry: RendererRegistry = { spot_it: IsActiveProbe };
+
 type LifecycleHandlers = {
   onCardEngaged?: (i: number, cardId: string) => void;
   onCardSkipped?: (i: number, cardId: string) => void;
@@ -279,6 +294,21 @@ describe('FeedScreen', () => {
     expect(screen.getByTestId('feed-game-2')).toHaveTextContent('game:b0-2');
     expect(screen.queryByTestId('feed-game-0')).not.toBeInTheDocument();
     expect(screen.getByTestId('feed-placeholder-0')).toBeInTheDocument();
+  });
+
+  it('passes isActive only to the focused slide; advancing moves it (#137)', () => {
+    renderFeed(undefined, isActiveRegistry);
+
+    // Active is index 0: only its slide is active; the pre-mounted neighbour
+    // (index 1, windowed but off-screen) is inactive — so a timed pre-phase there
+    // cannot elapse before the user swipes to it.
+    expect(screen.getByTestId('active-b0-0')).toHaveTextContent('active');
+    expect(screen.getByTestId('active-b0-1')).toHaveTextContent('inactive');
+
+    // Advancing makes index 1 the focused slide; index 0 is no longer active.
+    fireEvent.keyDown(scroller(), { key: 'ArrowDown' });
+    expect(screen.getByTestId('active-b0-1')).toHaveTextContent('active');
+    expect(screen.getByTestId('active-b0-0')).toHaveTextContent('inactive');
   });
 
   it('records a resolution locally without auto-advancing (#106 seam)', () => {
