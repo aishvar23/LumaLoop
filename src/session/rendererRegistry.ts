@@ -25,6 +25,7 @@ import type { TemplateProps } from '../templates/contract';
 import CodeBreakCard from '../templates/codeBreak/CodeBreakCard';
 import MemorySequenceCard from '../templates/memorySequence/MemorySequenceCard';
 import PatternChainCard from '../templates/patternChain/PatternChainCard';
+import PrismPathCard from '../templates/prismPath/PrismPathCard';
 import RuleFlipCard from '../templates/ruleFlip/RuleFlipCard';
 import SpotItCard from '../templates/spotIt/SpotItCard';
 import StepLogicCard from '../templates/stepLogic/StepLogicCard';
@@ -99,4 +100,5 @@ export const defaultRendererRegistry: RendererRegistry = {
   pattern_chain: PatternChainCard,
   step_logic: StepLogicCard,
   code_break: CodeBreakCard,
+  prism_path: PrismPathCard,
 };

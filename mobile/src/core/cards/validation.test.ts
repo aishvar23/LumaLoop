@@ -3,11 +3,13 @@ import {
   MAX_CHAIN_STEPS,
   MAX_CODE_GUESSES,
   MAX_CODE_LENGTH,
+  MAX_PRISM_GRID_SIZE,
   MAX_SEQUENCE_LENGTH,
   MAX_STEP_LOGIC_STEPS,
   MAX_TIME_LIMIT_MS,
   MIN_CODE_GUESSES,
   MIN_CODE_LENGTH,
+  MIN_PRISM_GRID_SIZE,
   MIN_TIME_LIMIT_MS,
   ValidationRule,
   assertValidCatalog,
@@ -20,6 +22,7 @@ import {
   type LiquidCard,
   type MemorySequenceCard,
   type PatternChainCard,
+  type PrismPathCard,
   type PuzzleDna,
   type RuleFlipCard,
   type SpotItCard,
@@ -233,19 +236,19 @@ function validPatternChain(): PatternChainCard {
 
 function validStepLogic(): StepLogicCard {
   return {
-    cardId: 'step-1',
+    cardId: 'steplogic-1',
     creatorHandle: 'lumaloop',
     templateType: 'step_logic',
     category: 'logical_reasoning',
-    difficulty: 'easy',
+    difficulty: 'medium',
     evidenceTier: 'mechanic_mapped',
     reviewStatus: 'manual_reviewed',
-    estimatedSeconds: 16,
-    prompt: 'Answer each linked clue in order.',
+    estimatedSeconds: 18,
+    prompt: 'Work through the linked clues one step at a time.',
     puzzleDna: dna('multi-step-deduction'),
     explanation: {
-      title: 'Chained reasoning',
-      body: 'Each answer feeds the next.',
+      title: 'Logical reasoning',
+      body: 'Each sub-answer feeds the next, so the chain resolves in order.',
     },
     config: {
       premise: 'Mia is taller than Jo. Jo is taller than Sam.',
@@ -267,7 +270,7 @@ function validStepLogic(): StepLogicCard {
           correctOptionId: 'b',
         },
       ],
-      timeLimitMs: 16000,
+      timeLimitMs: 18000,
     },
   };
 }
@@ -298,6 +301,42 @@ function validCodeBreak(): CodeBreakCard {
   };
 }
 
+function validPrismPath(): PrismPathCard {
+  return {
+    cardId: 'prismpath-1',
+    creatorHandle: 'lumaloop',
+    templateType: 'prism_path',
+    category: 'logical_reasoning',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 20,
+    prompt: 'Rotate mirrors to route the beam.',
+    puzzleDna: dna('mirror-beam-routing'),
+    explanation: {
+      title: 'Mirror routing',
+      body: 'Each mirror redirects the beam by a right angle until the route reaches the target.',
+    },
+    config: {
+      rows: 4,
+      columns: 4,
+      entry: { row: 3, column: 0 },
+      entryDirection: 'right',
+      target: { row: 0, column: 3 },
+      mirrors: [
+        { id: 'm1', row: 3, column: 2, initialOrientation: 'slash' },
+        { id: 'm2', row: 0, column: 2, initialOrientation: 'slash' },
+      ],
+      blockers: [{ row: 1, column: 1 }],
+      solution: [
+        { mirrorId: 'm1', orientation: 'slash' },
+        { mirrorId: 'm2', orientation: 'slash' },
+      ],
+      timeLimitMs: 20000,
+    },
+  };
+}
+
 function validCatalog(): LiquidCard[] {
   return [
     validSpotIt(),
@@ -308,6 +347,7 @@ function validCatalog(): LiquidCard[] {
     validPatternChain(),
     validStepLogic(),
     validCodeBreak(),
+    validPrismPath(),
   ];
 }
 
@@ -485,12 +525,6 @@ describe('validateCatalog', () => {
     );
   });
 
-  it('accepts a valid memory_sequence card', () => {
-    const result = validateCatalog([validMemorySequence()]);
-    expect(result.valid).toBe(true);
-    expect(result.errors).toEqual([]);
-  });
-
   it('rejects a memory_sequence with an empty sequence', () => {
     const card = validMemorySequence();
     card.config = { ...card.config, sequence: [] };
@@ -508,7 +542,7 @@ describe('validateCatalog', () => {
       sequence: [
         { row: 0, column: 0 },
         { row: 1, column: 1 },
-        { row: 2, column: 9 }, // column 9 is outside a 3-column grid
+        { row: card.config.rows, column: 2 }, // one past the last row
       ],
     };
     const result = validateCatalog([card]);
@@ -520,7 +554,7 @@ describe('validateCatalog', () => {
 
   it('rejects a memory_sequence whose length is below [3, 8]', () => {
     const card = validMemorySequence();
-    // Two tiles is below the minimum span of three.
+    // Two in-grid coords — valid coordinates, but a length below the minimum.
     card.config = {
       ...card.config,
       sequence: [
@@ -537,6 +571,8 @@ describe('validateCatalog', () => {
 
   it('accepts a memory_sequence at the raised max length (8)', () => {
     const card = validMemorySequence();
+    // 8 in-grid coords on a 3x3 grid (reuse the diagonal; coordinates may repeat
+    // across the watch order — only the per-coord grid bounds are enforced).
     card.config = {
       ...card.config,
       sequence: [
@@ -576,12 +612,6 @@ describe('validateCatalog', () => {
     expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
       true,
     );
-  });
-
-  it('accepts a valid pattern_chain card', () => {
-    const result = validateCatalog([validPatternChain()]);
-    expect(result.valid).toBe(true);
-    expect(result.errors).toEqual([]);
   });
 
   it('rejects a pattern_chain with an empty visible sequence', () => {
@@ -671,12 +701,6 @@ describe('validateCatalog', () => {
     );
   });
 
-  it('accepts a valid step_logic card', () => {
-    const result = validateCatalog([validStepLogic()]);
-    expect(result.valid).toBe(true);
-    expect(result.errors).toEqual([]);
-  });
-
   it('rejects a step_logic with an empty premise', () => {
     const card = validStepLogic();
     card.config = { ...card.config, premise: '   ' };
@@ -689,7 +713,10 @@ describe('validateCatalog', () => {
 
   it('rejects a step_logic with fewer than two steps', () => {
     const card = validStepLogic();
-    card.config = { ...card.config, steps: [card.config.steps[0]] };
+    card.config = {
+      ...card.config,
+      steps: [card.config.steps[0]],
+    };
     const result = validateCatalog([card]);
     expect(result.valid).toBe(false);
     expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
@@ -728,7 +755,7 @@ describe('validateCatalog', () => {
     card.config = {
       ...card.config,
       steps: [
-        { ...card.config.steps[0], stem: '' },
+        { ...card.config.steps[0], stem: '  ' },
         card.config.steps[1],
       ],
     };
@@ -857,7 +884,7 @@ describe('validateCatalog', () => {
 
   it('rejects a code_break whose secret length does not match codeLength', () => {
     const card = validCodeBreak();
-    card.config = { ...card.config, secret: ['🔴', '🟢'] };
+    card.config = { ...card.config, secret: ['🔴', '🟢'] }; // length 2, codeLength 3
     const result = validateCatalog([card]);
     expect(result.valid).toBe(false);
     expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
@@ -865,7 +892,7 @@ describe('validateCatalog', () => {
     );
   });
 
-  it('rejects a code_break secret symbol not in the palette', () => {
+  it('rejects a code_break secret symbol that is not in the palette', () => {
     const card = validCodeBreak();
     card.config = { ...card.config, secret: ['🔴', '🟢', '⚫'] };
     const result = validateCatalog([card]);
@@ -877,7 +904,25 @@ describe('validateCatalog', () => {
 
   it('rejects a code_break with a duplicate-symbol palette', () => {
     const card = validCodeBreak();
-    card.config = { ...card.config, palette: ['🔴', '🔴', '🔵', '🟡'] };
+    card.config = {
+      ...card.config,
+      palette: ['🔴', '🔴', '🔵', '🟡'],
+    };
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('rejects a code_break with too small a palette', () => {
+    const card = validCodeBreak();
+    card.config = {
+      ...card.config,
+      palette: ['🔴'],
+      codeLength: 1,
+      secret: ['🔴'],
+    };
     const result = validateCatalog([card]);
     expect(result.valid).toBe(false);
     expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
@@ -932,6 +977,73 @@ describe('validateCatalog', () => {
     expect(result.valid).toBe(false);
     expect(hasRule(result.errors, ValidationRule.TIME_LIMIT_RANGE)).toBe(true);
   });
+
+  // ── prism_path ────────────────────────────────────────────────────────────
+
+  it('accepts a valid prism_path', () => {
+    const result = validateCatalog([validPrismPath()]);
+    expect(result.errors).toEqual([]);
+    expect(result.valid).toBe(true);
+  });
+
+  it('rejects a prism_path grid outside bounds', () => {
+    const card = validPrismPath();
+    card.config = {
+      ...card.config,
+      rows: MIN_PRISM_GRID_SIZE - 1,
+      columns: MAX_PRISM_GRID_SIZE + 1,
+    };
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('rejects prism_path overlapping mirrors and blockers', () => {
+    const card = validPrismPath();
+    card.config = {
+      ...card.config,
+      blockers: [{ row: 3, column: 2 }],
+    };
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('rejects a prism_path solution that references an unknown mirror', () => {
+    const card = validPrismPath();
+    card.config = {
+      ...card.config,
+      solution: [
+        { mirrorId: 'm1', orientation: 'slash' },
+        { mirrorId: 'ghost', orientation: 'slash' },
+      ],
+    };
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('rejects a prism_path whose authored solution misses the target', () => {
+    const card = validPrismPath();
+    card.config = {
+      ...card.config,
+      solution: [
+        { mirrorId: 'm1', orientation: 'backslash' },
+        { mirrorId: 'm2', orientation: 'backslash' },
+      ],
+    };
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -956,6 +1068,7 @@ const ALL_TEMPLATE_TYPES: TemplateType[] = [
   'pattern_chain',
   'step_logic',
   'code_break',
+  'prism_path',
 ];
 
 const ALL_CATEGORIES: ChallengeCategory[] = [
@@ -977,6 +1090,7 @@ const validCardFor: Record<TemplateType, () => LiquidCard> = {
   pattern_chain: validPatternChain,
   step_logic: validStepLogic,
   code_break: validCodeBreak,
+  prism_path: validPrismPath,
 };
 
 describe('templateCategoryMap <-> validation consistency', () => {

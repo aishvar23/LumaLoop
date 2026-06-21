@@ -10,17 +10,21 @@
 import { describe, expect, it } from 'vitest';
 
 import type {
+  CodeBreakCard,
   LiquidCard,
   MemorySequenceCard,
   PatternChainCard,
+  PrismPathCard,
   RuleFlipCard,
   SpotItCard,
   StepLogicCard,
   TinyLogicCard,
   WhatChangedCard,
 } from '../cards/types';
+import CodeBreakCardRenderer from '../templates/codeBreak/CodeBreakCard';
 import MemorySequenceCardRenderer from '../templates/memorySequence/MemorySequenceCard';
 import PatternChainCardRenderer from '../templates/patternChain/PatternChainCard';
+import PrismPathCardRenderer from '../templates/prismPath/PrismPathCard';
 import RuleFlipCardRenderer from '../templates/ruleFlip/RuleFlipCard';
 import SpotItCardRenderer from '../templates/spotIt/SpotItCard';
 import StepLogicCardRenderer from '../templates/stepLogic/StepLogicCard';
@@ -236,6 +240,62 @@ function stepLogicCard(): StepLogicCard {
   };
 }
 
+function codeBreakCard(): CodeBreakCard {
+  return {
+    cardId: 'cb-1',
+    creatorHandle: '@test',
+    templateType: 'code_break',
+    category: 'logical_reasoning',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 25,
+    prompt: 'Crack the hidden code',
+    puzzleDna: { mechanic: 'm', inputMode: 'tap', measuredSignals: ['correct'] },
+    explanation: { title: 't', body: 'b' },
+    config: {
+      palette: ['A', 'B', 'C'],
+      codeLength: 3,
+      secret: ['A', 'B', 'C'],
+      maxGuesses: 8,
+      timeLimitMs: 20_000,
+    },
+  };
+}
+
+function prismPathCard(): PrismPathCard {
+  return {
+    cardId: 'pp-1',
+    creatorHandle: '@test',
+    templateType: 'prism_path',
+    category: 'logical_reasoning',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 20,
+    prompt: 'Route the beam',
+    puzzleDna: { mechanic: 'm', inputMode: 'tap', measuredSignals: ['correct'] },
+    explanation: { title: 't', body: 'b' },
+    config: {
+      rows: 4,
+      columns: 4,
+      entry: { row: 3, column: 0 },
+      entryDirection: 'right',
+      target: { row: 0, column: 3 },
+      mirrors: [
+        { id: 'm1', row: 3, column: 2, initialOrientation: 'slash' },
+        { id: 'm2', row: 0, column: 2, initialOrientation: 'slash' },
+      ],
+      blockers: [],
+      solution: [
+        { mirrorId: 'm1', orientation: 'slash' },
+        { mirrorId: 'm2', orientation: 'slash' },
+      ],
+      timeLimitMs: 20_000,
+    },
+  };
+}
+
 describe('defaultRendererRegistry', () => {
   it('wires the spot_it renderer', () => {
     expect(defaultRendererRegistry.spot_it).toBe(SpotItCardRenderer);
@@ -267,6 +327,14 @@ describe('defaultRendererRegistry', () => {
 
   it('wires the step_logic renderer', () => {
     expect(defaultRendererRegistry.step_logic).toBe(StepLogicCardRenderer);
+  });
+
+  it('wires the code_break renderer', () => {
+    expect(defaultRendererRegistry.code_break).toBe(CodeBreakCardRenderer);
+  });
+
+  it('wires the prism_path renderer', () => {
+    expect(defaultRendererRegistry.prism_path).toBe(PrismPathCardRenderer);
   });
 
   it('resolves the spot_it card to its renderer', () => {
@@ -308,6 +376,18 @@ describe('defaultRendererRegistry', () => {
   it('resolves the step_logic card to its renderer', () => {
     expect(resolveRenderer(defaultRendererRegistry, stepLogicCard())).toBe(
       StepLogicCardRenderer,
+    );
+  });
+
+  it('resolves the code_break card to its renderer', () => {
+    expect(resolveRenderer(defaultRendererRegistry, codeBreakCard())).toBe(
+      CodeBreakCardRenderer,
+    );
+  });
+
+  it('resolves the prism_path card to its renderer', () => {
+    expect(resolveRenderer(defaultRendererRegistry, prismPathCard())).toBe(
+      PrismPathCardRenderer,
     );
   });
 

@@ -26,6 +26,8 @@ import {
   type LiquidCard,
   type MemorySequenceCard,
   type PatternChainCard,
+  type PrismMirrorOrientation,
+  type PrismPathCard,
   type RuleFlipCard,
   type SpotItCard,
   type StepLogicCard,
@@ -33,6 +35,10 @@ import {
   type TinyLogicCard,
   type WhatChangedCard,
 } from './types';
+import {
+  orientationMapFromSolution,
+  tracePrismPath,
+} from '../templates/prismPath/prismPathEvaluator';
 
 /** Inclusive lower bound for any template's `config.timeLimitMs` (5 seconds). */
 export const MIN_TIME_LIMIT_MS = 5000;
@@ -105,6 +111,7 @@ const templateAnswerValidators: {
   pattern_chain: validatePatternChainAnswer,
   step_logic: validateStepLogicAnswer,
   code_break: validateCodeBreakAnswer,
+  prism_path: validatePrismPathAnswer,
 };
 
 /**
@@ -474,6 +481,216 @@ function validateCodeBreakAnswer(card: CodeBreakCard): ValidationError[] {
       );
     }
   });
+
+  return errors;
+}
+
+/** Inclusive grid bounds for prism_path (small enough for feed-native play). */
+export const MIN_PRISM_GRID_SIZE = 3;
+export const MAX_PRISM_GRID_SIZE = 7;
+/** Bounds for authored prism_path mirrors. */
+export const MIN_PRISM_MIRRORS = 1;
+export const MAX_PRISM_MIRRORS = 8;
+
+function isOrientation(value: unknown): value is PrismMirrorOrientation {
+  return value === 'slash' || value === 'backslash';
+}
+
+function coordKey(row: number, column: number): string {
+  return `${row}:${column}`;
+}
+
+function validatePrismPathAnswer(card: PrismPathCard): ValidationError[] {
+  const {
+    rows,
+    columns,
+    entry,
+    target,
+    mirrors,
+    blockers,
+    solution,
+  } = card.config;
+  const errors: ValidationError[] = [];
+
+  const dimensionsValid =
+    Number.isInteger(rows) &&
+    Number.isInteger(columns) &&
+    rows >= MIN_PRISM_GRID_SIZE &&
+    rows <= MAX_PRISM_GRID_SIZE &&
+    columns >= MIN_PRISM_GRID_SIZE &&
+    columns <= MAX_PRISM_GRID_SIZE;
+  if (!dimensionsValid) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `prism_path grid ${rows}x${columns} is outside [${MIN_PRISM_GRID_SIZE}, ${MAX_PRISM_GRID_SIZE}]`,
+      ),
+    );
+  }
+
+  const inBounds = (row: number, column: number) =>
+    Number.isInteger(row) &&
+    Number.isInteger(column) &&
+    row >= 0 &&
+    row < rows &&
+    column >= 0 &&
+    column < columns;
+
+  if (!inBounds(entry.row, entry.column)) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `prism_path entry (${entry.row}, ${entry.column}) is outside grid bounds`,
+      ),
+    );
+  }
+  if (!inBounds(target.row, target.column)) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `prism_path target (${target.row}, ${target.column}) is outside grid bounds`,
+      ),
+    );
+  }
+  if (
+    entry.row === target.row &&
+    entry.column === target.column
+  ) {
+    errors.push(
+      answerError(card.cardId, 'prism_path entry and target must differ'),
+    );
+  }
+
+  if (
+    mirrors.length < MIN_PRISM_MIRRORS ||
+    mirrors.length > MAX_PRISM_MIRRORS
+  ) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `prism_path mirror count ${mirrors.length} is outside [${MIN_PRISM_MIRRORS}, ${MAX_PRISM_MIRRORS}]`,
+      ),
+    );
+  }
+
+  const occupied = new Map<string, string>();
+  occupied.set(coordKey(entry.row, entry.column), 'entry');
+  occupied.set(coordKey(target.row, target.column), 'target');
+
+  const mirrorIds = new Set<string>();
+  for (const mirror of mirrors) {
+    if (typeof mirror.id !== 'string' || mirror.id.trim().length === 0) {
+      errors.push(answerError(card.cardId, 'prism_path mirror has an empty id'));
+    } else if (mirrorIds.has(mirror.id)) {
+      errors.push(
+        answerError(card.cardId, `prism_path duplicate mirror id "${mirror.id}"`),
+      );
+    }
+    mirrorIds.add(mirror.id);
+
+    if (!isOrientation(mirror.initialOrientation)) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `prism_path mirror "${mirror.id}" has invalid initial orientation`,
+        ),
+      );
+    }
+    if (!inBounds(mirror.row, mirror.column)) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `prism_path mirror "${mirror.id}" (${mirror.row}, ${mirror.column}) is outside grid bounds`,
+        ),
+      );
+    }
+    const key = coordKey(mirror.row, mirror.column);
+    const existing = occupied.get(key);
+    if (existing) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `prism_path mirror "${mirror.id}" overlaps ${existing}`,
+        ),
+      );
+    }
+    occupied.set(key, `mirror "${mirror.id}"`);
+  }
+
+  blockers.forEach((blocker, index) => {
+    if (!inBounds(blocker.row, blocker.column)) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `prism_path blocker ${index} (${blocker.row}, ${blocker.column}) is outside grid bounds`,
+        ),
+      );
+    }
+    const key = coordKey(blocker.row, blocker.column);
+    const existing = occupied.get(key);
+    if (existing) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `prism_path blocker ${index} overlaps ${existing}`,
+        ),
+      );
+    }
+    occupied.set(key, `blocker ${index}`);
+  });
+
+  if (solution.length !== mirrors.length) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `prism_path solution must set every mirror once, got ${solution.length} for ${mirrors.length} mirrors`,
+      ),
+    );
+  }
+
+  const solutionIds = new Set<string>();
+  for (const item of solution) {
+    if (!mirrorIds.has(item.mirrorId)) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `prism_path solution references unknown mirror "${item.mirrorId}"`,
+        ),
+      );
+    }
+    if (solutionIds.has(item.mirrorId)) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `prism_path solution repeats mirror "${item.mirrorId}"`,
+        ),
+      );
+    }
+    solutionIds.add(item.mirrorId);
+    if (!isOrientation(item.orientation)) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `prism_path solution for "${item.mirrorId}" has invalid orientation`,
+        ),
+      );
+    }
+  }
+
+  if (errors.length === 0) {
+    const solvedTrace = tracePrismPath(
+      card.config,
+      orientationMapFromSolution(solution),
+    );
+    if (!solvedTrace.reachedTarget) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `prism_path authored solution does not reach target (exit: ${solvedTrace.exitReason})`,
+        ),
+      );
+    }
+  }
 
   return errors;
 }

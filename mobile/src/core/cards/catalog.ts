@@ -32,6 +32,7 @@ import type {
   LiquidCard,
   MemorySequenceCard,
   PatternChainCard,
+  PrismPathCard,
   RuleFlipCard,
   SpotItCard,
   StepLogicCard,
@@ -3087,7 +3088,7 @@ const codeBreakCards: CodeBreakCard[] = [
     difficulty: 'easy',
     evidenceTier: 'mechanic_mapped',
     reviewStatus: 'manual_reviewed',
-    estimatedSeconds: 30,
+    estimatedSeconds: 26,
     prompt: 'Crack the 3-symbol code. Each guess shows how close you got.',
     puzzleDna: {
       mechanic: 'deductive-code-breaking',
@@ -3245,6 +3246,275 @@ const codeBreakCards: CodeBreakCard[] = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// prism_path — rotate mirrors to route a beam to a target. A visually rich,
+// feed-native planning puzzle with pure beam-trace scoring.
+// Categories allowed: logical_reasoning | pattern_recognition | working_memory.
+// ---------------------------------------------------------------------------
+
+const prismPathCards: PrismPathCard[] = [
+  {
+    cardId: 'prismpath-001',
+    creatorHandle: '@prismworks',
+    templateType: 'prism_path',
+    category: 'logical_reasoning',
+    difficulty: 'easy',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 20,
+    prompt: 'Rotate the mirrors so the beam reaches the star.',
+    puzzleDna: {
+      mechanic: 'mirror-beam-routing',
+      inputMode: 'tap',
+      measuredSignals: ['accuracy', 'rotations_used', 'beam_steps'],
+    },
+    explanation: {
+      title: 'Two clean bends',
+      body: 'The first mirror sends the beam upward; the second sends it right into the target.',
+    },
+    shareText: 'Bent a beam through the grid with two mirror turns.',
+    config: {
+      rows: 4,
+      columns: 4,
+      entry: { row: 3, column: 0 },
+      entryDirection: 'right',
+      target: { row: 0, column: 3 },
+      mirrors: [
+        { id: 'm1', row: 3, column: 2, initialOrientation: 'backslash' },
+        { id: 'm2', row: 0, column: 2, initialOrientation: 'backslash' },
+      ],
+      blockers: [{ row: 1, column: 1 }],
+      solution: [
+        { mirrorId: 'm1', orientation: 'slash' },
+        { mirrorId: 'm2', orientation: 'slash' },
+      ],
+      timeLimitMs: 20000,
+    },
+  },
+  {
+    cardId: 'prismpath-002',
+    creatorHandle: '@raywright',
+    templateType: 'prism_path',
+    category: 'pattern_recognition',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 24,
+    prompt: 'Build a three-bounce route around the blocks.',
+    puzzleDna: {
+      mechanic: 'mirror-beam-routing',
+      inputMode: 'tap',
+      measuredSignals: ['accuracy', 'rotations_used', 'beam_steps'],
+    },
+    explanation: {
+      title: 'Down, right, up',
+      body: 'A backslash mirror turns the downward beam right; two slash mirrors lift it back to the target row.',
+    },
+    config: {
+      rows: 5,
+      columns: 5,
+      entry: { row: 0, column: 0 },
+      entryDirection: 'down',
+      target: { row: 0, column: 4 },
+      mirrors: [
+        { id: 'm1', row: 2, column: 0, initialOrientation: 'slash' },
+        { id: 'm2', row: 2, column: 3, initialOrientation: 'backslash' },
+        { id: 'm3', row: 0, column: 3, initialOrientation: 'backslash' },
+      ],
+      blockers: [
+        { row: 1, column: 2 },
+        { row: 3, column: 3 },
+      ],
+      solution: [
+        { mirrorId: 'm1', orientation: 'backslash' },
+        { mirrorId: 'm2', orientation: 'slash' },
+        { mirrorId: 'm3', orientation: 'slash' },
+      ],
+      timeLimitMs: 24000,
+    },
+  },
+  {
+    cardId: 'prismpath-003',
+    creatorHandle: '@neonroute',
+    templateType: 'prism_path',
+    category: 'pattern_recognition',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 24,
+    prompt: 'Thread the beam from the top edge to the lower-right target.',
+    puzzleDna: {
+      mechanic: 'mirror-beam-routing',
+      inputMode: 'tap',
+      measuredSignals: ['accuracy', 'rotations_used', 'beam_steps'],
+    },
+    explanation: {
+      title: 'Corner relay',
+      body: 'The slash mirror drops the beam; the two backslash mirrors carry it across and down to the target.',
+    },
+    config: {
+      rows: 5,
+      columns: 5,
+      entry: { row: 0, column: 4 },
+      entryDirection: 'left',
+      target: { row: 4, column: 4 },
+      mirrors: [
+        { id: 'm1', row: 0, column: 2, initialOrientation: 'backslash' },
+        { id: 'm2', row: 3, column: 2, initialOrientation: 'slash' },
+        { id: 'm3', row: 3, column: 4, initialOrientation: 'slash' },
+      ],
+      blockers: [
+        { row: 2, column: 1 },
+        { row: 1, column: 4 },
+      ],
+      solution: [
+        { mirrorId: 'm1', orientation: 'slash' },
+        { mirrorId: 'm2', orientation: 'backslash' },
+        { mirrorId: 'm3', orientation: 'backslash' },
+      ],
+      timeLimitMs: 24000,
+    },
+  },
+  {
+    cardId: 'prismpath-004',
+    creatorHandle: '@prismworks',
+    templateType: 'prism_path',
+    category: 'logical_reasoning',
+    difficulty: 'hard',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 30,
+    prompt: 'Six mirrors. Make the long route hit the far star.',
+    puzzleDna: {
+      mechanic: 'mirror-beam-routing',
+      inputMode: 'tap',
+      measuredSignals: ['accuracy', 'rotations_used', 'beam_steps'],
+    },
+    explanation: {
+      title: 'Long-route planning',
+      body: 'The solved route climbs, crosses, drops, doubles back, then climbs again before the last mirror sends it across the top row.',
+    },
+    shareText: 'Solved a six-mirror beam route without losing the thread.',
+    config: {
+      rows: 6,
+      columns: 6,
+      entry: { row: 5, column: 0 },
+      entryDirection: 'right',
+      target: { row: 0, column: 5 },
+      mirrors: [
+        { id: 'm1', row: 5, column: 2, initialOrientation: 'backslash' },
+        { id: 'm2', row: 2, column: 2, initialOrientation: 'backslash' },
+        { id: 'm3', row: 2, column: 4, initialOrientation: 'slash' },
+        { id: 'm4', row: 4, column: 4, initialOrientation: 'backslash' },
+        { id: 'm5', row: 4, column: 1, initialOrientation: 'slash' },
+        { id: 'm6', row: 0, column: 1, initialOrientation: 'backslash' },
+      ],
+      blockers: [
+        { row: 1, column: 2 },
+        { row: 3, column: 3 },
+        { row: 5, column: 4 },
+      ],
+      solution: [
+        { mirrorId: 'm1', orientation: 'slash' },
+        { mirrorId: 'm2', orientation: 'slash' },
+        { mirrorId: 'm3', orientation: 'backslash' },
+        { mirrorId: 'm4', orientation: 'slash' },
+        { mirrorId: 'm5', orientation: 'backslash' },
+        { mirrorId: 'm6', orientation: 'slash' },
+      ],
+      timeLimitMs: 30000,
+    },
+  },
+  {
+    cardId: 'prismpath-005',
+    creatorHandle: '@raywright',
+    templateType: 'prism_path',
+    category: 'logical_reasoning',
+    difficulty: 'hard',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 28,
+    prompt: 'Turn the beam through the lower lane without clipping a block.',
+    puzzleDna: {
+      mechanic: 'mirror-beam-routing',
+      inputMode: 'tap',
+      measuredSignals: ['accuracy', 'rotations_used', 'beam_steps'],
+    },
+    explanation: {
+      title: 'Lower-lane detour',
+      body: 'The route drops from the top, turns left, drops again, then uses a backslash mirror to sweep across the bottom lane.',
+    },
+    config: {
+      rows: 6,
+      columns: 6,
+      entry: { row: 0, column: 0 },
+      entryDirection: 'right',
+      target: { row: 5, column: 5 },
+      mirrors: [
+        { id: 'm1', row: 0, column: 3, initialOrientation: 'slash' },
+        { id: 'm2', row: 3, column: 3, initialOrientation: 'backslash' },
+        { id: 'm3', row: 3, column: 1, initialOrientation: 'backslash' },
+        { id: 'm4', row: 5, column: 1, initialOrientation: 'slash' },
+      ],
+      blockers: [
+        { row: 1, column: 1 },
+        { row: 2, column: 4 },
+        { row: 4, column: 3 },
+      ],
+      solution: [
+        { mirrorId: 'm1', orientation: 'backslash' },
+        { mirrorId: 'm2', orientation: 'slash' },
+        { mirrorId: 'm3', orientation: 'slash' },
+        { mirrorId: 'm4', orientation: 'backslash' },
+      ],
+      timeLimitMs: 28000,
+    },
+  },
+  {
+    cardId: 'prismpath-006',
+    creatorHandle: '@neonroute',
+    templateType: 'prism_path',
+    category: 'working_memory',
+    difficulty: 'easy',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 18,
+    prompt: 'Hold the three turns in mind and guide the beam to the star.',
+    puzzleDna: {
+      mechanic: 'mirror-beam-routing',
+      inputMode: 'tap',
+      measuredSignals: ['accuracy', 'rotations_used', 'beam_steps'],
+    },
+    explanation: {
+      title: 'Remember the turn order',
+      body: 'The route goes up, right, then up again. Keeping that turn order steady makes the mirror choices fall into place.',
+    },
+    shareText: 'Held a three-turn beam route steady and found the star.',
+    config: {
+      rows: 4,
+      columns: 5,
+      entry: { row: 3, column: 0 },
+      entryDirection: 'right',
+      target: { row: 0, column: 4 },
+      mirrors: [
+        { id: 'm1', row: 3, column: 1, initialOrientation: 'backslash' },
+        { id: 'm2', row: 1, column: 1, initialOrientation: 'backslash' },
+        { id: 'm3', row: 1, column: 4, initialOrientation: 'backslash' },
+      ],
+      blockers: [
+        { row: 0, column: 2 },
+        { row: 2, column: 3 },
+      ],
+      solution: [
+        { mirrorId: 'm1', orientation: 'slash' },
+        { mirrorId: 'm2', orientation: 'slash' },
+        { mirrorId: 'm3', orientation: 'slash' },
+      ],
+      timeLimitMs: 18000,
+    },
+  },
+];
+
 /**
  * The complete authored catalog. Order groups cards by template for
  * readability; session selection / shuffling is the engine's concern, not the
@@ -3260,6 +3530,7 @@ export const catalog: readonly LiquidCard[] = [
   ...patternChainCards,
   ...stepLogicCards,
   ...codeBreakCards,
+  ...prismPathCards,
 ];
 
 /**
