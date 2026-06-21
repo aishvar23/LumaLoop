@@ -59,7 +59,8 @@ export type TemplateType =
   | 'memory_sequence'
   | 'pattern_chain'
   | 'step_logic'
-  | 'code_break';
+  | 'code_break'
+  | 'prism_path';
 
 export type Difficulty = 'easy' | 'medium' | 'hard';
 
@@ -157,6 +158,12 @@ export type TinyLogicCard = LiquidCardBase & {
  * `column` are zero-based indices into the `rows × columns` grid.
  */
 export type GridCoordinate = { row: number; column: number };
+
+/** Cardinal directions used by beam/path-style templates. */
+export type GridDirection = 'up' | 'right' | 'down' | 'left';
+
+/** Mirror orientations for prism_path. */
+export type PrismMirrorOrientation = 'slash' | 'backslash';
 
 /**
  * Watch a sequence of tiles flash, then reproduce the order by tapping
@@ -329,6 +336,60 @@ export type CodeBreakCard = LiquidCardBase & {
 };
 
 /**
+ * Rotate mirrors to route a light beam from an entry tile to a target tile — a
+ * compact, visual planning puzzle (logical_reasoning / pattern_recognition /
+ * working_memory).
+ *
+ * The renderer shows a grid with one beam entry, one target, optional blockers,
+ * and tappable mirrors. Each mirror toggles between slash (`/`) and backslash
+ * (`\`) orientation. The pure evaluator traces the beam through the current
+ * mirror orientations and resolves correct only when the beam reaches the target.
+ * This keeps the renderer visual and tactile while the answer logic stays in one
+ * React-free source of truth.
+ */
+export type PrismPathMirror = GridCoordinate & {
+  /** Stable id used by the renderer/evaluator to track a mirror's orientation. */
+  id: string;
+  /** The authored starting orientation shown when the card mounts. */
+  initialOrientation: PrismMirrorOrientation;
+};
+
+export type PrismPathSolution = {
+  /** The mirror id being set for the authored answer key. */
+  mirrorId: string;
+  /** The final orientation needed for the canonical solution. */
+  orientation: PrismMirrorOrientation;
+};
+
+export type PrismPathCard = LiquidCardBase & {
+  templateType: 'prism_path';
+  config: {
+    /** Grid height, positive and small enough for a feed card. */
+    rows: number;
+    /** Grid width, positive and small enough for a feed card. */
+    columns: number;
+    /** Beam entry tile inside the grid. */
+    entry: GridCoordinate;
+    /** Direction the beam travels as it enters the entry tile. */
+    entryDirection: GridDirection;
+    /** Target tile the beam must reach. */
+    target: GridCoordinate;
+    /** Tappable mirrors. They must have unique ids and in-bounds coordinates. */
+    mirrors: ReadonlyArray<PrismPathMirror>;
+    /** Static blocked cells that stop the beam. */
+    blockers: ReadonlyArray<GridCoordinate>;
+    /**
+     * Canonical solved orientations. Validation proves this authored solution
+     * reaches the target; the renderer accepts any orientation set that reaches
+     * the target, so alternate valid paths are not unfairly rejected.
+     */
+    solution: ReadonlyArray<PrismPathSolution>;
+    /** Countdown for the whole solve (5-30s; see validation). */
+    timeLimitMs: number;
+  };
+};
+
+/**
  * The discriminated union of every card. Narrow on `templateType` to access a
  * card's typed `config`. Adding a template means adding a member here (step 2).
  */
@@ -340,7 +401,8 @@ export type LiquidCard =
   | MemorySequenceCard
   | PatternChainCard
   | StepLogicCard
-  | CodeBreakCard;
+  | CodeBreakCard
+  | PrismPathCard;
 
 /**
  * The categories each template is allowed to map to (Technical Design §11).
@@ -369,4 +431,11 @@ export const templateCategoryMap: Readonly<
   // logical_reasoning (the same category as tiny_logic/step_logic) — no new
   // ChallengeCategory is warranted.
   code_break: Object.freeze(['logical_reasoning'] as const),
+  // prism_path is visual route planning: the user manipulates mirrors, traces
+  // consequences, and checks whether the beam reaches the target.
+  prism_path: Object.freeze([
+    'logical_reasoning',
+    'pattern_recognition',
+    'working_memory',
+  ] as const),
 }) satisfies Readonly<Record<TemplateType, readonly ChallengeCategory[]>>;

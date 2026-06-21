@@ -3,11 +3,13 @@ import {
   MAX_CHAIN_STEPS,
   MAX_CODE_GUESSES,
   MAX_CODE_LENGTH,
+  MAX_PRISM_GRID_SIZE,
   MAX_SEQUENCE_LENGTH,
   MAX_STEP_LOGIC_STEPS,
   MAX_TIME_LIMIT_MS,
   MIN_CODE_GUESSES,
   MIN_CODE_LENGTH,
+  MIN_PRISM_GRID_SIZE,
   MIN_TIME_LIMIT_MS,
   ValidationRule,
   assertValidCatalog,
@@ -20,6 +22,7 @@ import {
   type LiquidCard,
   type MemorySequenceCard,
   type PatternChainCard,
+  type PrismPathCard,
   type PuzzleDna,
   type RuleFlipCard,
   type SpotItCard,
@@ -298,6 +301,42 @@ function validCodeBreak(): CodeBreakCard {
   };
 }
 
+function validPrismPath(): PrismPathCard {
+  return {
+    cardId: 'prismpath-1',
+    creatorHandle: 'lumaloop',
+    templateType: 'prism_path',
+    category: 'logical_reasoning',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 20,
+    prompt: 'Rotate mirrors to route the beam.',
+    puzzleDna: dna('mirror-beam-routing'),
+    explanation: {
+      title: 'Mirror routing',
+      body: 'Each mirror redirects the beam by a right angle until the route reaches the target.',
+    },
+    config: {
+      rows: 4,
+      columns: 4,
+      entry: { row: 3, column: 0 },
+      entryDirection: 'right',
+      target: { row: 0, column: 3 },
+      mirrors: [
+        { id: 'm1', row: 3, column: 2, initialOrientation: 'slash' },
+        { id: 'm2', row: 0, column: 2, initialOrientation: 'slash' },
+      ],
+      blockers: [{ row: 1, column: 1 }],
+      solution: [
+        { mirrorId: 'm1', orientation: 'slash' },
+        { mirrorId: 'm2', orientation: 'slash' },
+      ],
+      timeLimitMs: 20000,
+    },
+  };
+}
+
 function validCatalog(): LiquidCard[] {
   return [
     validSpotIt(),
@@ -308,6 +347,7 @@ function validCatalog(): LiquidCard[] {
     validPatternChain(),
     validStepLogic(),
     validCodeBreak(),
+    validPrismPath(),
   ];
 }
 
@@ -937,6 +977,73 @@ describe('validateCatalog', () => {
     expect(result.valid).toBe(false);
     expect(hasRule(result.errors, ValidationRule.TIME_LIMIT_RANGE)).toBe(true);
   });
+
+  // ── prism_path ────────────────────────────────────────────────────────────
+
+  it('accepts a valid prism_path', () => {
+    const result = validateCatalog([validPrismPath()]);
+    expect(result.errors).toEqual([]);
+    expect(result.valid).toBe(true);
+  });
+
+  it('rejects a prism_path grid outside bounds', () => {
+    const card = validPrismPath();
+    card.config = {
+      ...card.config,
+      rows: MIN_PRISM_GRID_SIZE - 1,
+      columns: MAX_PRISM_GRID_SIZE + 1,
+    };
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('rejects prism_path overlapping mirrors and blockers', () => {
+    const card = validPrismPath();
+    card.config = {
+      ...card.config,
+      blockers: [{ row: 3, column: 2 }],
+    };
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('rejects a prism_path solution that references an unknown mirror', () => {
+    const card = validPrismPath();
+    card.config = {
+      ...card.config,
+      solution: [
+        { mirrorId: 'm1', orientation: 'slash' },
+        { mirrorId: 'ghost', orientation: 'slash' },
+      ],
+    };
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('rejects a prism_path whose authored solution misses the target', () => {
+    const card = validPrismPath();
+    card.config = {
+      ...card.config,
+      solution: [
+        { mirrorId: 'm1', orientation: 'backslash' },
+        { mirrorId: 'm2', orientation: 'backslash' },
+      ],
+    };
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -961,6 +1068,7 @@ const ALL_TEMPLATE_TYPES: TemplateType[] = [
   'pattern_chain',
   'step_logic',
   'code_break',
+  'prism_path',
 ];
 
 const ALL_CATEGORIES: ChallengeCategory[] = [
@@ -982,6 +1090,7 @@ const validCardFor: Record<TemplateType, () => LiquidCard> = {
   pattern_chain: validPatternChain,
   step_logic: validStepLogic,
   code_break: validCodeBreak,
+  prism_path: validPrismPath,
 };
 
 describe('templateCategoryMap <-> validation consistency', () => {

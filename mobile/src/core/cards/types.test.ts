@@ -17,6 +17,7 @@ const ALL_TEMPLATE_TYPES: TemplateType[] = [
   'pattern_chain',
   'step_logic',
   'code_break',
+  'prism_path',
 ];
 
 const ALL_CATEGORIES: ChallengeCategory[] = [
@@ -86,6 +87,7 @@ describe('templateCategoryMap', () => {
       pattern_chain: ['pattern_recognition'],
       step_logic: ['logical_reasoning'],
       code_break: ['logical_reasoning'],
+      prism_path: ['logical_reasoning', 'pattern_recognition', 'working_memory'],
     });
   });
 });
@@ -122,6 +124,9 @@ function categoriesForCard(card: LiquidCard): ChallengeCategory {
       return 'logical_reasoning';
     case 'code_break':
       void card.config.secret;
+      return 'logical_reasoning';
+    case 'prism_path':
+      void card.config.mirrors;
       return 'logical_reasoning';
     default: {
       // If a new TemplateType is added without a case above, `card` is no
@@ -193,9 +198,33 @@ describe('LiquidCard discriminated union', () => {
         timeLimitMs: 20000,
       },
     };
+    const prismPath: LiquidCard = {
+      ...base,
+      cardId: 'c4',
+      templateType: 'prism_path',
+      category: 'logical_reasoning',
+      config: {
+        rows: 4,
+        columns: 4,
+        entry: { row: 3, column: 0 },
+        entryDirection: 'right',
+        target: { row: 0, column: 3 },
+        mirrors: [
+          { id: 'm1', row: 3, column: 2, initialOrientation: 'slash' },
+          { id: 'm2', row: 0, column: 2, initialOrientation: 'slash' },
+        ],
+        blockers: [],
+        solution: [
+          { mirrorId: 'm1', orientation: 'slash' },
+          { mirrorId: 'm2', orientation: 'slash' },
+        ],
+        timeLimitMs: 20000,
+      },
+    };
 
     expect(categoriesForCard(spotIt)).toBe('visual_attention');
     expect(categoriesForCard(tinyLogic)).toBe('logical_reasoning');
     expect(categoriesForCard(codeBreak)).toBe('logical_reasoning');
+    expect(categoriesForCard(prismPath)).toBe('logical_reasoning');
   });
 });
