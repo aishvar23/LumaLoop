@@ -57,7 +57,8 @@ export type TemplateType =
   | 'rule_flip'
   | 'tiny_logic'
   | 'memory_sequence'
-  | 'pattern_chain';
+  | 'pattern_chain'
+  | 'step_logic';
 
 export type Difficulty = 'easy' | 'medium' | 'hard';
 
@@ -234,6 +235,55 @@ export type PatternChainCard = LiquidCardBase & {
 };
 
 /**
+ * One linked sub-question in a {@link StepLogicCard}: a multiple-choice `stem`
+ * with its `options` and the `correctOptionId` that answers it. Steps are ordered
+ * and may build on one another — a later `stem` can refer to facts established by
+ * the premise or an earlier step. Authored option ids are stable, unique-within-a-
+ * step slugs.
+ */
+export type StepLogicStep = {
+  /** The sub-question text shown for this step. */
+  stem: string;
+  /** The candidate answers for this step; exactly one is `correctOptionId`. */
+  options: Array<{ id: string; label: string }>;
+  /** The id of the option that correctly answers this step's `stem`. */
+  correctOptionId: string;
+};
+
+/**
+ * Answer a short chain of 2–3 LINKED multiple-choice sub-questions that build on
+ * a shared `premise` — a MULTI-STEP logical-reasoning mechanic (logical_reasoning).
+ *
+ * The renderer shows the `premise` throughout, then presents each step's `stem`
+ * and `options` in order: on every pick it reveals the next step, until all
+ * `steps` are answered. The shared `timeLimitMs` covers the whole solve (no
+ * preview phase — interaction is enabled at card start, so the controller sets
+ * `interactionEnabledAtMs === activeAtMs`). Correctness is an exact ordered match
+ * of every step's pick against its `correctOptionId`, decided by the pure
+ * `evaluateStepLogic` (the renderer routes its collected picks through it). The
+ * chain is NON-STRICT: a wrong sub-answer does not end the card early — the player
+ * always completes every step (mirroring `pattern_chain`).
+ */
+export type StepLogicCard = LiquidCardBase & {
+  templateType: 'step_logic';
+  config: {
+    /**
+     * The shared premise shown above every sub-question for the whole solve.
+     * Catalog validation requires it to be non-empty.
+     */
+    premise: string;
+    /**
+     * The ordered linked sub-questions. Each step offers `options` and names the
+     * `correctOptionId` that answers its `stem`. Length 2–3 (enforced by catalog
+     * validation); `correctOptionId` must be one of that step's `options`.
+     */
+    steps: ReadonlyArray<StepLogicStep>;
+    /** Countdown for the whole solve (5–30s; see validation). */
+    timeLimitMs: number;
+  };
+};
+
+/**
  * The discriminated union of every card. Narrow on `templateType` to access a
  * card's typed `config`. Adding a template means adding a member here (step 2).
  */
@@ -243,7 +293,8 @@ export type LiquidCard =
   | RuleFlipCard
   | TinyLogicCard
   | MemorySequenceCard
-  | PatternChainCard;
+  | PatternChainCard
+  | StepLogicCard;
 
 /**
  * The categories each template is allowed to map to (Technical Design §11).
@@ -266,4 +317,5 @@ export const templateCategoryMap: Readonly<
   tiny_logic: Object.freeze(['logical_reasoning', 'pattern_recognition'] as const),
   memory_sequence: Object.freeze(['working_memory'] as const),
   pattern_chain: Object.freeze(['pattern_recognition'] as const),
+  step_logic: Object.freeze(['logical_reasoning'] as const),
 }) satisfies Readonly<Record<TemplateType, readonly ChallengeCategory[]>>;

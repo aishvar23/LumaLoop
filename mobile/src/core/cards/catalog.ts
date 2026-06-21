@@ -33,6 +33,7 @@ import type {
   PatternChainCard,
   RuleFlipCard,
   SpotItCard,
+  StepLogicCard,
   TinyLogicCard,
   WhatChangedCard,
 } from './types';
@@ -1183,6 +1184,202 @@ const patternChainCards: PatternChainCard[] = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// step_logic — answer a short chain of 2-3 LINKED multiple-choice sub-questions
+// that build on a shared premise (each answer reveals the next). Category
+// allowed: logical_reasoning. Each step names a correctOptionId among its
+// options. NON-STRICT: a wrong sub-answer never ends the chain early.
+// ---------------------------------------------------------------------------
+
+const stepLogicCards: StepLogicCard[] = [
+  {
+    cardId: 'steplogic-001',
+    creatorHandle: '@chainofthought',
+    templateType: 'step_logic',
+    category: 'logical_reasoning',
+    difficulty: 'easy',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 16,
+    prompt: 'Work through the clues one step at a time.',
+    puzzleDna: {
+      mechanic: 'multi-step-deduction',
+      inputMode: 'choice',
+      measuredSignals: ['accuracy', 'chained_reasoning'],
+    },
+    explanation: {
+      title: 'Carry each fact forward',
+      body: 'Mia is taller than Jo, and Jo is taller than Sam, so Mia is the tallest and Sam is the shortest. Each answer feeds the next.',
+    },
+    shareText: 'Reasoned through a two-step height puzzle without a slip.',
+    config: {
+      premise: 'Mia is taller than Jo. Jo is taller than Sam.',
+      steps: [
+        {
+          stem: 'Who is the tallest?',
+          options: [
+            { id: 's1-mia', label: 'Mia' },
+            { id: 's1-jo', label: 'Jo' },
+            { id: 's1-sam', label: 'Sam' },
+          ],
+          correctOptionId: 's1-mia',
+        },
+        {
+          stem: 'Given that, who is the shortest?',
+          options: [
+            { id: 's2-mia', label: 'Mia' },
+            { id: 's2-jo', label: 'Jo' },
+            { id: 's2-sam', label: 'Sam' },
+          ],
+          correctOptionId: 's2-sam',
+        },
+      ],
+      timeLimitMs: 16000,
+    },
+  },
+  {
+    cardId: 'steplogic-002',
+    creatorHandle: '@logicloom',
+    templateType: 'step_logic',
+    category: 'logical_reasoning',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 20,
+    prompt: 'Follow the rule, then apply what you found.',
+    puzzleDna: {
+      mechanic: 'multi-step-deduction',
+      inputMode: 'choice',
+      measuredSignals: ['accuracy', 'chained_reasoning'],
+    },
+    explanation: {
+      title: 'Chain the conditionals',
+      body: 'Every Zib is a Dax, and every Dax is a Wol. So a Zib is a Dax, and because every Dax is a Wol, a Zib must be a Wol too.',
+    },
+    config: {
+      premise: 'Every Zib is a Dax. Every Dax is a Wol.',
+      steps: [
+        {
+          stem: 'Is a Zib a Dax?',
+          options: [
+            { id: 's1-yes', label: 'Yes' },
+            { id: 's1-no', label: 'No' },
+            { id: 's1-unknown', label: 'Cannot be known' },
+          ],
+          correctOptionId: 's1-yes',
+        },
+        {
+          stem: 'So is a Zib a Wol?',
+          options: [
+            { id: 's2-yes', label: 'Yes' },
+            { id: 's2-no', label: 'No' },
+            { id: 's2-unknown', label: 'Cannot be known' },
+          ],
+          correctOptionId: 's2-yes',
+        },
+      ],
+      timeLimitMs: 18000,
+    },
+  },
+  {
+    cardId: 'steplogic-003',
+    creatorHandle: '@chainofthought',
+    templateType: 'step_logic',
+    category: 'logical_reasoning',
+    difficulty: 'medium',
+    evidenceTier: 'entertainment_only',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 22,
+    prompt: 'Pin down each day from the clues in order.',
+    puzzleDna: {
+      mechanic: 'multi-step-deduction',
+      inputMode: 'choice',
+      measuredSignals: ['accuracy', 'chained_reasoning'],
+    },
+    explanation: {
+      title: 'One day at a time',
+      body: "Today is not Monday, so among the two options it must be Wednesday. The day after Wednesday is Thursday, which answers the second step.",
+    },
+    config: {
+      premise: 'Today is either Monday or Wednesday. It is not Monday.',
+      steps: [
+        {
+          stem: 'What day is it today?',
+          options: [
+            { id: 's1-mon', label: 'Monday' },
+            { id: 's1-wed', label: 'Wednesday' },
+          ],
+          correctOptionId: 's1-wed',
+        },
+        {
+          stem: 'So what day is tomorrow?',
+          options: [
+            { id: 's2-tue', label: 'Tuesday' },
+            { id: 's2-thu', label: 'Thursday' },
+            { id: 's2-sun', label: 'Sunday' },
+          ],
+          correctOptionId: 's2-thu',
+        },
+      ],
+      timeLimitMs: 20000,
+    },
+  },
+  {
+    cardId: 'steplogic-004',
+    creatorHandle: '@logicloom',
+    templateType: 'step_logic',
+    category: 'logical_reasoning',
+    difficulty: 'hard',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 26,
+    prompt: 'Three linked clues — solve them in sequence.',
+    puzzleDna: {
+      mechanic: 'multi-step-deduction',
+      inputMode: 'choice',
+      measuredSignals: ['accuracy', 'chained_reasoning'],
+    },
+    explanation: {
+      title: 'Build the order step by step',
+      body: 'Ada sits left of Ben, and Cy sits right of Ben, giving the order Ada, Ben, Cy from left to right. Ada is on the far left and Cy is on the far right, so Ben is in the middle.',
+    },
+    shareText: 'Cracked a three-step seating puzzle in order.',
+    config: {
+      premise: 'Three friends sit in a row. Ada sits to the left of Ben. Cy sits to the right of Ben.',
+      steps: [
+        {
+          stem: 'Who sits on the far left?',
+          options: [
+            { id: 's1-ada', label: 'Ada' },
+            { id: 's1-ben', label: 'Ben' },
+            { id: 's1-cy', label: 'Cy' },
+          ],
+          correctOptionId: 's1-ada',
+        },
+        {
+          stem: 'Who sits on the far right?',
+          options: [
+            { id: 's2-ada', label: 'Ada' },
+            { id: 's2-ben', label: 'Ben' },
+            { id: 's2-cy', label: 'Cy' },
+          ],
+          correctOptionId: 's2-cy',
+        },
+        {
+          stem: 'So who is in the middle?',
+          options: [
+            { id: 's3-ada', label: 'Ada' },
+            { id: 's3-ben', label: 'Ben' },
+            { id: 's3-cy', label: 'Cy' },
+          ],
+          correctOptionId: 's3-ben',
+        },
+      ],
+      timeLimitMs: 26000,
+    },
+  },
+];
+
 /**
  * The complete authored catalog. Order groups cards by template for
  * readability; session selection / shuffling is the engine's concern, not the
@@ -1196,6 +1393,7 @@ export const catalog: readonly LiquidCard[] = [
   ...tinyLogicCards,
   ...memorySequenceCards,
   ...patternChainCards,
+  ...stepLogicCards,
 ];
 
 /**
