@@ -1,9 +1,13 @@
 import {
   ALLOWED_EVIDENCE_TIERS,
   MAX_CHAIN_STEPS,
+  MAX_CODE_GUESSES,
+  MAX_CODE_LENGTH,
   MAX_SEQUENCE_LENGTH,
   MAX_STEP_LOGIC_STEPS,
   MAX_TIME_LIMIT_MS,
+  MIN_CODE_GUESSES,
+  MIN_CODE_LENGTH,
   MIN_TIME_LIMIT_MS,
   ValidationRule,
   assertValidCatalog,
@@ -12,6 +16,7 @@ import {
 import {
   templateCategoryMap,
   type ChallengeCategory,
+  type CodeBreakCard,
   type LiquidCard,
   type MemorySequenceCard,
   type PatternChainCard,
@@ -267,6 +272,32 @@ function validStepLogic(): StepLogicCard {
   };
 }
 
+function validCodeBreak(): CodeBreakCard {
+  return {
+    cardId: 'codebreak-1',
+    creatorHandle: 'lumaloop',
+    templateType: 'code_break',
+    category: 'logical_reasoning',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 25,
+    prompt: 'Crack the hidden code from the peg feedback.',
+    puzzleDna: dna('deductive-code-breaking'),
+    explanation: {
+      title: 'Deductive code breaking',
+      body: 'Each row of pegs narrows the possibilities until one code remains.',
+    },
+    config: {
+      palette: ['🔴', '🟢', '🔵', '🟡'],
+      codeLength: 3,
+      secret: ['🔴', '🟢', '🔵'],
+      maxGuesses: 8,
+      timeLimitMs: 25000,
+    },
+  };
+}
+
 function validCatalog(): LiquidCard[] {
   return [
     validSpotIt(),
@@ -276,6 +307,7 @@ function validCatalog(): LiquidCard[] {
     validMemorySequence(),
     validPatternChain(),
     validStepLogic(),
+    validCodeBreak(),
   ];
 }
 
@@ -814,6 +846,92 @@ describe('validateCatalog', () => {
     expect(hasRule(result.errors, ValidationRule.EVIDENCE_TIER)).toBe(true);
     expect(result.errors.length).toBeGreaterThanOrEqual(2);
   });
+
+  // ── code_break (#143) ──────────────────────────────────────────────────────
+
+  it('accepts a valid code_break', () => {
+    const result = validateCatalog([validCodeBreak()]);
+    expect(result.errors).toEqual([]);
+    expect(result.valid).toBe(true);
+  });
+
+  it('rejects a code_break whose secret length does not match codeLength', () => {
+    const card = validCodeBreak();
+    card.config = { ...card.config, secret: ['🔴', '🟢'] };
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('rejects a code_break secret symbol not in the palette', () => {
+    const card = validCodeBreak();
+    card.config = { ...card.config, secret: ['🔴', '🟢', '⚫'] };
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('rejects a code_break with a duplicate-symbol palette', () => {
+    const card = validCodeBreak();
+    card.config = { ...card.config, palette: ['🔴', '🔴', '🔵', '🟡'] };
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('rejects a code_break codeLength outside bounds', () => {
+    const tooLong = MAX_CODE_LENGTH + 1;
+    const palette = Array.from({ length: tooLong }, (_, i) => `s${i}`);
+    const card = validCodeBreak();
+    card.config = {
+      ...card.config,
+      palette,
+      codeLength: tooLong,
+      secret: palette.slice(0, tooLong),
+    };
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('accepts a code_break at the min codeLength and max guesses', () => {
+    const card = validCodeBreak();
+    card.config = {
+      ...card.config,
+      codeLength: MIN_CODE_LENGTH,
+      secret: ['🔴', '🟢', '🔵'],
+      maxGuesses: MAX_CODE_GUESSES,
+    };
+    const result = validateCatalog([card]);
+    expect(result.errors).toEqual([]);
+    expect(result.valid).toBe(true);
+  });
+
+  it('rejects a code_break maxGuesses below the minimum', () => {
+    const card = validCodeBreak();
+    card.config = { ...card.config, maxGuesses: MIN_CODE_GUESSES - 1 };
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('rejects a code_break with an out-of-range time limit', () => {
+    const card = validCodeBreak();
+    card.config = { ...card.config, timeLimitMs: MAX_TIME_LIMIT_MS + 1 };
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.TIME_LIMIT_RANGE)).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -837,6 +955,7 @@ const ALL_TEMPLATE_TYPES: TemplateType[] = [
   'memory_sequence',
   'pattern_chain',
   'step_logic',
+  'code_break',
 ];
 
 const ALL_CATEGORIES: ChallengeCategory[] = [
@@ -857,6 +976,7 @@ const validCardFor: Record<TemplateType, () => LiquidCard> = {
   memory_sequence: validMemorySequence,
   pattern_chain: validPatternChain,
   step_logic: validStepLogic,
+  code_break: validCodeBreak,
 };
 
 describe('templateCategoryMap <-> validation consistency', () => {

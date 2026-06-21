@@ -16,6 +16,7 @@ const ALL_TEMPLATE_TYPES: TemplateType[] = [
   'memory_sequence',
   'pattern_chain',
   'step_logic',
+  'code_break',
 ];
 
 const ALL_CATEGORIES: ChallengeCategory[] = [
@@ -84,6 +85,7 @@ describe('templateCategoryMap', () => {
       memory_sequence: ['working_memory'],
       pattern_chain: ['pattern_recognition'],
       step_logic: ['logical_reasoning'],
+      code_break: ['logical_reasoning'],
     });
   });
 });
@@ -117,6 +119,9 @@ function categoriesForCard(card: LiquidCard): ChallengeCategory {
       return 'pattern_recognition';
     case 'step_logic':
       void card.config.premise;
+      return 'logical_reasoning';
+    case 'code_break':
+      void card.config.secret;
       return 'logical_reasoning';
     default: {
       // If a new TemplateType is added without a case above, `card` is no
@@ -175,7 +180,22 @@ describe('LiquidCard discriminated union', () => {
       },
     };
 
+    const codeBreak: LiquidCard = {
+      ...base,
+      cardId: 'c3',
+      templateType: 'code_break',
+      category: 'logical_reasoning',
+      config: {
+        palette: ['A', 'B', 'C'],
+        codeLength: 3,
+        secret: ['A', 'B', 'C'],
+        maxGuesses: 8,
+        timeLimitMs: 20000,
+      },
+    };
+
     expect(categoriesForCard(spotIt)).toBe('visual_attention');
     expect(categoriesForCard(tinyLogic)).toBe('logical_reasoning');
+    expect(categoriesForCard(codeBreak)).toBe('logical_reasoning');
   });
 });

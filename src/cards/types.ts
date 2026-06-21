@@ -56,7 +56,8 @@ export type TemplateType =
   | 'tiny_logic'
   | 'memory_sequence'
   | 'pattern_chain'
-  | 'step_logic';
+  | 'step_logic'
+  | 'code_break';
 
 export type Difficulty = 'easy' | 'medium' | 'hard';
 
@@ -282,6 +283,50 @@ export type StepLogicCard = LiquidCardBase & {
 };
 
 /**
+ * Crack a hidden code from per-guess peg feedback — a Mastermind / Bulls-and-Cows
+ * style DEDUCTIVE code-breaking mechanic (logical_reasoning).
+ *
+ * The renderer shows an empty board: the player builds a guess of `codeLength`
+ * symbols (each slot cycles/selects from the `palette`), submits it, and gets
+ * per-guess peg feedback computed by the pure {@link evaluateCodeBreak}:
+ *   - `exact`   — symbols that are the right symbol AND in the right slot;
+ *   - `partial` — symbols that are in the code but in the wrong slot.
+ * Duplicate symbols are counted WITHOUT double-counting (a guess symbol consumes
+ * at most one secret symbol; see the evaluator). The player has `maxGuesses`
+ * attempts and `config.timeLimitMs` to deduce the exact `secret`. The card
+ * resolves CORRECT the moment a guess equals the secret (all-exact), INCORRECT
+ * when the last guess is used without solving, and TIMEOUT on the clock.
+ *
+ * This is the single biggest step-change in challenge: multi-guess, deductive,
+ * with a strong "one more try" loop. Correctness + the peg feedback are owned by
+ * the pure evaluator (the single source of truth); the renderer never
+ * re-implements peg logic.
+ */
+export type CodeBreakCard = LiquidCardBase & {
+  templateType: 'code_break';
+  config: {
+    /**
+     * The symbols the player can place in each slot — short display glyphs
+     * (e.g. emoji or letters). Catalog validation requires length ≥ 2, unique
+     * symbols, and that every `secret` symbol is one of these.
+     */
+    palette: ReadonlyArray<string>;
+    /** Number of slots in the code (catalog validation bounds it 3–6). */
+    codeLength: number;
+    /**
+     * The hidden code, length `codeLength`, every symbol drawn from `palette`.
+     * This is the answer key — the renderer routes guesses through the pure
+     * evaluator rather than ever comparing against this directly.
+     */
+    secret: ReadonlyArray<string>;
+    /** How many guesses the player gets (catalog validation bounds it 4–12). */
+    maxGuesses: number;
+    /** Countdown for the whole solve (5–30s; see validation). */
+    timeLimitMs: number;
+  };
+};
+
+/**
  * The discriminated union of every card. Narrow on `templateType` to access a
  * card's typed `config`. Adding a template means adding a member here (step 2).
  */
@@ -292,7 +337,8 @@ export type LiquidCard =
   | TinyLogicCard
   | MemorySequenceCard
   | PatternChainCard
-  | StepLogicCard;
+  | StepLogicCard
+  | CodeBreakCard;
 
 /**
  * The categories each template is allowed to map to (Technical Design §11).
@@ -316,4 +362,9 @@ export const templateCategoryMap: Readonly<
   memory_sequence: Object.freeze(['working_memory'] as const),
   pattern_chain: Object.freeze(['pattern_recognition'] as const),
   step_logic: Object.freeze(['logical_reasoning'] as const),
+  // code_break is deductive elimination: each peg-feedback row constrains the
+  // hypothesis space and the player reasons to the unique code. That is squarely
+  // logical_reasoning (the same category as tiny_logic/step_logic) — no new
+  // ChallengeCategory is warranted.
+  code_break: Object.freeze(['logical_reasoning'] as const),
 }) satisfies Readonly<Record<TemplateType, readonly ChallengeCategory[]>>;

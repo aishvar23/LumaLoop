@@ -22,6 +22,7 @@ import type { ComponentType, ReactNode } from 'react';
 
 import type { LiquidCard, TemplateType } from '../cards/types';
 import type { TemplateProps } from '../templates/contract';
+import CodeBreakCard from '../templates/codeBreak/CodeBreakCard';
 import MemorySequenceCard from '../templates/memorySequence/MemorySequenceCard';
 import PatternChainCard from '../templates/patternChain/PatternChainCard';
 import RuleFlipCard from '../templates/ruleFlip/RuleFlipCard';
@@ -97,4 +98,5 @@ export const defaultRendererRegistry: RendererRegistry = {
   memory_sequence: MemorySequenceCard,
   pattern_chain: PatternChainCard,
   step_logic: StepLogicCard,
+  code_break: CodeBreakCard,
 };

@@ -78,7 +78,7 @@ Key contract pieces:
 
 ---
 
-## 3. The games (7 mechanics, 37 cards)
+## 3. The games (8 mechanics)
 
 Original 4 (single-step):
 1. **Spot It** (`spot_it`, visual_attention) — tap the anomaly in a grid.
@@ -95,6 +95,15 @@ New multi-step 3 (Phase G):
    picking the next item, then the next (2–3 sequential steps).
 7. **Step Logic** (`step_logic`, logical_reasoning) — a premise + a chain of 2–3
    linked multiple-choice sub-questions, revealed sequentially.
+
+New deductive game (Phase 6, inspired by gamesforthebrain.com):
+8. **Code Break** (`code_break`, logical_reasoning) — a Mastermind / Bulls-and-Cows
+   hidden-code game. The player builds a guess of N symbols from a palette, submits,
+   and gets per-guess peg feedback (exact = right symbol + slot; partial = right
+   symbol, wrong slot) computed by the pure evaluator with duplicate-safe counting.
+   Multi-guess, deductive, with a strong "one more try" loop — the biggest step-change
+   in challenge. Easy = 3 slots/4 symbols + generous guesses; hard = 5 slots/6 symbols,
+   fewer guesses, tighter clock.
 
 Categories: visual_attention, working_memory, logical_reasoning, cognitive_flexibility,
 pattern_recognition, processing_speed. Catalog validated at startup (unique ids, valid

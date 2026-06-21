@@ -33,6 +33,7 @@ describe('authored card catalog', () => {
       'memory_sequence',
       'pattern_chain',
       'step_logic',
+      'code_break',
     ];
     for (const template of templates) {
       const count = catalog.filter(
@@ -51,6 +52,7 @@ describe('authored card catalog', () => {
       'memory_sequence',
       'pattern_chain',
       'step_logic',
+      'code_break',
     ];
     const hardCount = catalog.filter((card) => card.difficulty === 'hard').length;
     expect(hardCount).toBeGreaterThanOrEqual(15);
@@ -81,6 +83,7 @@ describe('authored card catalog', () => {
       'memory_sequence',
       'pattern_chain',
       'step_logic',
+      'code_break',
     ];
     for (const template of templates) {
       const perTemplate = new Set(
