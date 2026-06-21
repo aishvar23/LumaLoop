@@ -15,6 +15,7 @@ import {
   type PuzzleDna,
   type RuleFlipCard,
   type SpotItCard,
+  type StepLogicCard,
   type TemplateType,
   type TinyLogicCard,
   type WhatChangedCard,
@@ -222,6 +223,47 @@ function validPatternChain(): PatternChainCard {
   };
 }
 
+function validStepLogic(): StepLogicCard {
+  return {
+    cardId: 'step-1',
+    creatorHandle: 'lumaloop',
+    templateType: 'step_logic',
+    category: 'logical_reasoning',
+    difficulty: 'easy',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 16,
+    prompt: 'Answer each linked clue in order.',
+    puzzleDna: dna('multi-step-deduction'),
+    explanation: {
+      title: 'Chained reasoning',
+      body: 'Each answer feeds the next.',
+    },
+    config: {
+      premise: 'Mia is taller than Jo. Jo is taller than Sam.',
+      steps: [
+        {
+          stem: 'Who is the tallest?',
+          options: [
+            { id: 'a', label: 'Mia' },
+            { id: 'b', label: 'Jo' },
+          ],
+          correctOptionId: 'a',
+        },
+        {
+          stem: 'Who is the shortest?',
+          options: [
+            { id: 'a', label: 'Mia' },
+            { id: 'b', label: 'Sam' },
+          ],
+          correctOptionId: 'b',
+        },
+      ],
+      timeLimitMs: 16000,
+    },
+  };
+}
+
 function validCatalog(): LiquidCard[] {
   return [
     validSpotIt(),
@@ -230,6 +272,7 @@ function validCatalog(): LiquidCard[] {
     validTinyLogic(),
     validMemorySequence(),
     validPatternChain(),
+    validStepLogic(),
   ];
 }
 
@@ -524,6 +567,87 @@ describe('validateCatalog', () => {
     );
   });
 
+  it('accepts a valid step_logic card', () => {
+    const result = validateCatalog([validStepLogic()]);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
+  it('rejects a step_logic with an empty premise', () => {
+    const card = validStepLogic();
+    card.config = { ...card.config, premise: '   ' };
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('rejects a step_logic with fewer than two steps', () => {
+    const card = validStepLogic();
+    card.config = { ...card.config, steps: [card.config.steps[0]] };
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('rejects a step_logic step with an empty stem', () => {
+    const card = validStepLogic();
+    card.config = {
+      ...card.config,
+      steps: [
+        { ...card.config.steps[0], stem: '' },
+        card.config.steps[1],
+      ],
+    };
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('rejects a step_logic step whose correctOptionId is not among its options', () => {
+    const card = validStepLogic();
+    card.config = {
+      ...card.config,
+      steps: [
+        { ...card.config.steps[0], correctOptionId: 'does-not-exist' },
+        card.config.steps[1],
+      ],
+    };
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('rejects a step_logic step with duplicate option ids', () => {
+    const card = validStepLogic();
+    card.config = {
+      ...card.config,
+      steps: [
+        {
+          stem: 'Who is the tallest?',
+          options: [
+            { id: 'dup', label: 'Mia' },
+            { id: 'dup', label: 'Jo' },
+          ],
+          correctOptionId: 'dup',
+        },
+        card.config.steps[1],
+      ],
+    };
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
   it('rejects a missing explanation', () => {
     const card = validSpotIt();
     card.explanation = { title: '', body: '' };
@@ -614,6 +738,7 @@ const ALL_TEMPLATE_TYPES: TemplateType[] = [
   'tiny_logic',
   'memory_sequence',
   'pattern_chain',
+  'step_logic',
 ];
 
 const ALL_CATEGORIES: ChallengeCategory[] = [
@@ -633,6 +758,7 @@ const validCardFor: Record<TemplateType, () => LiquidCard> = {
   tiny_logic: validTinyLogic,
   memory_sequence: validMemorySequence,
   pattern_chain: validPatternChain,
+  step_logic: validStepLogic,
 };
 
 describe('templateCategoryMap <-> validation consistency', () => {

@@ -32,6 +32,7 @@ import RuleFlipCard from './templates/RuleFlipCard';
 import TinyLogicCard from './templates/TinyLogicCard';
 import MemorySequenceCard from './templates/MemorySequenceCard';
 import PatternChainCard from './templates/PatternChainCard';
+import StepLogicCard from './templates/StepLogicCard';
 
 /**
  * A template renderer: a component that accepts {@link TemplateProps} for its
@@ -93,4 +94,5 @@ export const defaultRendererRegistry: RendererRegistry = {
   tiny_logic: TinyLogicCard,
   memory_sequence: MemorySequenceCard,
   pattern_chain: PatternChainCard,
+  step_logic: StepLogicCard,
 };

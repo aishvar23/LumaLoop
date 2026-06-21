@@ -27,6 +27,7 @@ import {
   type PatternChainCard,
   type RuleFlipCard,
   type SpotItCard,
+  type StepLogicCard,
   type TemplateType,
   type TinyLogicCard,
   type WhatChangedCard,
@@ -101,6 +102,7 @@ const templateAnswerValidators: {
   tiny_logic: validateTinyLogicAnswer,
   memory_sequence: validateMemorySequenceAnswer,
   pattern_chain: validatePatternChainAnswer,
+  step_logic: validateStepLogicAnswer,
 };
 
 /**
@@ -318,6 +320,66 @@ function validatePatternChainAnswer(
         answerError(
           card.cardId,
           `pattern_chain step ${index} has duplicate option ids`,
+        ),
+      );
+    }
+  });
+
+  return errors;
+}
+
+/** Inclusive bounds for a step_logic's number of linked sub-questions (Tech #139). */
+export const MIN_STEP_LOGIC_STEPS = 2;
+export const MAX_STEP_LOGIC_STEPS = 3;
+
+function validateStepLogicAnswer(card: StepLogicCard): ValidationError[] {
+  const { premise, steps } = card.config;
+  const errors: ValidationError[] = [];
+
+  if (typeof premise !== 'string' || premise.trim().length === 0) {
+    errors.push(answerError(card.cardId, 'step_logic has an empty premise'));
+  }
+
+  if (
+    steps.length < MIN_STEP_LOGIC_STEPS ||
+    steps.length > MAX_STEP_LOGIC_STEPS
+  ) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `step_logic step count ${steps.length} is outside [${MIN_STEP_LOGIC_STEPS}, ${MAX_STEP_LOGIC_STEPS}]`,
+      ),
+    );
+  }
+
+  // Every step must carry a non-empty stem, offer options, and name a correct
+  // option that is among them (with unique ids so a pick maps to one option).
+  steps.forEach((step, index) => {
+    if (typeof step.stem !== 'string' || step.stem.trim().length === 0) {
+      errors.push(
+        answerError(card.cardId, `step_logic step ${index} has an empty stem`),
+      );
+    }
+    if (step.options.length === 0) {
+      errors.push(
+        answerError(card.cardId, `step_logic step ${index} has no options`),
+      );
+      return;
+    }
+    if (!step.options.some((option) => option.id === step.correctOptionId)) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `step_logic step ${index} correctOptionId "${step.correctOptionId}" is not among its options`,
+        ),
+      );
+    }
+    const ids = step.options.map((option) => option.id);
+    if (new Set(ids).size !== ids.length) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `step_logic step ${index} has duplicate option ids`,
         ),
       );
     }
