@@ -22,6 +22,9 @@
   --color-surface: #16181f;
   --color-surface-raised: #1d2029;
   --color-border: #262a33;
+  /* A faint light wash that lifts a chip/badge off a tinted surface regardless
+   * of the surface's own hue (used by the result-card outcome badge). */
+  --color-surface-overlay: rgba(255, 255, 255, 0.04);
 
   /* ── Text ─────────────────────────────────────────────────────────────── */
   --color-text: #f5f6fa;
@@ -30,6 +33,56 @@
   /* ── Brand / accent ───────────────────────────────────────────────────── */
   --color-accent: #6c7bff;
   --color-accent-contrast: #ffffff;
+
+  /* ── Per-category accent palette (Phase 3 visual upgrade) ─────────────────
+   * One cohesive accent per performance category, spaced across the colour
+   * wheel and tuned bright/saturated enough to read on the near-black feed
+   * surface. Each category exposes three stops:
+   *   --cat-<c>          the accent (byline, selected/active states, badges)
+   *   --cat-<c>-deep     a deeper stop for the primary-button / chip gradient
+   *   --cat-<c>-tint     a low-alpha fill for the slide background wash
+   * `--color-accent-on` (shared) is the near-black ink used for text/glyphs on
+   * any of these bright accent fills — every accent here clears WCAG AA for the
+   * button label at this ink (large/bold control text). Colour is NEVER the sole
+   * signal anywhere it is used (Design accessibility guardrails): glyph / word /
+   * text always carries the meaning; the accent only reinforces it.
+   *
+   * The feed derives the ACTIVE accent generically from `card.category` (see
+   * src/ui/categoryTheme.ts) and exposes it on the slide as the local aliases
+   * --accent / --accent-deep / --accent-tint, so components stay category- and
+   * template-agnostic (no per-category branching in the engine). */
+  --color-accent-on: #0b0b0f;
+
+  --cat-visual_attention: #3fd6c9; /* teal/cyan — sharp, eye-catching */
+  --cat-visual_attention-deep: #1f9e95;
+  --cat-visual_attention-tint: rgba(63, 214, 201, 0.14);
+
+  --cat-working_memory: #9d7bff; /* violet — recall, calm */
+  --cat-working_memory-deep: #6f4fd6;
+  --cat-working_memory-tint: rgba(157, 123, 255, 0.14);
+
+  --cat-logical_reasoning: #5b8cff; /* blue — reasoning */
+  --cat-logical_reasoning-deep: #3f6ad8;
+  --cat-logical_reasoning-tint: rgba(91, 140, 255, 0.14);
+
+  --cat-cognitive_flexibility: #f5a84c; /* amber — a warm "shift" */
+  --cat-cognitive_flexibility-deep: #d4842a;
+  --cat-cognitive_flexibility-tint: rgba(245, 168, 76, 0.14);
+
+  --cat-pattern_recognition: #ff6fae; /* magenta/pink — vivid pattern */
+  --cat-pattern_recognition-deep: #d94a8a;
+  --cat-pattern_recognition-tint: rgba(255, 111, 174, 0.14);
+
+  --cat-processing_speed: #7ed957; /* lime/green — fast, energetic */
+  --cat-processing_speed-deep: #57b432;
+  --cat-processing_speed-tint: rgba(126, 217, 87, 0.14);
+
+  /* Fallback accent (unknown/absent category) — the brand blue family, so a new
+   * category renders sensibly until it gets a dedicated hue. The active slide
+   * seeds these local aliases from the category accent at runtime. */
+  --accent: var(--color-accent);
+  --accent-deep: #3f6ad8;
+  --accent-tint: rgba(108, 123, 255, 0.14);
 
   /* ── Feedback (Okabe-Ito CUD palette — colour-blind-safe) ─────────────────
    * Always accompany with a non-colour cue (icon / text / shape). */
@@ -43,6 +96,20 @@
   --color-error-contrast: #1a1205;
   --color-warning: #e69f00; /* orange — caution / time low */
   --color-warning-contrast: #1a1205; /* ≈8.9:1 on #e69f00 — AA pass */
+
+  /* Tinted result-card surfaces (Phase 3): a low-alpha fill + a stronger border
+   * drawn from the same CUD hues, so the post-resolution feedback card reads as a
+   * success / not-quite RESULT (mirrors mobile's success/danger surfaces). Colour
+   * is never the sole cue — the outcome WORD + glyph carry the meaning; the tint
+   * only reinforces it. Brighter on-surface hues are used for the heading/glyph so
+   * the outcome word stays high-contrast on the dark tint (the body ink tokens
+   * above are for text ON the solid accent fill, not on these tints). */
+  --color-success-bright: #2fd29a; /* heading/glyph on the dark success tint */
+  --color-success-surface: rgba(0, 158, 115, 0.16);
+  --color-success-border: rgba(47, 210, 154, 0.55);
+  --color-error-bright: #ff8a4c; /* heading/glyph on the dark error tint */
+  --color-error-surface: rgba(213, 94, 0, 0.16);
+  --color-error-border: rgba(255, 138, 76, 0.5);
 
   /* ── Spacing scale ────────────────────────────────────────────────────── */
   --space-1: 4px;
@@ -65,6 +132,9 @@
   --font-size-sm: 14px;
   --font-size-md: 16px;
   --font-size-lg: 20px;
+  /* Hero prompt — the TikTok-caption-style headline that leads each game
+   * (Phase 3). Sits between lg and xl; pair with the tight line-height. */
+  --font-size-hero: 24px;
   --font-size-xl: 28px;
 
   /* Line-height scale (unitless — multiplies the element font-size). */

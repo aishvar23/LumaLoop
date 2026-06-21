@@ -1,0 +1,63 @@
+/*
+ * Button — accent/gradient primary + pressed states (Phase 3 polish).
+ *
+ * Token-driven only. The primary fill is a vertical gradient from the active
+ * accent to its deeper stop; `--accent` / `--accent-deep` default to the brand
+ * accent and are overridden per feed slide from the card's category (see
+ * src/feed/FeedScreen.tsx), so a button inside a game inherits that game's accent
+ * with no per-template branching. The ghost variant stays a quiet outline.
+ *
+ * Motion (the press lift + hover) is non-essential and degrades automatically
+ * under the global prefers-reduced-motion rule in styles/global.css.
+ */
+
+.btn {
+  min-height: var(--control-height-md);
+  padding: 12px 20px;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  font-family: inherit;
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    filter 120ms ease;
+}
+
+.btn--primary {
+  border: 1px solid transparent;
+  background: linear-gradient(
+    180deg,
+    var(--accent, var(--color-accent)) 0%,
+    var(--accent-deep, var(--color-accent)) 100%
+  );
+  color: var(--color-accent-on);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn--primary:hover {
+  filter: brightness(1.06);
+}
+
+.btn--primary:active {
+  /* Pressed: settle down + dim slightly so the press reads physically. */
+  transform: translateY(1px);
+  filter: brightness(0.94);
+  box-shadow: none;
+}
+
+.btn--ghost {
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text);
+}
+
+.btn--ghost:hover {
+  border-color: var(--accent, var(--color-accent));
+}
+
+.btn--ghost:active {
+  transform: translateY(1px);
+  background: var(--color-surface-raised);
+}

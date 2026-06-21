@@ -237,9 +237,10 @@ const sectionStyle = {
 
 const promptStyle = {
   margin: 0,
-  fontSize: 'var(--font-size-lg)',
-  fontWeight: 'var(--font-weight-semibold)',
-  lineHeight: 'var(--line-height-snug)',
+  fontSize: 'var(--font-size-hero)',
+  fontWeight: 'var(--font-weight-bold)',
+  lineHeight: 'var(--line-height-tight)',
+  letterSpacing: '-0.01em',
 } as const;
 
 const sequenceStyle = {
@@ -270,8 +271,11 @@ const chipStyle = {
 // never colour alone).
 const chosenChipStyle = {
   ...chipStyle,
-  borderColor: 'var(--color-accent)',
-  background: 'var(--color-accent)',
+  borderColor: 'var(--accent, var(--color-accent))',
+  background: 'var(--accent, var(--color-accent))',
+  // Dark ink on the bright accent fill (the chip's distinctness is carried by
+  // position in the chain too, never colour alone).
+  color: 'var(--color-accent-on)',
 } as const;
 
 const nextSlotStyle = {

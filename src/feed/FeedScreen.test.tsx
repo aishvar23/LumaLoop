@@ -249,6 +249,22 @@ describe('FeedScreen', () => {
     expect(screen.queryByText('@@creator_b0-0')).not.toBeInTheDocument();
   });
 
+  it('renders a creator monogram avatar (first handle letter, no @)', () => {
+    renderFeed();
+    // Handle is `@creator_b0-0` → monogram "C". The avatar is decorative
+    // (aria-hidden); the @handle beside it carries the readable meaning.
+    const byline = screen.getByTestId('feed-byline-0');
+    const author = byline.parentElement;
+    expect(author).not.toBeNull();
+    expect(author).toHaveTextContent('C');
+  });
+
+  it('renders a category chip with guardrail-safe, humanized copy', () => {
+    renderFeed();
+    // category `visual_attention` → "Visual attention" (no IQ/trait language).
+    expect(screen.getAllByText('Visual attention').length).toBeGreaterThan(0);
+  });
+
   it('only mounts games inside the active window; others are placeholders', () => {
     renderFeed();
     // Active is 0 → indices 0 and 1 are windowed, 2+ are placeholders.
