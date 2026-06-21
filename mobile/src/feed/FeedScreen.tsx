@@ -40,6 +40,7 @@ import {
 } from 'react';
 import {
   FlatList,
+  Pressable,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -51,7 +52,17 @@ import {
   useSafeAreaInsets,
   type EdgeInsets,
 } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 
+import {
+  colors,
+  fontSize,
+  fontWeight,
+  radius,
+  space,
+  PAGE_BACKGROUND,
+  slideGradient,
+} from './templates/tokens';
 import { getCardById as getCatalogCardById } from '../core/cards/catalog';
 import type { LiquidCard } from '../core/cards/types';
 import type { CardResolution, CardStartContext } from '../core/templates/contract';
@@ -496,10 +507,7 @@ const FeedSlide = memo(function FeedSlide({
         style={[styles.slide, slideInsetStyle(insets), { height }]}
         testID={`feed-slide-${index}`}
       >
-        {/* creatorHandle already includes the leading `@` (catalog convention). */}
-        <Text style={styles.byline} testID={`feed-byline-${index}`}>
-          {card.creatorHandle}
-        </Text>
+        <SlideBackground />
         {/* MP2 (#134): center the game (and, via the gate, the feedback step)
             vertically + horizontally in the slide. The full-width inner wrapper
             keeps games spanning the padded content box rather than collapsing to
@@ -522,6 +530,10 @@ const FeedSlide = memo(function FeedSlide({
             />
           </View>
         </View>
+        {/* MP3 (#135): the social-feed author byline as a bottom-left overlay
+            (avatar monogram + @handle) plus a subtle swipe-up affordance — so each
+            slide reads like a Reels/TikTok card, not a plain page. */}
+        <SlideChrome creatorHandle={card.creatorHandle} index={index} />
       </View>
     );
   }
@@ -531,6 +543,7 @@ const FeedSlide = memo(function FeedSlide({
       style={[styles.slide, slideInsetStyle(insets), { height }]}
       testID={`feed-slide-${index}`}
     >
+      <SlideBackground />
       <View style={styles.placeholder} testID={`feed-placeholder-${index}`}>
         {/* Decorative only — hidden from screen readers (off-screen filler). */}
         <Text
@@ -545,8 +558,76 @@ const FeedSlide = memo(function FeedSlide({
   );
 });
 
-/** App dark background — the full-bleed immersive slide surface (Design §7). */
-const PAGE_BACKGROUND = '#0b0b0f';
+/**
+ * The full-bleed slide background: a subtle vertical dark gradient over the page
+ * colour for depth (MP3 #135). Non-interactive and hidden from assistive tech so it
+ * never intercepts a swipe/tap or adds noise; the slide keeps its own solid
+ * {@link PAGE_BACKGROUND} underneath so paging never flashes a seam.
+ */
+function SlideBackground() {
+  return (
+    <LinearGradient
+      colors={slideGradient.colors}
+      locations={slideGradient.locations}
+      start={slideGradient.start}
+      end={slideGradient.end}
+      style={StyleSheet.absoluteFill}
+      pointerEvents="none"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    />
+  );
+}
+
+/**
+ * The bottom-of-slide social chrome (MP3 #135): the creator byline styled like a
+ * feed author (avatar monogram circle + @handle) on the left, and a subtle
+ * swipe-up cue on the right. Tapping the byline is a no-op seam — a real creator
+ * profile is a later phase (Design later phases); the press just acknowledges so
+ * the affordance reads as tappable.
+ */
+function SlideChrome({
+  creatorHandle,
+  index,
+}: {
+  creatorHandle: string;
+  index: number;
+}) {
+  // creatorHandle already includes the leading `@` (catalog convention); the
+  // monogram is the first letter of the handle, ignoring that `@`.
+  const monogram = (creatorHandle.replace(/^@/, '')[0] ?? '?').toUpperCase();
+  return (
+    <View style={styles.chrome}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Creator ${creatorHandle}`}
+        accessibilityHint="Creator profiles are coming soon"
+        onPress={noop}
+        style={styles.bylinePressable}
+      >
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>{monogram}</Text>
+        </View>
+        <Text style={styles.byline} testID={`feed-byline-${index}`}>
+          {creatorHandle}
+        </Text>
+      </Pressable>
+      {/* Decorative scroll affordance — the FlatList already carries the
+          screen-reader swipe instruction, so hide this from assistive tech. */}
+      <Text
+        style={styles.swipeHint}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      >
+        Swipe up  ⌃
+      </Text>
+    </View>
+  );
+}
+
+/** No-op seam for the (later-phase) tappable creator profile. */
+function noop() {}
+
 /** Base horizontal slide padding so centered games aren't edge-to-edge cramped. */
 const SLIDE_PADDING_X = 20;
 /** Base vertical slide padding, stacked ON TOP of the device safe-area insets. */
@@ -576,13 +657,9 @@ const styles = StyleSheet.create({
   slide: {
     width: '100%',
     // Each slide carries the dark background too, so the feed stays full-bleed
-    // immersive edge-to-edge even as windowed slides mount/unmount.
+    // immersive edge-to-edge even as windowed slides mount/unmount; the gradient
+    // (SlideBackground) layers over this solid base for depth (MP3 #135).
     backgroundColor: PAGE_BACKGROUND,
-  },
-  byline: {
-    color: '#9aa0aa',
-    fontSize: 15,
-    fontWeight: '600',
   },
   // MP2 (#134): center the game content in the middle of the viewport, not pinned
   // to the top — TikTok/Reels-style. Template-agnostic: centering happens here at
@@ -597,13 +674,51 @@ const styles = StyleSheet.create({
   gameContent: {
     width: '100%',
   },
+  // MP3 (#135): the bottom social chrome row — byline left, swipe cue right.
+  chrome: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: space.lg,
+  },
+  bylinePressable: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    flexShrink: 1,
+  },
+  avatar: {
+    width: 34,
+    height: 34,
+    borderRadius: radius.pill,
+    backgroundColor: colors.avatar,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    color: colors.accentContrast,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.bold,
+  },
+  byline: {
+    color: colors.text,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.semibold,
+    flexShrink: 1,
+  },
+  swipeHint: {
+    color: colors.textFaint,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.medium,
+    marginLeft: space.sm,
+  },
   placeholder: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   placeholderText: {
-    color: '#4a4a55',
-    fontSize: 15,
+    color: colors.textFaint,
+    fontSize: fontSize.sm,
   },
 });

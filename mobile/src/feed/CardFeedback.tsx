@@ -1,8 +1,9 @@
 /**
  * CardFeedback — the uniform, in-feed FEEDBACK + EXPLANATION state shown after a
- * card resolves, React Native (ADO #133; Design §8.2 "Immediate success/failure
- * feedback" + "Optional explanation after resolution"; Technical Design §14
- * "Card feedback state" / "Explanation state").
+ * card resolves, React Native (ADO #133; restyled into a polished result card for
+ * MP3 #135). Design §8.2 "Immediate success/failure feedback" + "Optional
+ * explanation after resolution"; Technical Design §14 "Card feedback state" /
+ * "Explanation state".
  *
  * Native counterpart of web `src/ui/CardFeedback.tsx`. This is the ADDITIONAL
  * uniform step EVERY template shares, regardless of whether its renderer surfaces
@@ -10,25 +11,37 @@
  * timeout and shows the card's authored `explanation` (title + body) for EVERY
  * resolution — including correct answers, which several renderers resolve silently.
  *
- * Purely presentational. It owns NO progression: unlike the web (whose controller
- * auto-advances), the native feed advances on a SWIPE, so there is no "Next" button
- * here — the step persists on the slide until the player swipes on, with a subtle
- * "swipe up" cue. The {@link FeedbackGate} owns when this is shown and forwarding
- * the resolution outward.
+ * MP3 look & feel: the step is a result CARD — an outcome badge (glyph + word),
+ * a supporting line, the explanation in its own panel, and a swipe-up cue with a
+ * chevron — colour-tinted per outcome (success vs. not) to feel rewarding, within
+ * the positioning guardrails (no IQ/ability/score/trait claims). It fades + lifts in
+ * on appearance via `Animated`, degrading to an instant appearance when the OS
+ * "reduce motion" preference is on ({@link useReducedMotion}). Colour is never the
+ * sole carrier of meaning — the outcome WORD reports the result and a polite live
+ * region announces it.
+ *
+ * Purely presentational. It owns NO progression: the native feed advances on a
+ * SWIPE, so there is no "Next" button — the step persists until the player swipes
+ * on. The {@link FeedbackGate} owns when this is shown and forwarding the resolution.
  *
  * Non-modal by design (Technical Design §14 "No nested modal game experiences"):
- * this renders in-flow as a `View`, never as an overlay/dialog. Colour is never the
- * sole carrier of meaning — the outcome WORD itself reports the result (Design §7);
- * the outcome is announced via a polite live region for assistive tech.
- *
- * Centering (MP2) and richer look & feel (MP3) are separate tasks — this step is
- * intentionally visually simple for now.
+ * renders in-flow as a `View`, never as an overlay/dialog.
  */
 
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Animated, StyleSheet, Text, View } from 'react-native';
 
 import type { CardResolution, ResolutionType } from '../core/templates/contract';
-import { colors, fontSize, radius, space } from './templates/tokens';
+import { useReducedMotion } from './useReducedMotion';
+import {
+  colors,
+  elevation,
+  fontSize,
+  fontWeight,
+  lineHeight,
+  radius,
+  space,
+} from './templates/tokens';
 
 export type CardFeedbackProps = {
   /** The resolution captured from the card's renderer. */
@@ -51,34 +64,92 @@ const OUTCOME_DETAIL: Readonly<Record<ResolutionType, string>> = {
   timeout: 'The timer ran out — here is how this one works.',
 };
 
+/** Decorative badge glyph (the WORD carries meaning; glyph is hidden from a11y). */
+const OUTCOME_GLYPH: Readonly<Record<ResolutionType, string>> = {
+  correct: '✓',
+  incorrect: '✕',
+  timeout: '⏱',
+};
+
 export default function CardFeedback({
   resolution,
   explanation,
 }: CardFeedbackProps) {
-  const heading = OUTCOME_HEADING[resolution.resolutionType];
-  const detail = OUTCOME_DETAIL[resolution.resolutionType];
+  const { resolutionType } = resolution;
+  const heading = OUTCOME_HEADING[resolutionType];
+  const detail = OUTCOME_DETAIL[resolutionType];
+  const positive = resolutionType === 'correct';
+
+  // Outcome-tinted treatment: a success hue reinforces "Correct"; the softer
+  // danger hue reinforces "Not quite"/"Time's up". Always paired with the word.
+  const accent = positive ? colors.success : colors.danger;
+  const cardSurface = positive ? colors.successSurface : colors.dangerSurface;
+  const cardBorder = positive ? colors.successBorder : colors.dangerBorder;
+
+  // Fade + lift in on appearance, unless reduce-motion is on (then snap to final).
+  const reducedMotion = useReducedMotion();
+  const anim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (reducedMotion) {
+      anim.setValue(1);
+      return undefined;
+    }
+    const animation = Animated.timing(anim, {
+      toValue: 1,
+      duration: 220,
+      useNativeDriver: true,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [reducedMotion, anim]);
+  const animatedStyle = {
+    opacity: anim,
+    transform: [
+      {
+        translateY: anim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [12, 0],
+        }),
+      },
+    ],
+  };
 
   return (
-    <View
+    <Animated.View
       testID="card-feedback"
       accessibilityLabel="Card feedback"
       // Surface the machine-readable outcome to tests/assistive queries without
       // relying on colour — mirrors the web `data-outcome` hook.
-      accessibilityValue={{ text: resolution.resolutionType }}
-      style={styles.section}
+      accessibilityValue={{ text: resolutionType }}
+      style={[
+        styles.card,
+        { backgroundColor: cardSurface, borderColor: cardBorder },
+        animatedStyle,
+      ]}
     >
-      {/* Visible outcome — the word itself carries the meaning (not colour-only).
-          A polite live region announces it once for assistive tech. */}
-      <View>
-        <Text
-          testID="feedback-outcome"
-          accessibilityLiveRegion="polite"
-          accessibilityRole="header"
-          style={styles.outcomeHeading}
+      {/* Outcome badge: a tinted glyph chip + the outcome word. The word itself
+          carries meaning (not colour-only); a polite live region announces it. */}
+      <View style={styles.outcomeRow}>
+        <View
+          style={[styles.badge, { borderColor: accent }]}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
         >
-          {heading}
-        </Text>
-        <Text style={styles.outcomeDetail}>{detail}</Text>
+          <Text style={[styles.badgeGlyph, { color: accent }]}>
+            {OUTCOME_GLYPH[resolutionType]}
+          </Text>
+        </View>
+        <View style={styles.outcomeText}>
+          <Text
+            testID="feedback-outcome"
+            accessibilityLiveRegion="polite"
+            accessibilityRole="header"
+            style={[styles.outcomeHeading, { color: accent }]}
+          >
+            {heading}
+          </Text>
+          <Text style={styles.outcomeDetail}>{detail}</Text>
+        </View>
       </View>
 
       {/* Explanation state — the card's authored copy, shown for every outcome. */}
@@ -95,36 +166,61 @@ export default function CardFeedback({
         </Text>
       </View>
 
-      {/* Advancing is a swipe, not a button — a subtle cue, no auto-advance. */}
+      {/* Advancing is a swipe, not a button — a subtle cue with a chevron. */}
       <Text
         testID="feedback-swipe-cue"
         accessibilityLabel="Swipe up for the next game"
         style={styles.swipeCue}
       >
-        Swipe up for the next game
+        Swipe up for the next game  ⌃
       </Text>
-    </View>
+    </Animated.View>
   );
 }
 CardFeedback.displayName = 'CardFeedback';
 
 const styles = StyleSheet.create({
-  section: {
+  card: {
     gap: space.lg,
+    padding: space.xl,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    ...elevation.card,
+  },
+  outcomeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+  },
+  badge: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.pill,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+  },
+  badgeGlyph: {
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.heavy,
+  },
+  outcomeText: {
+    flex: 1,
   },
   outcomeHeading: {
-    color: colors.text,
     fontSize: fontSize.lg,
-    fontWeight: '700',
+    fontWeight: fontWeight.heavy,
   },
   outcomeDetail: {
     marginTop: space.xs,
     color: colors.textMuted,
     fontSize: fontSize.sm,
+    lineHeight: fontSize.sm * lineHeight.normal,
   },
   explanation: {
     gap: space.xs,
-    padding: space.md,
+    padding: space.lg,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
@@ -133,15 +229,17 @@ const styles = StyleSheet.create({
   explanationTitle: {
     color: colors.text,
     fontSize: fontSize.md,
-    fontWeight: '600',
+    fontWeight: fontWeight.semibold,
   },
   explanationBody: {
     color: colors.text,
     fontSize: fontSize.sm,
+    lineHeight: fontSize.sm * lineHeight.relaxed,
   },
   swipeCue: {
-    color: colors.textMuted,
+    color: colors.textFaint,
     fontSize: fontSize.sm,
+    fontWeight: fontWeight.medium,
     textAlign: 'center',
   },
 });

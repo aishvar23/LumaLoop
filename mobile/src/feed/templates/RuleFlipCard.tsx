@@ -49,7 +49,16 @@ import {
   type RuleFlipResponse,
   type RuleFlipResponseKind,
 } from '../../core/templates/ruleFlip/ruleFlipEvaluator';
-import { colors, fontSize, radius, space, TAP_TARGET_MIN } from './tokens';
+import {
+  colors,
+  elevation,
+  fontSize,
+  fontWeight,
+  lineHeight,
+  radius,
+  space,
+  TAP_TARGET_MIN,
+} from './tokens';
 
 /**
  * The renderer accepts the shared {@link TemplateProps} plus an optional injectable
@@ -134,7 +143,10 @@ function RuleFlipGate({
         accessibilityRole="button"
         accessibilityLabel="Start"
         onPress={onStart}
-        style={styles.primaryButton}
+        style={({ pressed }) => [
+          styles.primaryButton,
+          pressed && styles.primaryButtonPressed,
+        ]}
       >
         <Text style={styles.primaryButtonText}>Start</Text>
       </Pressable>
@@ -397,7 +409,10 @@ function RuleFlipStream({
           accessibilityRole="button"
           accessibilityLabel="Match"
           onPress={() => handleResponse('match')}
-          style={styles.responseButton}
+          style={({ pressed }) => [
+            styles.responseButton,
+            pressed && styles.responseButtonPressed,
+          ]}
         >
           <Text style={styles.responseButtonText}>Match</Text>
         </Pressable>
@@ -406,7 +421,10 @@ function RuleFlipStream({
           accessibilityRole="button"
           accessibilityLabel="No-match"
           onPress={() => handleResponse('no_match')}
-          style={styles.responseButton}
+          style={({ pressed }) => [
+            styles.responseButton,
+            pressed && styles.responseButtonPressed,
+          ]}
         >
           <Text style={styles.responseButtonText}>No-match</Text>
         </Pressable>
@@ -427,78 +445,92 @@ function RuleFlipStream({
 
 const styles = StyleSheet.create({
   section: {
-    gap: space.md,
+    gap: space.lg,
   },
   prompt: {
     color: colors.text,
-    fontSize: fontSize.lg,
-    fontWeight: '700',
+    fontSize: fontSize.hero,
+    fontWeight: fontWeight.heavy,
+    lineHeight: fontSize.hero * lineHeight.tight,
   },
   gate: {
-    gap: space.md,
+    gap: space.lg,
     alignItems: 'flex-start',
     width: '100%',
   },
   instruction: {
     fontSize: fontSize.md,
     color: colors.textMuted,
+    lineHeight: fontSize.md * lineHeight.normal,
   },
   stream: {
-    gap: space.md,
+    gap: space.lg,
     width: '100%',
   },
   ruleLabel: {
     fontSize: fontSize.lg,
-    fontWeight: '700',
+    fontWeight: fontWeight.bold,
     color: colors.text,
   },
   flipBanner: {
+    alignSelf: 'flex-start',
     paddingVertical: space.sm,
     paddingHorizontal: space.md,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     borderWidth: 2,
     borderColor: colors.warning,
-    backgroundColor: colors.surface,
+    backgroundColor: 'rgba(245, 177, 76, 0.12)',
     color: colors.text,
     fontSize: fontSize.md,
-    fontWeight: '700',
+    fontWeight: fontWeight.bold,
     overflow: 'hidden',
   },
+  // A deliberate, elevated stage that frames the streaming stimulus.
   stimulusStage: {
-    minHeight: TAP_TARGET_MIN * 2,
+    minHeight: TAP_TARGET_MIN * 2.4,
     width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: radius.md,
+    paddingVertical: space.lg,
+    borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceRaised,
+    ...elevation.card,
   },
   stimulus: {
     minHeight: TAP_TARGET_MIN,
     fontSize: fontSize.xl,
+    fontWeight: fontWeight.bold,
     color: colors.text,
     textAlign: 'center',
   },
   responseRow: {
     flexDirection: 'row',
-    gap: space.sm,
+    gap: space.md,
     width: '100%',
   },
   responseButton: {
     flex: 1,
-    minHeight: TAP_TARGET_MIN,
+    minHeight: TAP_TARGET_MIN + 6,
     alignItems: 'center',
     justifyContent: 'center',
     padding: space.md,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceRaised,
+    ...elevation.tile,
+  },
+  responseButtonPressed: {
+    backgroundColor: colors.surfacePressed,
+    borderColor: colors.borderStrong,
+    transform: [{ scale: 0.97 }],
   },
   responseButtonText: {
     color: colors.text,
     fontSize: fontSize.md,
+    fontWeight: fontWeight.semibold,
   },
   primaryButton: {
     minHeight: TAP_TARGET_MIN,
@@ -506,13 +538,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: space.md,
     paddingHorizontal: space.xl,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     backgroundColor: colors.accent,
+    ...elevation.tile,
+  },
+  primaryButtonPressed: {
+    backgroundColor: colors.accentDeep,
+    transform: [{ scale: 0.97 }],
   },
   primaryButtonText: {
     color: colors.accentContrast,
     fontSize: fontSize.md,
-    fontWeight: '600',
+    fontWeight: fontWeight.bold,
   },
   status: {
     minHeight: fontSize.md,
