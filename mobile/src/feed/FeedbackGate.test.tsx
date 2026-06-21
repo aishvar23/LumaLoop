@@ -217,6 +217,44 @@ it('a SKIPPED card (never resolved) shows no feedback', () => {
   expect(onExplanationViewed).not.toHaveBeenCalled();
 });
 
+it('a card PLAYED while active keeps its outcome after going off-screen and back (no phantom timeout)', () => {
+  jest.useFakeTimers();
+  try {
+    const onResolve = jest.fn<void, [CardResolution]>();
+    function Parent({ isActive }: { isActive: boolean }) {
+      return (
+        <GatedTinyLogic
+          card={tinyLogicCard()}
+          context={context()}
+          isActive={isActive}
+          onAttempt={jest.fn()}
+          onResolve={onResolve}
+          onExplanationViewed={jest.fn()}
+        />
+      );
+    }
+    const { rerender } = render(<Parent isActive />);
+
+    // Answer CORRECTLY while the slide is active.
+    fireEvent.press(screen.getByTestId('tl-option-opt-b'));
+    expect(screen.getByTestId('feedback-outcome')).toHaveTextContent('Correct');
+
+    // Scroll the played slide off-screen, then elapse well past the time limit:
+    // the gate must NOT re-mount the renderer / re-arm its timer, so no phantom
+    // timeout can overwrite the captured 'correct' outcome.
+    rerender(<Parent isActive={false} />);
+    act(() => jest.advanceTimersByTime(5000));
+    rerender(<Parent isActive />);
+
+    expect(screen.getByTestId('feedback-outcome')).toHaveTextContent('Correct');
+    // Exactly one resolution ever forwarded — the correct one, no stray timeout.
+    expect(onResolve).toHaveBeenCalledTimes(1);
+    expect(onResolve.mock.calls[0][0]).toMatchObject({ resolutionType: 'correct' });
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
 it('an ABANDONED card (resolves while OFF-SCREEN) forwards the resolution but shows no feedback', () => {
   const onResolve = jest.fn<void, [CardResolution]>();
   const onExplanationViewed = jest.fn();

@@ -71,17 +71,28 @@ export function withFeedbackGate(
     // does not advance, so telemetry timing is unchanged) AND capture it to drive
     // the feedback step. Stable handler so the inner renderer never re-renders on
     // a moved `onResolve` identity.
+    // Latch "played WHILE active" at resolve time. We must not recompute feedback
+    // visibility from the LIVE `isActive`: once a played card scrolls off-screen
+    // (`isActive` → false) that would unmount the feedback and re-mount `Inner`,
+    // re-arming its `useCardTimer` — a phantom off-screen timeout then overwrites
+    // the captured outcome (correct → timeout) and a stray timer fires per left
+    // card. So we capture activeness at the resolve instant: resolved-while-active
+    // ⇒ played (feedback persists even after leaving); resolved-while-inactive
+    // (an abandoned off-screen timeout) ⇒ not played (no feedback). `isActive`
+    // omitted ≡ active, so a standalone render still shows feedback.
+    const isActiveRef = useRef(isActive);
+    isActiveRef.current = isActive;
+    const [played, setPlayed] = useState(false);
+
     const onResolveRef = useRef(onResolve);
     onResolveRef.current = onResolve;
     const handleResolve = useCallback((next: CardResolution) => {
       setResolution(next);
+      if (isActiveRef.current !== false) setPlayed(true);
       onResolveRef.current(next);
     }, []);
 
-    // Show feedback only on the focused slide. An off-screen abandoned slide whose
-    // timer fires later must NOT surface feedback (it was left, not played);
-    // `isActive` omitted ≡ active, so a standalone render still shows feedback.
-    const showFeedback = resolution !== null && isActive !== false;
+    const showFeedback = resolution !== null && played;
 
     // Fire the explanation-viewed seam (M5 telemetry `Card_Explanation_Viewed`)
     // exactly once, when the feedback step — and thus the explanation — first
