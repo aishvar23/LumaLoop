@@ -1,15 +1,18 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
+    "name": "LumaLoop",
+    "slug": "lumaloop",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
+    "scheme": "lumaloop",
     "userInterfaceStyle": "light",
     "ios": {
+      "bundleIdentifier": "app.lumaloop.mobile",
       "supportsTablet": true
     },
     "android": {
+      "package": "app.lumaloop.mobile",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",

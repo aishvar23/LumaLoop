@@ -9,18 +9,26 @@
  * the SAME deployed Vercel ingestion (`/api/event` → Supabase `telemetry_events`)
  * as the web app.
  *
- * NOTE (real-device delivery — ADO #82): the placeholder default is the project's
- * preview URL; the STABLE production URL must be set in `.env.production` AND
- * Vercel Deployment Protection must be lifted on `/api/event` before a real
- * device can actually deliver. Until then the client is exercised against a FAKE
- * transport in unit tests (mirroring the web #75 posture).
+ * NOTE (real-device delivery — ADO #82): the default below is our STABLE Vercel
+ * PRODUCTION alias (scoped to our project). It is currently behind Vercel
+ * Deployment Protection, which returns HTTP 401 to anonymous clients, so the
+ * native app's telemetry POSTs will NOT land until the owner turns Deployment
+ * Protection OFF (or to "Only Preview Deployments") — ADO #82. Until then the
+ * client fails gracefully (no crash; failures spill to a small capped retry
+ * queue), and unit tests exercise it against a FAKE transport (web #75 posture).
+ *
+ * IMPORTANT: do NOT use `https://luma-loop.vercel.app` — that global name belongs
+ * to an UNRELATED project (a bottle company); it is NOT ours. Our scope alias is
+ * the `*-madhursethji-7775s-projects.vercel.app` host below.
  */
 
 /**
- * Documented placeholder base URL. Overridden per environment via
+ * Documented default base URL: our STABLE Vercel production alias (NOT a secret —
+ * no keys ship in the client). Overridden per environment via
  * `EXPO_PUBLIC_API_BASE_URL` in `mobile/.env*`. No trailing slash.
  */
-export const DEFAULT_API_BASE_URL = 'https://luma-loop.vercel.app';
+export const DEFAULT_API_BASE_URL =
+  'https://luma-loop-madhursethji-7775s-projects.vercel.app';
 
 /** The ingestion path appended to the base URL (mirrors the web `/api/event`). */
 export const TELEMETRY_EVENT_PATH = '/api/event';
