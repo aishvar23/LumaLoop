@@ -25,6 +25,7 @@ import type { FeedBatchSource } from '../core/feed/feedDeck';
 import FeedScreen from './FeedScreen';
 import type { RendererRegistry } from './rendererRegistry';
 import { defaultRendererRegistry } from './rendererRegistry';
+import { feedRegistry } from './FeedbackGate';
 import { StubRenderer, stubRendererRegistry } from './stubRenderer';
 
 // --- Deterministic feed source + cards ----------------------------------------
@@ -434,6 +435,60 @@ describe('FeedScreen (native)', () => {
 
     expect(onCardExplanationViewed).toHaveBeenCalledTimes(1);
     expect(onCardExplanationViewed).toHaveBeenCalledWith(0, 'b0-0');
+  });
+
+  it('shows the uniform feedback + explanation after a real game resolves through the gated default registry (#133)', () => {
+    const onCardResolved = jest.fn();
+    const onCardExplanationViewed = jest.fn();
+    render(
+      <FeedScreen
+        anonymousUserId="anon"
+        source={fakeSource}
+        registry={feedRegistry}
+        getCardById={fakeGetCardById}
+        onCardResolved={onCardResolved}
+        onCardExplanationViewed={onCardExplanationViewed}
+      />,
+    );
+
+    // Resolve the active spot_it game (its single cell is the anomaly).
+    const activeGame = within(screen.getByTestId('feed-game-0'));
+    fireEvent.press(activeGame.getByTestId('spot-cell-0-0'));
+
+    // The gate replaces the game with the uniform feedback step + the explanation.
+    const feedback = within(screen.getByTestId('feed-game-0'));
+    expect(feedback.getByTestId('card-feedback')).toBeOnTheScreen();
+    expect(feedback.getByTestId('feedback-outcome')).toHaveTextContent('Correct');
+    expect(feedback.getByText('Why')).toBeOnTheScreen(); // explanation.title
+    expect(feedback.getByText('Because.')).toBeOnTheScreen(); // explanation.body
+
+    // The resolution + explanation-viewed seams still fire (telemetry unchanged).
+    expect(onCardResolved).toHaveBeenCalledTimes(1);
+    expect(onCardResolved).toHaveBeenCalledWith(
+      0,
+      expect.objectContaining({ cardId: 'b0-0', resolutionType: 'correct' }),
+    );
+    expect(onCardExplanationViewed).toHaveBeenCalledTimes(1);
+    expect(onCardExplanationViewed).toHaveBeenCalledWith(0, 'b0-0');
+  });
+
+  it('a SKIPPED game produces no feedback step through the gated default registry (#133)', () => {
+    const onCardExplanationViewed = jest.fn();
+    render(
+      <FeedScreen
+        anonymousUserId="anon"
+        source={fakeSource}
+        registry={feedRegistry}
+        getCardById={fakeGetCardById}
+        onCardExplanationViewed={onCardExplanationViewed}
+      />,
+    );
+
+    snapTo(1, 'b0-1'); // leave game 0 without ever resolving it.
+
+    // Neither the left game nor the newly-active one shows feedback (un-resolved).
+    expect(screen.queryByTestId('card-feedback')).toBeNull();
+    expect(onCardExplanationViewed).not.toHaveBeenCalled();
   });
 
   it('latches skip per index — revisiting an un-engaged game never re-fires (#106)', () => {

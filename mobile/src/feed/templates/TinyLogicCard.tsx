@@ -12,13 +12,16 @@
  * Resolution semantics (Design §9.4 — "one-move logic choice"): a single committed
  * choice resolves the card — correct iff `correctOptionId`, else incorrect (the
  * wrong choice is the recorded "distractor choice"). No retry affordance: a wrong
- * commit resolves the card and reveals the explanation as post-resolution feedback
- * rather than re-arming. Correctness + the chosen distractor come from
- * {@link evaluateTinyLogicSelection} (source of truth), never re-derived.
+ * commit resolves the card rather than re-arming. Correctness + the chosen
+ * distractor come from {@link evaluateTinyLogicSelection} (source of truth), never
+ * re-derived.
  *
- * Explanation-after-error (Design §9.4): the card's `explanation` (title + body) is
- * shown ONLY when the committed choice is wrong; its own polite copy. A correct
- * choice resolves silently with no explanation.
+ * Explanation (#133): the card's `explanation` is NO LONGER shown by this renderer.
+ * The feed-level `FeedbackGate` now shows a UNIFORM feedback + explanation step for
+ * EVERY resolution (correct/incorrect/timeout) once the card resolves, so revealing
+ * it here too would double the explanation. The renderer keeps only its own in-play
+ * selection echo (the polite result line); the gate owns the explanation reveal and
+ * the `Card_Explanation_Viewed` seam.
  *
  * Timeout semantics (Design §9.4; Technical Design §7): `config.timeLimitMs` is
  * armed via the shared {@link useCardTimer}; on expiry the card resolves TIMEOUT
@@ -52,19 +55,17 @@ export default function TinyLogicCard({
   context,
   onAttempt,
   onResolve,
-  onExplanationViewed,
   now = Date.now,
 }: TinyLogicCardProps) {
   const { config } = card;
 
   // Interaction bookkeeping lives in refs so selections don't depend on render
-  // timing. `selectedId` / `showExplanation` are mirrored into state purely to
-  // drive the pressed affordance, the announcement, and the explanation reveal.
+  // timing. `selectedId` is mirrored into state purely to drive the pressed
+  // affordance and the polite result announcement.
   const firstSelectionElapsedRef = useRef<number | null>(null);
   const attemptCountRef = useRef(0);
   const resolvedRef = useRef(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [showExplanation, setShowExplanation] = useState(false);
 
   // Latch both resolution paths (own selection + the hook's timeout) so any late
   // selection is inert and cannot re-announce on a finished card.
@@ -117,14 +118,9 @@ export default function TinyLogicCard({
         optionId,
       );
 
-      // Explanation-after-error: reveal the explanation only on a wrong commit.
-      // Revealing it is the `Card_Explanation_Viewed` moment (#129, M5); fire the
-      // optional telemetry seam once here (the wrong commit happens at most once).
-      if (!isCorrect) {
-        setShowExplanation(true);
-        onExplanationViewed?.();
-      }
-
+      // The explanation is no longer revealed here (#133): the feed-level
+      // FeedbackGate shows it uniformly after every resolution and owns the
+      // `Card_Explanation_Viewed` seam, so this renderer just resolves.
       timer.resolve({
         cardId: card.cardId,
         resolutionType: isCorrect ? 'correct' : 'incorrect',
@@ -149,13 +145,12 @@ export default function TinyLogicCard({
       context.interactionEnabledAtMs,
       now,
       onAttempt,
-      onExplanationViewed,
       timer,
     ],
   );
 
-  // The committed selection drives a polite announcement; since the explanation
-  // reveals correctness on error, the announcement names the result too.
+  // The committed selection drives a polite in-play announcement naming the result.
+  // The card's explanation is shown separately by the feed-level gate (#133).
   const selectedLabel = selectedId
     ? (config.options.find((option) => option.id === selectedId)?.label ?? null)
     : null;
@@ -203,17 +198,6 @@ export default function TinyLogicCard({
       >
         {resultText}
       </Text>
-      {showExplanation ? (
-        <View
-          testID="tl-explanation"
-          accessibilityLabel="Explanation"
-          accessibilityLiveRegion="polite"
-          style={styles.explanation}
-        >
-          <Text style={styles.explanationTitle}>{card.explanation.title}</Text>
-          <Text style={styles.explanationBody}>{card.explanation.body}</Text>
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -254,22 +238,5 @@ const styles = StyleSheet.create({
     minHeight: fontSize.md,
     fontSize: fontSize.sm,
     color: colors.textMuted,
-  },
-  explanation: {
-    gap: space.xs,
-    padding: space.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  explanationTitle: {
-    fontSize: fontSize.md,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  explanationBody: {
-    fontSize: fontSize.sm,
-    color: colors.text,
   },
 });
