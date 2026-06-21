@@ -51,13 +51,42 @@ const OUTCOME_DETAIL: Readonly<Record<ResolutionType, string>> = {
   timeout: 'The timer ran out — here is how this one works.',
 };
 
+/**
+ * Decorative badge glyph per outcome (Phase 3). The outcome WORD carries the
+ * meaning (Technical Design §14); the glyph + colour only REINFORCE it, so the
+ * card stays readable without colour. Hidden from assistive tech.
+ */
+const OUTCOME_GLYPH: Readonly<Record<ResolutionType, string>> = {
+  correct: '✓',
+  incorrect: '✕',
+  timeout: '⏱',
+};
+
 export default function CardFeedback({
   resolution,
   explanation,
   onContinue,
 }: CardFeedbackProps) {
-  const heading = OUTCOME_HEADING[resolution.resolutionType];
-  const detail = OUTCOME_DETAIL[resolution.resolutionType];
+  const { resolutionType } = resolution;
+  const heading = OUTCOME_HEADING[resolutionType];
+  const detail = OUTCOME_DETAIL[resolutionType];
+  const glyph = OUTCOME_GLYPH[resolutionType];
+  const positive = resolutionType === 'correct';
+
+  // Outcome-tinted RESULT card (Phase 3, mirroring mobile): a success hue
+  // reinforces "Correct"; the softer error hue reinforces "Not quite"/"Time's up".
+  // Always paired with the outcome word + glyph, so colour is never the sole cue.
+  const tint = positive
+    ? {
+        surface: 'var(--color-success-surface)',
+        border: 'var(--color-success-border)',
+        bright: 'var(--color-success-bright)',
+      }
+    : {
+        surface: 'var(--color-error-surface)',
+        border: 'var(--color-error-border)',
+        bright: 'var(--color-error-bright)',
+      };
 
   // Populate the live region AFTER mount so it announces as a mutation. Keyed on
   // the outcome so a new card's feedback re-announces.
@@ -70,8 +99,12 @@ export default function CardFeedback({
     <section
       aria-label="Card feedback"
       data-testid="card-feedback"
-      data-outcome={resolution.resolutionType}
-      style={sectionStyle}
+      data-outcome={resolutionType}
+      style={{
+        ...cardStyle,
+        background: tint.surface,
+        borderColor: tint.border,
+      }}
     >
       <Stack gap={3}>
         {/* Dedicated polite live region — empty on first paint, set post-mount
@@ -80,12 +113,26 @@ export default function CardFeedback({
         <div role="status" aria-live="polite" style={visuallyHidden}>
           {announced}
         </div>
-        {/* Visible outcome — plain (non-live) text. Not colour-only: the outcome
-            word itself carries the meaning (Technical Design §14). */}
-        <div>
-          <p style={outcomeHeadingStyle}>{heading}</p>
-          <p style={outcomeDetailStyle}>{detail}</p>
+
+        {/* Outcome badge: a tinted glyph chip + the outcome word. The word carries
+            the meaning (not colour-only). Plain (non-live) visible text so the
+            outcome is announced exactly once (via the live region above). */}
+        <div style={outcomeRowStyle}>
+          <span
+            aria-hidden="true"
+            style={{ ...badgeStyle, borderColor: tint.bright, color: tint.bright }}
+          >
+            {glyph}
+          </span>
+          <div>
+            <p style={{ ...outcomeHeadingStyle, color: tint.bright }}>{heading}</p>
+            <p style={outcomeDetailStyle}>{detail}</p>
+          </div>
         </div>
+
+        {/* Phase-4 slot: the per-resolution score / streak chip drops in here,
+            above the explanation, with no other change to this card. Intentionally
+            empty in Phase 3 (scoring is not built yet). */}
 
         {/* Explanation state — headed copy, not a second live region, so the
             outcome above is not double-announced. */}
@@ -108,10 +155,37 @@ export default function CardFeedback({
 
 // ── Token-driven styles (no hardcoded colours/sizes; Design tokens, #51) ──────
 
-const sectionStyle = {
+/** The tinted result-card surface (Phase 3). Surface/border are set per-outcome
+ * inline so the one card serves both success and error. */
+const cardStyle = {
   display: 'flex',
   flexDirection: 'column',
   gap: 'var(--space-3)',
+  padding: 'var(--space-4)',
+  borderRadius: 'var(--radius-lg)',
+  border: '1px solid var(--color-border)',
+  boxShadow: 'var(--shadow-md)',
+} as const;
+
+const outcomeRowStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 'var(--space-3)',
+} as const;
+
+const badgeStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  flex: '0 0 auto',
+  width: 44,
+  height: 44,
+  borderRadius: 'var(--radius-pill)',
+  border: '2px solid currentColor',
+  background: 'var(--color-surface-overlay)',
+  fontSize: 'var(--font-size-lg)',
+  fontWeight: 'var(--font-weight-bold)',
+  lineHeight: 1,
 } as const;
 
 /** Off-screen but accessible — carries the announced outcome for assistive tech

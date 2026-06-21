@@ -180,7 +180,7 @@ export default function TinyLogicCard({
               data-testid={`tl-option-${option.id}`}
               aria-pressed={isSelected}
               onClick={() => handleSelect(option.id)}
-              style={optionStyle}
+              style={isSelected ? optionSelectedStyle : optionStyle}
             >
               {option.label}
             </button>
@@ -245,6 +245,17 @@ const optionStyle = {
   fontSize: 'var(--font-size-md)',
   fontFamily: 'var(--font-sans)',
   cursor: 'pointer',
+} as const;
+
+/**
+ * The selected option (Phase 3): tinted with the slide's accent + an accent
+ * border. Selection is ALSO carried by `aria-pressed` (and the live region), so
+ * colour is never the sole signal — the accent only reinforces the pressed state.
+ */
+const optionSelectedStyle = {
+  ...optionStyle,
+  border: '1px solid var(--accent, var(--color-accent))',
+  background: 'var(--accent-tint, var(--color-surface-raised))',
 } as const;
 
 const liveRegionStyle = {

@@ -62,6 +62,53 @@ export const colors = {
 } as const;
 
 /**
+ * Per-category accent palette (Phase 3 visual upgrade) — the native parallel of
+ * web's `--cat-*` tokens / `src/ui/categoryTheme.ts`. One cohesive accent per
+ * performance category, spaced across the colour wheel and tuned to read on the
+ * near-black feed surface. `accent` drives the byline monogram + the category
+ * chip; `tint` is the chip fill. Colour is never the sole signal — the chip text
+ * and the @handle carry the meaning; the accent only reinforces them.
+ *
+ * Hex values are kept in lock-step with web's `tokens.css` so the two feeds look
+ * parallel. {@link categoryAccent} resolves a card's category to its accent with a
+ * safe fallback, so the feed stays category- and template-agnostic.
+ */
+export const categoryAccents = {
+  visual_attention: { accent: '#3fd6c9', tint: 'rgba(63, 214, 201, 0.16)' },
+  working_memory: { accent: '#9d7bff', tint: 'rgba(157, 123, 255, 0.16)' },
+  logical_reasoning: { accent: '#5b8cff', tint: 'rgba(91, 140, 255, 0.16)' },
+  cognitive_flexibility: { accent: '#f5a84c', tint: 'rgba(245, 168, 76, 0.16)' },
+  pattern_recognition: { accent: '#ff6fae', tint: 'rgba(255, 111, 174, 0.16)' },
+  processing_speed: { accent: '#7ed957', tint: 'rgba(126, 217, 87, 0.16)' },
+} as const;
+
+/** One category's accent theme (accent + chip tint). */
+export type CategoryAccent = { accent: string; tint: string };
+
+/**
+ * Safe fallback accent (unknown/absent category) — the shared brand blue
+ * (`#6c7bff`), matching web's `--color-accent` fallback so the two feeds stay in
+ * lock-step AND the fallback stays distinct from the logical_reasoning hue
+ * (`#5b8cff`), so a fallback card never reads as a logical_reasoning card.
+ */
+export const FALLBACK_CATEGORY_ACCENT: CategoryAccent = {
+  accent: '#6c7bff',
+  tint: 'rgba(108, 123, 255, 0.16)',
+};
+
+/**
+ * Resolve a card's category to its accent theme, falling back to
+ * {@link FALLBACK_CATEGORY_ACCENT} for an unknown/absent category — so the feed
+ * always gets a defined accent and never branches on category/`templateType`.
+ */
+export function categoryAccent(category: string | undefined): CategoryAccent {
+  if (category && category in categoryAccents) {
+    return categoryAccents[category as keyof typeof categoryAccents];
+  }
+  return FALLBACK_CATEGORY_ACCENT;
+}
+
+/**
  * Full-bleed slide background. A subtle vertical gradient (top → bottom) layered
  * over the app's near-black page colour gives each card depth without the flat,
  * "plain" look — TikTok/Reels-style immersion. The first/last stops stay close to

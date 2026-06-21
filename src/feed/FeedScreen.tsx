@@ -35,6 +35,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type CSSProperties,
   type KeyboardEvent,
 } from 'react';
 
@@ -44,6 +45,7 @@ import { resolveRenderer } from '../session/rendererRegistry';
 import type { RendererRegistry, TemplateRenderer } from '../session/rendererRegistry';
 import type { CardResolution, CardStartContext } from '../templates/contract';
 import { getAnonymousUserId } from '../telemetry/anonymousUser';
+import { resolveCategoryTheme } from '../ui/categoryTheme';
 import { feedRegistry } from '../ui/feedRegistry';
 import type { FeedBatchSource } from './feedDeck';
 import { useFeedController } from './useFeedController';
@@ -499,9 +501,20 @@ const FeedSlide = memo(function FeedSlide({
       interactionEnabledAtMs: engageAtMs ?? activeAtMs,
     };
     return (
-      <div className="feed-slide" data-index={index} data-testid="feed-slide" ref={registerSlide}>
-        {/* creatorHandle already includes the leading `@` (catalog convention). */}
-        <p className="feed-slide__byline">{card.creatorHandle}</p>
+      <div
+        className="feed-slide"
+        data-index={index}
+        data-testid="feed-slide"
+        // Derive the slide's accent generically from the card's category and seed
+        // the local `--accent*` aliases (Phase 3). Every descendant — the
+        // category chip, the game's selected/active states, the primary button,
+        // the result card — reads ONE accent, so the feed stays template- and
+        // category-agnostic (no branching on `templateType`). The category-tinted
+        // gradient wash is painted by `.feed-slide` from `--accent-tint`.
+        style={slideAccentStyle(card.category)}
+        ref={registerSlide}
+      >
+        <SlideTopChrome category={card.category} />
         <div className="feed-slide__game" data-testid={`feed-game-${index}`}>
           {createElement(Renderer as TemplateRenderer<LiquidCard>, {
             key: `${feedId}:${index}`,
@@ -518,6 +531,7 @@ const FeedSlide = memo(function FeedSlide({
             onResolve: (resolution: CardResolution) => onResolve(index, resolution),
           })}
         </div>
+        <SlideBottomChrome creatorHandle={card.creatorHandle} index={index} />
       </div>
     );
   }
@@ -534,3 +548,76 @@ const FeedSlide = memo(function FeedSlide({
     </div>
   );
 });
+
+/**
+ * Seed the slide's local accent aliases from the card's category (Phase 3). The
+ * values live in `tokens.css`; {@link resolveCategoryTheme} maps the category to
+ * its `--cat-*` token references and we assign them to the generic `--accent*`
+ * custom properties the descendants read. Typed via CSS custom-property keys.
+ */
+function slideAccentStyle(category: string): CSSProperties {
+  const t = resolveCategoryTheme(category);
+  return {
+    '--accent': t.accent,
+    '--accent-deep': t.accentDeep,
+    '--accent-tint': t.accentTint,
+  } as CSSProperties;
+}
+
+/** Format a category id ("visual_attention") into a chip label ("Visual attention"). */
+function categoryLabel(category: string): string {
+  const spaced = category.replace(/_/g, ' ');
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+/**
+ * Top-of-slide chrome (Phase 3): a small category CHIP, accent-tinted from the
+ * slide's `--accent`. It names the performance category in modest, guardrail-safe
+ * copy (no IQ/trait language) and is purely informative — colour is never the sole
+ * signal (the chip text carries the meaning). Decorative to assistive tech beyond
+ * its text label.
+ */
+function SlideTopChrome({ category }: { category: string }) {
+  return (
+    <div className="feed-slide__top">
+      <span className="feed-slide__chip">{categoryLabel(category)}</span>
+    </div>
+  );
+}
+
+/**
+ * Bottom-of-slide social chrome (Phase 3, mirroring mobile #135): the creator
+ * byline styled like a feed author — an accent monogram avatar + the `@handle` —
+ * on the left, and an animated "Swipe up" cue on the right. The byline text is the
+ * meaning; the avatar is decorative. The swipe cue is hidden from assistive tech
+ * (the feed landmark already carries the swipe instruction) and its motion degrades
+ * under `prefers-reduced-motion` (global.css gates animation).
+ */
+function SlideBottomChrome({
+  creatorHandle,
+  index,
+}: {
+  creatorHandle: string;
+  index: number;
+}) {
+  // creatorHandle already includes the leading `@` (catalog convention); the
+  // monogram is the first letter of the handle, ignoring that `@`.
+  const monogram = (creatorHandle.replace(/^@/, '')[0] ?? '?').toUpperCase();
+  return (
+    <div className="feed-slide__chrome">
+      <span className="feed-slide__author">
+        <span className="feed-slide__avatar" aria-hidden="true">
+          {monogram}
+        </span>
+        {/* creatorHandle already carries the leading `@` (catalog convention). */}
+        <span className="feed-slide__byline" data-testid={`feed-byline-${index}`}>
+          {creatorHandle}
+        </span>
+      </span>
+      <span className="feed-slide__swipe" aria-hidden="true">
+        Swipe up
+        <span className="feed-slide__swipe-chevron">⌃</span>
+      </span>
+    </div>
+  );
+}

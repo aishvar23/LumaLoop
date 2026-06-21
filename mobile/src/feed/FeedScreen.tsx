@@ -62,6 +62,7 @@ import {
   space,
   PAGE_BACKGROUND,
   slideGradient,
+  categoryAccent,
 } from './templates/tokens';
 import { getCardById as getCatalogCardById } from '../core/cards/catalog';
 import type { LiquidCard } from '../core/cards/types';
@@ -508,6 +509,10 @@ const FeedSlide = memo(function FeedSlide({
         testID={`feed-slide-${index}`}
       >
         <SlideBackground />
+        {/* Phase 3: a category CHIP at the top, accent-tinted from the card's
+            category. The chip text carries the meaning (guardrail-safe copy, no
+            IQ/trait language); colour only reinforces it. */}
+        <CategoryChip category={card.category} />
         {/* MP2 (#134): center the game (and, via the gate, the feedback step)
             vertically + horizontally in the slide. The full-width inner wrapper
             keeps games spanning the padded content box rather than collapsing to
@@ -532,8 +537,13 @@ const FeedSlide = memo(function FeedSlide({
         </View>
         {/* MP3 (#135): the social-feed author byline as a bottom-left overlay
             (avatar monogram + @handle) plus a subtle swipe-up affordance — so each
-            slide reads like a Reels/TikTok card, not a plain page. */}
-        <SlideChrome creatorHandle={card.creatorHandle} index={index} />
+            slide reads like a Reels/TikTok card, not a plain page. Phase 3: the
+            avatar is tinted with the card's category accent. */}
+        <SlideChrome
+          creatorHandle={card.creatorHandle}
+          category={card.category}
+          index={index}
+        />
       </View>
     );
   }
@@ -588,14 +598,18 @@ function SlideBackground() {
  */
 function SlideChrome({
   creatorHandle,
+  category,
   index,
 }: {
   creatorHandle: string;
+  category: string;
   index: number;
 }) {
   // creatorHandle already includes the leading `@` (catalog convention); the
   // monogram is the first letter of the handle, ignoring that `@`.
   const monogram = (creatorHandle.replace(/^@/, '')[0] ?? '?').toUpperCase();
+  // Phase 3: tint the avatar with the card's category accent (template-agnostic).
+  const { accent } = categoryAccent(category);
   return (
     <View style={styles.chrome}>
       <Pressable
@@ -605,7 +619,7 @@ function SlideChrome({
         onPress={noop}
         style={styles.bylinePressable}
       >
-        <View style={styles.avatar}>
+        <View style={[styles.avatar, { backgroundColor: accent }]}>
           <Text style={styles.avatarText}>{monogram}</Text>
         </View>
         <Text style={styles.byline} testID={`feed-byline-${index}`}>
@@ -627,6 +641,29 @@ function SlideChrome({
 
 /** No-op seam for the (later-phase) tappable creator profile. */
 function noop() {}
+
+/** Format a category id ("visual_attention") into a chip label ("Visual attention"). */
+function categoryLabel(category: string): string {
+  const spaced = category.replace(/_/g, ' ');
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+/**
+ * The top-of-slide category chip (Phase 3, native parallel of web's
+ * `.feed-slide__chip`): an accent-tinted pill naming the performance category in
+ * modest, guardrail-safe copy (no IQ/trait language). The chip text carries the
+ * meaning — colour only reinforces it.
+ */
+function CategoryChip({ category }: { category: string }) {
+  const { accent, tint } = categoryAccent(category);
+  return (
+    <View style={styles.chipRow}>
+      <View style={[styles.chip, { borderColor: accent, backgroundColor: tint }]}>
+        <Text style={styles.chipText}>{categoryLabel(category)}</Text>
+      </View>
+    </View>
+  );
+}
 
 /** Base horizontal slide padding so centered games aren't edge-to-edge cramped. */
 const SLIDE_PADDING_X = 20;
@@ -673,6 +710,22 @@ const styles = StyleSheet.create({
   // step) span the padded content width instead of shrinking to intrinsic width.
   gameContent: {
     width: '100%',
+  },
+  // Phase 3: the top-of-slide category chip row.
+  chipRow: {
+    flexDirection: 'row',
+    marginBottom: space.md,
+  },
+  chip: {
+    paddingVertical: space.xs,
+    paddingHorizontal: space.md,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+  },
+  chipText: {
+    color: colors.text,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.semibold,
   },
   // MP3 (#135): the bottom social chrome row — byline left, swipe cue right.
   chrome: {

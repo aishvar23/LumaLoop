@@ -34,8 +34,17 @@
   outline: none;
 }
 
-/* One game per viewport slide; snaps to the top edge. */
+/* One game per viewport slide; snaps to the top edge.
+ *
+ * Phase 3 immersion: a subtle category-tinted vertical gradient (top → bottom)
+ * over the near-black page colour gives each slide depth instead of the flat
+ * "plain" look (mirrors the mobile feed). `--accent-tint` is seeded per-slide
+ * from the card's category (see FeedScreen.tsx); the first/last stops stay close
+ * to --color-bg so paging never flashes a seam. `position: relative` anchors the
+ * bottom chrome overlay. The slide is the accent scope: descendants read the
+ * `--accent*` aliases set on it. */
 .feed-slide {
+  position: relative;
   box-sizing: border-box;
   height: 100dvh;
   scroll-snap-align: start;
@@ -45,15 +54,28 @@
   overflow: hidden;
   padding: calc(var(--space-3) + var(--safe-top)) var(--space-3)
     calc(var(--space-3) + var(--safe-bottom));
+  background:
+    linear-gradient(
+      180deg,
+      var(--accent-tint, transparent) 0%,
+      transparent 42%,
+      rgba(0, 0, 0, 0.28) 100%
+    ),
+    var(--color-bg);
 }
 
-/* The mounted game (or its feedback gate) fills the slide and may scroll if a
- * single game's content is taller than the viewport. */
+/* The mounted game (or its feedback gate) is centered in the slide (TikTok/Reels
+ * style — not pinned to the top) and may scroll if a single game's content is
+ * taller than the viewport. `safe center` is essential here: a plain `center` on
+ * a scroll container pushes overflow PAST the start edge where it can't be
+ * scrolled to (clipping the prompt's top); `safe` falls back to start-alignment
+ * the moment content overflows, so tall games stay fully scrollable. */
 .feed-slide__game {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
+  justify-content: safe center;
   overflow-y: auto;
 }
 
@@ -68,12 +90,106 @@
   font-size: var(--font-size-sm);
 }
 
+/* ── Top chrome: the category chip ──────────────────────────────────────────
+ * Accent-tinted pill naming the performance category (guardrail-safe copy). The
+ * chip TEXT carries the meaning — colour only reinforces it. */
+.feed-slide__top {
+  display: flex;
+  margin-bottom: var(--space-2);
+}
+
+.feed-slide__chip {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--accent, var(--color-accent));
+  background: var(--accent-tint, transparent);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.01em;
+}
+
+/* ── Bottom chrome: creator byline + swipe-up cue ───────────────────────────
+ * The social author row (avatar monogram + @handle) on the left and an animated
+ * "Swipe up" affordance on the right, mirroring the mobile feed. */
+.feed-slide__chrome {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.feed-slide__author {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/* Accent monogram avatar — the creator's initial on the slide accent. Decorative
+ * (aria-hidden); the @handle beside it is the readable byline. */
+.feed-slide__avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-pill);
+  background: var(--accent, var(--color-accent));
+  color: var(--color-accent-on);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+}
+
 /* The byline naming the card's creator (data already on every card). */
 .feed-slide__byline {
-  margin: 0 0 var(--space-2);
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The animated swipe-up affordance — a faint cue that bobs upward to invite the
+ * next-game gesture. Decorative (aria-hidden); the feed landmark already names
+ * the swipe instruction for assistive tech. */
+.feed-slide__swipe {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: 0 0 auto;
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
+}
+
+.feed-slide__swipe-chevron {
+  display: inline-block;
+  font-size: var(--font-size-md);
+  line-height: 1;
+  animation: feed-swipe-bob 1.6s ease-in-out infinite;
+}
+
+/* Gentle upward bob to draw the eye toward the next-game swipe. Disabled by the
+ * global prefers-reduced-motion rule (styles/global.css), which forces near-zero
+ * animation duration — the cue then sits still while staying readable. */
+@keyframes feed-swipe-bob {
+  0%,
+  100% {
+    transform: translateY(2px);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
 }
 
 /* Off-screen but accessible — names landmarks / nav controls without chrome. */

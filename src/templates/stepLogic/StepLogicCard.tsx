@@ -227,9 +227,10 @@ const sectionStyle = {
 
 const promptStyle = {
   margin: 0,
-  fontSize: 'var(--font-size-lg)',
-  fontWeight: 'var(--font-weight-semibold)',
-  lineHeight: 'var(--line-height-snug)',
+  fontSize: 'var(--font-size-hero)',
+  fontWeight: 'var(--font-weight-bold)',
+  lineHeight: 'var(--line-height-tight)',
+  letterSpacing: '-0.01em',
 } as const;
 
 // The shared premise stays visible above every sub-question for the whole solve.

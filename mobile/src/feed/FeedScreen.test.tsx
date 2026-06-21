@@ -221,6 +221,12 @@ describe('FeedScreen (native)', () => {
     expect(screen.queryByText('@@creator_b0-0')).toBeNull();
   });
 
+  it('shows a category chip with guardrail-safe, humanized copy', () => {
+    renderFeed();
+    // category `visual_attention` → "Visual attention" (no IQ/trait language).
+    expect(screen.getAllByText('Visual attention').length).toBeGreaterThan(0);
+  });
+
   it('windows the mount: off-window slides render the placeholder, not the stub', () => {
     renderFeed();
     // Active is 0 → indices 0 and 1 are windowed, 3 is a placeholder.

@@ -250,7 +250,7 @@ function WhatChangedAnswer({
               data-testid={`wc-option-${option.id}`}
               aria-pressed={isSelected}
               onClick={() => handleSelect(option.id)}
-              style={optionStyle}
+              style={isSelected ? optionSelectedStyle : optionStyle}
             >
               {option.label}
             </button>
@@ -300,9 +300,10 @@ const sectionStyle = {
 
 const promptStyle = {
   margin: 0,
-  fontSize: 'var(--font-size-lg)',
-  fontWeight: 'var(--font-weight-semibold)',
-  lineHeight: 'var(--line-height-snug)',
+  fontSize: 'var(--font-size-hero)',
+  fontWeight: 'var(--font-weight-bold)',
+  lineHeight: 'var(--line-height-tight)',
+  letterSpacing: '-0.01em',
 } as const;
 
 const patternStyle = {
@@ -347,6 +348,15 @@ const optionStyle = {
   fontSize: 'var(--font-size-md)',
   fontFamily: 'var(--font-sans)',
   cursor: 'pointer',
+} as const;
+
+/** The selected option (Phase 3): accent-tinted + accent border. Selection is
+ * also carried by `aria-pressed` + the live region, so colour is never the sole
+ * signal — the accent only reinforces the pressed state. */
+const optionSelectedStyle = {
+  ...optionStyle,
+  border: '1px solid var(--accent, var(--color-accent))',
+  background: 'var(--accent-tint, var(--color-surface-raised))',
 } as const;
 
 const liveRegionStyle = {
