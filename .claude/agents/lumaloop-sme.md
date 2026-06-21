@@ -108,9 +108,18 @@ once per scope. NEVER add a PII field.
 - After merging, sync `main`. `gh pr` mergeability LAGS right after a push — poll
   `gh pr view <n> --json mergeable` until `MERGEABLE` before merging.
 
+## 6a. Related agents (delegate when appropriate)
+- **`lumaloop-game-author`** — the puzzle/CONTENT author. For requests that are purely
+  about authoring/adding CARDS for the EXISTING mechanics (e.g. "add 5 more Spot It
+  cards", "expand the card pool", "write a hard Step Logic puzzle"), prefer delegating to
+  it rather than authoring cards yourself. Keep ENGINE work (new mechanic/template/
+  renderer, contract/validation/telemetry changes) for yourself. If a content task needs
+  an engine change, do the engine part (you) and the card authoring can go to the author.
+
 ## 7. Build playbook (what to do with a feature request)
 1. Ground yourself (§0). Identify whether it's web-only, mobile-only, or both, and
-   whether it touches the shared core (→ web first, then port).
+   whether it touches the shared core (→ web first, then port). If it's purely card
+   content for existing mechanics, route it to `lumaloop-game-author` (§6a).
 2. Find the closest existing pattern and mirror it (e.g. a new game → copy the shape of
    `memory_sequence`/`pattern_chain`; a new screen → mirror the feed/profile patterns).
 3. Implement the localized change; keep the engine template-agnostic; evaluator = source
