@@ -5,6 +5,7 @@ import { StyleSheet } from 'react-native';
 import { v4 as uuidV4 } from 'uuid';
 
 import FeedScreen from './src/feed/FeedScreen';
+import FirstRunNotice from './src/feed/FirstRunNotice';
 import { createTelemetryClient } from './src/telemetry/telemetryClient';
 import { ensureAnonymousUserId } from './src/telemetry/anonymousUser';
 import { useFeedTelemetry } from './src/telemetry/useFeedTelemetry';
@@ -23,9 +24,11 @@ import { useFeedTelemetry } from './src/telemetry/useFeedTelemetry';
  * telemetry `anonymousUserId` agree on one stable id per launch (a fast read — a
  * brief blank frame, no spinner ceremony for the prototype).
  *
- * SEAM (M6): the one-time first-run anonymous-data notice (FEED_DIRECTION.md §3.6)
- * is shown once before/over the first feed view. It is intentionally NOT built
- * here yet — it will wrap or precede `<FeedScreen />` without changing the feed.
+ * M6 (ADO #130): the one-time first-run anonymous-data notice (FEED_DIRECTION.md
+ * §3.6, Technical Design §21.8) now gates the feed. {@link FirstRunNotice} wraps
+ * the feed, shows the REQUIRED non-assessment notice ONCE over the first view, and
+ * persists the acknowledgement (best-effort AsyncStorage) so it never shows again.
+ * It owns no feed progression — the feed renders unchanged behind it.
  *
  * `GestureHandlerRootView` wraps the tree so native gesture handlers work app-wide
  * (gesture-handler docs); it must be the root view and fill the screen.
@@ -46,9 +49,11 @@ export default function App() {
 
   return (
     <GestureHandlerRootView style={styles.root}>
-      {anonymousUserId !== null ? (
-        <TelemetryFeed anonymousUserId={anonymousUserId} />
-      ) : null}
+      <FirstRunNotice>
+        {anonymousUserId !== null ? (
+          <TelemetryFeed anonymousUserId={anonymousUserId} />
+        ) : null}
+      </FirstRunNotice>
       <StatusBar style="light" />
     </GestureHandlerRootView>
   );
