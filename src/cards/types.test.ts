@@ -13,6 +13,7 @@ const ALL_TEMPLATE_TYPES: TemplateType[] = [
   'what_changed',
   'rule_flip',
   'tiny_logic',
+  'memory_sequence',
 ];
 
 const ALL_CATEGORIES: ChallengeCategory[] = [
@@ -78,6 +79,7 @@ describe('templateCategoryMap', () => {
       what_changed: ['working_memory', 'visual_attention'],
       rule_flip: ['cognitive_flexibility', 'processing_speed'],
       tiny_logic: ['logical_reasoning', 'pattern_recognition'],
+      memory_sequence: ['working_memory'],
     });
   });
 });
@@ -103,6 +105,9 @@ function categoriesForCard(card: LiquidCard): ChallengeCategory {
     case 'tiny_logic':
       void card.config.stem;
       return 'logical_reasoning';
+    case 'memory_sequence':
+      void card.config.sequence;
+      return 'working_memory';
     default: {
       // If a new TemplateType is added without a case above, `card` is no
       // longer `never` here and this assignment fails to compile.
