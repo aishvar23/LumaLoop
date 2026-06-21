@@ -54,7 +54,8 @@ export type TemplateType =
   | 'what_changed'
   | 'rule_flip'
   | 'tiny_logic'
-  | 'memory_sequence';
+  | 'memory_sequence'
+  | 'pattern_chain';
 
 export type Difficulty = 'easy' | 'medium' | 'hard';
 
@@ -186,6 +187,51 @@ export type MemorySequenceCard = LiquidCardBase & {
 };
 
 /**
+ * One step in a {@link PatternChainCard}: the choice of the NEXT item to extend
+ * the visible `sequence`. `options` are the candidate next items the player
+ * chooses among; exactly one (`correctOptionId`) genuinely continues the
+ * pattern. Authored option ids are stable, unique-within-a-step slugs.
+ */
+export type PatternChainStep = {
+  options: Array<{ id: string; label: string }>;
+  correctOptionId: string;
+};
+
+/**
+ * Continue a visible sequence by picking the next item, then the next — a
+ * MULTI-STEP pattern-recognition mechanic (pattern_recognition).
+ *
+ * The renderer shows the `sequence` (display items the player can see), then
+ * presents each step's `options` in order: on every pick it appends the chosen
+ * item to the shown sequence and advances to the next step, until all `steps`
+ * are answered. The shared `timeLimitMs` covers the whole solve (no preview
+ * phase — interaction is enabled at card start, so the controller sets
+ * `interactionEnabledAtMs === activeAtMs`). Correctness is an exact ordered
+ * match of every step's pick against its `correctOptionId`, decided by the pure
+ * `evaluatePatternChain` (the renderer routes its collected picks through it).
+ */
+export type PatternChainCard = LiquidCardBase & {
+  templateType: 'pattern_chain';
+  config: {
+    /**
+     * The visible sequence shown to the player as the pattern to continue —
+     * display items (glyphs, numbers, letters). Catalog validation requires it
+     * to be non-empty.
+     */
+    sequence: ReadonlyArray<string>;
+    /**
+     * The ordered "pick the next item" steps. Each step offers `options` and
+     * names the `correctOptionId` that continues the pattern. Length 2–3
+     * (enforced by catalog validation); `correctOptionId` must be one of that
+     * step's `options`.
+     */
+    steps: ReadonlyArray<PatternChainStep>;
+    /** Countdown for the whole solve (5–30s; see validation). */
+    timeLimitMs: number;
+  };
+};
+
+/**
  * The discriminated union of every card. Narrow on `templateType` to access a
  * card's typed `config`. Adding a template means adding a member here (step 2).
  */
@@ -194,7 +240,8 @@ export type LiquidCard =
   | WhatChangedCard
   | RuleFlipCard
   | TinyLogicCard
-  | MemorySequenceCard;
+  | MemorySequenceCard
+  | PatternChainCard;
 
 /**
  * The categories each template is allowed to map to (Technical Design §11).
@@ -216,4 +263,5 @@ export const templateCategoryMap: Readonly<
   rule_flip: Object.freeze(['cognitive_flexibility', 'processing_speed'] as const),
   tiny_logic: Object.freeze(['logical_reasoning', 'pattern_recognition'] as const),
   memory_sequence: Object.freeze(['working_memory'] as const),
+  pattern_chain: Object.freeze(['pattern_recognition'] as const),
 }) satisfies Readonly<Record<TemplateType, readonly ChallengeCategory[]>>;
