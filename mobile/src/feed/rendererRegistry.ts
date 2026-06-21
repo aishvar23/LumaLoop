@@ -31,6 +31,7 @@ import WhatChangedCard from './templates/WhatChangedCard';
 import RuleFlipCard from './templates/RuleFlipCard';
 import TinyLogicCard from './templates/TinyLogicCard';
 import MemorySequenceCard from './templates/MemorySequenceCard';
+import PatternChainCard from './templates/PatternChainCard';
 
 /**
  * A template renderer: a component that accepts {@link TemplateProps} for its
@@ -91,4 +92,5 @@ export const defaultRendererRegistry: RendererRegistry = {
   rule_flip: RuleFlipCard,
   tiny_logic: TinyLogicCard,
   memory_sequence: MemorySequenceCard,
+  pattern_chain: PatternChainCard,
 };

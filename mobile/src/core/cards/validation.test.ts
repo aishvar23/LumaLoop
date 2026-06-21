@@ -11,6 +11,7 @@ import {
   type ChallengeCategory,
   type LiquidCard,
   type MemorySequenceCard,
+  type PatternChainCard,
   type PuzzleDna,
   type RuleFlipCard,
   type SpotItCard,
@@ -182,6 +183,45 @@ function validMemorySequence(): MemorySequenceCard {
   };
 }
 
+function validPatternChain(): PatternChainCard {
+  return {
+    cardId: 'chain-1',
+    creatorHandle: 'lumaloop',
+    templateType: 'pattern_chain',
+    category: 'pattern_recognition',
+    difficulty: 'easy',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 15,
+    prompt: 'Continue the sequence by picking the next item, then the next.',
+    puzzleDna: dna('sequence-continuation'),
+    explanation: {
+      title: 'Pattern recognition',
+      body: 'The sequence climbs by two each step.',
+    },
+    config: {
+      sequence: ['2', '4', '6'],
+      steps: [
+        {
+          options: [
+            { id: 'a', label: '7' },
+            { id: 'b', label: '8' },
+          ],
+          correctOptionId: 'b',
+        },
+        {
+          options: [
+            { id: 'a', label: '9' },
+            { id: 'b', label: '10' },
+          ],
+          correctOptionId: 'b',
+        },
+      ],
+      timeLimitMs: 14000,
+    },
+  };
+}
+
 function validCatalog(): LiquidCard[] {
   return [
     validSpotIt(),
@@ -189,6 +229,7 @@ function validCatalog(): LiquidCard[] {
     validRuleFlip(),
     validTinyLogic(),
     validMemorySequence(),
+    validPatternChain(),
   ];
 }
 
@@ -416,6 +457,73 @@ describe('validateCatalog', () => {
     );
   });
 
+  it('accepts a valid pattern_chain card', () => {
+    const result = validateCatalog([validPatternChain()]);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
+  it('rejects a pattern_chain with an empty visible sequence', () => {
+    const card = validPatternChain();
+    card.config = { ...card.config, sequence: [] };
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('rejects a pattern_chain with fewer than two steps', () => {
+    const card = validPatternChain();
+    card.config = {
+      ...card.config,
+      steps: [card.config.steps[0]],
+    };
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('rejects a pattern_chain step whose correctOptionId is not among its options', () => {
+    const card = validPatternChain();
+    card.config = {
+      ...card.config,
+      steps: [
+        { ...card.config.steps[0], correctOptionId: 'does-not-exist' },
+        card.config.steps[1],
+      ],
+    };
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('rejects a pattern_chain step with duplicate option ids', () => {
+    const card = validPatternChain();
+    card.config = {
+      ...card.config,
+      steps: [
+        {
+          options: [
+            { id: 'dup', label: '7' },
+            { id: 'dup', label: '8' },
+          ],
+          correctOptionId: 'dup',
+        },
+        card.config.steps[1],
+      ],
+    };
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
   it('rejects a missing explanation', () => {
     const card = validSpotIt();
     card.explanation = { title: '', body: '' };
@@ -505,6 +613,7 @@ const ALL_TEMPLATE_TYPES: TemplateType[] = [
   'rule_flip',
   'tiny_logic',
   'memory_sequence',
+  'pattern_chain',
 ];
 
 const ALL_CATEGORIES: ChallengeCategory[] = [
@@ -523,6 +632,7 @@ const validCardFor: Record<TemplateType, () => LiquidCard> = {
   rule_flip: validRuleFlip,
   tiny_logic: validTinyLogic,
   memory_sequence: validMemorySequence,
+  pattern_chain: validPatternChain,
 };
 
 describe('templateCategoryMap <-> validation consistency', () => {
