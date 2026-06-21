@@ -4,9 +4,12 @@
  * A MULTI-STEP pattern-recognition template: the player continues a visible
  * `sequence` by picking the next item, then the next (2–3 ordered steps). Unlike
  * `memory_sequence`/`what_changed` there is NO timed PRE-phase — the sequence
- * and the first step's options mount immediately, so interaction is enabled at
- * card start and the controller sets `interactionEnabledAtMs === activeAtMs`;
- * `elapsedMs` and `interactionElapsedMs` therefore share the same origin.
+ * and the first step's options mount immediately, so the renderer treats
+ * interaction as enabled at card start. In the engage-gated feed (#106) the
+ * interaction origin (`interactionEnabledAtMs`) is the first-pick instant, which
+ * can be later than `activeAtMs`; the renderer uses each origin INDEPENDENTLY
+ * (`elapsedMs` from `activeAtMs`, `interactionElapsedMs`/TTI from
+ * `interactionEnabledAtMs`) and never relies on the two being equal.
  *
  * Step flow: the renderer presents step N's `options`; on a pick it APPENDS the
  * chosen item to the shown sequence and advances to step N+1, until every step
