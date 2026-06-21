@@ -98,6 +98,10 @@ export function useFeedScore(options: UseFeedScoreOptions): FeedScore {
   const getCardByIdRef = useRef(getCardById);
   getCardByIdRef.current = getCardById;
 
+  // Mirror `bestRun` into a ref so the stable handler can compare without deps.
+  const bestRunStateRef = useRef<number>(bestRun);
+  bestRunStateRef.current = bestRun;
+
   const onCardResolved = useCallback(
     (index: number, resolution: CardResolution) => {
       if (scoredIndicesRef.current.has(index)) return; // already scored once.
@@ -126,10 +130,6 @@ export function useFeedScore(options: UseFeedScoreOptions): FeedScore {
     },
     [],
   );
-
-  // Mirror `bestRun` into a ref so the stable handler can compare without deps.
-  const bestRunStateRef = useRef<number>(bestRun);
-  bestRunStateRef.current = bestRun;
 
   const getCardScore = useCallback(
     (index: number): CardScore | null =>
