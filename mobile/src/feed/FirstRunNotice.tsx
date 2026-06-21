@@ -87,11 +87,25 @@ export default function FirstRunNotice({
   }, [store]);
 
   const gated = status === 'pending';
+  // The feed is only interactive once the ack is KNOWN to be acknowledged. During
+  // the async `loading` window we keep it non-interactive too, so a first-run user
+  // cannot tap/swipe the feed in the few frames before the gate resolves.
+  const feedInteractive = status === 'acknowledged';
 
   return (
     <View style={styles.root}>
-      {/* Feed lives behind the gate; non-interactive while the notice is up. */}
-      <View style={styles.content} pointerEvents={gated ? 'none' : 'auto'}>
+      {/* Feed lives behind the gate; non-interactive (and hidden from assistive
+          tech) until acknowledged. accessibilityElementsHidden (iOS) +
+          importantForAccessibility=no-hide-descendants (Android) mirror the web
+          inert/aria-modal isolation on BOTH platforms. */}
+      <View
+        style={styles.content}
+        pointerEvents={feedInteractive ? 'auto' : 'none'}
+        accessibilityElementsHidden={!feedInteractive}
+        importantForAccessibility={
+          feedInteractive ? 'auto' : 'no-hide-descendants'
+        }
+      >
         {children}
       </View>
 
