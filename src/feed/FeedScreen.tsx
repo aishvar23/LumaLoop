@@ -552,7 +552,16 @@ const FeedSlide = memo(function FeedSlide({
         ref={registerSlide}
       >
         <SlideTopChrome category={card.category} />
-        <div className="feed-slide__game" data-testid={`feed-game-${index}`}>
+        <div
+          className="feed-slide__game"
+          data-testid={`feed-game-${index}`}
+          // Phase 5: drive the activation-gated entrance animation. Only the
+          // focused slide carries `data-active="true"`, so a pre-mounted
+          // neighbour stays still until it actually snaps into view (motion is
+          // gated on activation, NOT mount — see FeedScreen.css). Visual-only;
+          // it never feeds back into timing/`isActive` game logic.
+          data-active={active ? 'true' : 'false'}
+        >
           {createElement(Renderer as TemplateRenderer<LiquidCard>, {
             key: `${feedId}:${index}`,
             // #106: until engaged, the renderer's timer stays disarmed.

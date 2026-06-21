@@ -201,7 +201,11 @@ function ScoreChip({ cardScore }: { cardScore: CardScore }) {
 
 // ── Token-driven styles (no hardcoded colours/sizes; Design tokens, #51) ──────
 
-/** The game-points chip surface — accent-tinted, sits above the explanation. */
+/** The game-points chip surface — accent-tinted, sits above the explanation.
+ *
+ * Phase 5: the chip pops in just after the card (a short delay sequences it
+ * behind the result card's own pop), so a correct answer's points feel like
+ * they "land". Disabled under prefers-reduced-motion (global.css). */
 const scoreChipStyle = {
   display: 'flex',
   alignItems: 'baseline',
@@ -211,6 +215,7 @@ const scoreChipStyle = {
   borderRadius: 'var(--radius-pill)',
   border: '1px solid var(--accent, var(--color-accent))',
   background: 'var(--accent-tint, var(--color-surface-overlay))',
+  animation: 'card-score-pop var(--motion-base) var(--ease-pop) 80ms both',
 } as const;
 
 const scorePointsStyle = {
@@ -226,7 +231,14 @@ const scoreMetaStyle = {
 } as const;
 
 /** The tinted result-card surface (Phase 3). Surface/border are set per-outcome
- * inline so the one card serves both success and error. */
+ * inline so the one card serves both success and error.
+ *
+ * Phase 5: the card POPS in (scale + fade) when it mounts — the feedback gate
+ * mounts a fresh CardFeedback the instant a card resolves, so the animation
+ * fires exactly once at the rewarding moment with no extra state. Uses the
+ * slight-overshoot `--ease-pop` so a correct answer feels punchy without being
+ * cartoonish. Disabled under prefers-reduced-motion (global.css forces the
+ * duration to ~0 → the card simply appears). */
 const cardStyle = {
   display: 'flex',
   flexDirection: 'column',
@@ -235,6 +247,7 @@ const cardStyle = {
   borderRadius: 'var(--radius-lg)',
   border: '1px solid var(--color-border)',
   boxShadow: 'var(--shadow-md)',
+  animation: 'card-feedback-pop var(--motion-base) var(--ease-pop) both',
 } as const;
 
 const outcomeRowStyle = {

@@ -400,9 +400,13 @@ function RuleFlipStream({
       >
         {visibleIndex !== null ? (
           <span
+            // Phase 5: remount per stimulus so the reveal pop re-fires for each
+            // new item (a subtle fade/scale-in). Visual-only — the cadence
+            // timing (`stimulusDurationMs`/`interStimulusGapMs`) is unchanged.
+            key={visibleIndex}
             data-testid="rf-stimulus"
             data-stimulus-index={visibleIndex}
-            style={stimulusStyle}
+            style={stimulusRevealStyle}
           >
             {stimuli[visibleIndex].label}
           </span>
@@ -494,6 +498,11 @@ const flipBannerStyle = {
   color: 'var(--color-text)',
   fontSize: 'var(--font-size-md)',
   fontWeight: 'var(--font-weight-bold)',
+  // Phase 5: the "rule changed" banner pops in when the flip happens (it mounts
+  // only once `isFlipped` becomes true), drawing the eye to the rule switch.
+  // Visual-only; the flip TIMING is the cadence above. Degrades under
+  // prefers-reduced-motion (global.css).
+  animation: 'card-feedback-pop var(--motion-base) var(--ease-pop) both',
 } as const;
 
 const stimulusStageStyle = {
@@ -515,6 +524,15 @@ const stimulusStyle = {
   fontSize: 'var(--font-size-xl)',
   fontFamily: 'var(--font-sans)',
   color: 'var(--color-text)',
+} as const;
+
+// Phase 5: the visible stimulus reveals with a brief fade/scale-in (re-fired per
+// stimulus via the keyed remount above). Reuses the shared result-card pop
+// keyframe at the fast duration so each item lands crisply. Degrades to an
+// instant appearance under prefers-reduced-motion (global.css).
+const stimulusRevealStyle = {
+  ...stimulusStyle,
+  animation: 'card-feedback-pop var(--motion-fast) var(--ease-out) both',
 } as const;
 
 const responseRowStyle = {

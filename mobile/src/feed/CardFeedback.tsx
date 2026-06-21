@@ -94,7 +94,10 @@ export default function CardFeedback({
   const cardSurface = positive ? colors.successSurface : colors.dangerSurface;
   const cardBorder = positive ? colors.successBorder : colors.dangerBorder;
 
-  // Fade + lift in on appearance, unless reduce-motion is on (then snap to final).
+  // Phase 5: POP in on appearance (fade + lift + a slight overshoot scale) so a
+  // correct answer feels rewarding — the gate mounts a fresh CardFeedback the
+  // instant a card resolves, so this fires exactly once at that moment. Unless
+  // reduce-motion is on, in which case it snaps to the final value (no movement).
   const reducedMotion = useReducedMotion();
   const anim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -102,21 +105,33 @@ export default function CardFeedback({
       anim.setValue(1);
       return undefined;
     }
-    const animation = Animated.timing(anim, {
+    // Spring gives the subtle overshoot of web's `--ease-pop`; tuned tight so it
+    // reads punchy, never bouncy-cartoonish.
+    const animation = Animated.spring(anim, {
       toValue: 1,
-      duration: 220,
+      friction: 7,
+      tension: 90,
       useNativeDriver: true,
     });
     animation.start();
     return () => animation.stop();
   }, [reducedMotion, anim]);
   const animatedStyle = {
-    opacity: anim,
+    opacity: anim.interpolate({
+      inputRange: [0, 0.6, 1],
+      outputRange: [0, 1, 1],
+    }),
     transform: [
       {
         translateY: anim.interpolate({
           inputRange: [0, 1],
           outputRange: [12, 0],
+        }),
+      },
+      {
+        scale: anim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.94, 1],
         }),
       },
     ],
