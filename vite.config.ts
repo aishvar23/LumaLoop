@@ -10,6 +10,15 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     css: false,
+    // Accounts pivot: the Supabase client (src/auth/supabaseClient.ts) reads
+    // `import.meta.env.VITE_SUPABASE_*` at import and fails fast if missing.
+    // Provide harmless placeholder values for the test run so importing app code
+    // never throws — tests inject FAKE clients and never hit a real backend, so
+    // the values are never used for a real request. (CI has no `.env.local`.)
+    env: {
+      VITE_SUPABASE_URL: 'http://localhost:54321',
+      VITE_SUPABASE_ANON_KEY: 'test-anon-key',
+    },
     // Scope discovery to the web app only. `mobile/` is a self-contained
     // Expo/React Native sub-project with its OWN jest gate; without this,
     // vitest's default glob would also collect mobile/src/core/**/*.test.ts and

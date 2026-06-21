@@ -33,15 +33,18 @@ describe('routes', () => {
   });
 
   describe('routeKindFor', () => {
-    it('maps route keys to telemetry route kinds', () => {
+    it('maps route keys to route kinds', () => {
       expect(routeKindFor.session).toBe('session');
       expect(routeKindFor.cardDeepLink).toBe('card_deep_link');
+      // Account routes (accounts pivot) are not feed-telemetry surfaces.
+      expect(routeKindFor.authCallback).toBe('account');
+      expect(routeKindFor.profile).toBe('account');
     });
 
-    it('only yields the telemetry-aligned RouteKind union', () => {
+    it('only yields values from the RouteKind union', () => {
       const kinds: RouteKind[] = Object.values(routeKindFor);
       for (const kind of kinds) {
-        expect(['session', 'card_deep_link']).toContain(kind);
+        expect(['session', 'card_deep_link', 'account']).toContain(kind);
       }
     });
   });

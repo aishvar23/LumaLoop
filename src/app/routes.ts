@@ -17,6 +17,10 @@ export const ROUTES = {
   session: '/',
   /** `/c/:cardId` — opens a single creator-attributed card from the catalog. */
   cardDeepLink: '/c/:cardId',
+  /** `/auth/callback` — OAuth / magic-link PKCE return target (accounts pivot). */
+  authCallback: '/auth/callback',
+  /** `/you` — the signed-in user's profile + game-activity stats. */
+  profile: '/you',
 } as const;
 
 export type RouteKey = keyof typeof ROUTES;
@@ -27,12 +31,18 @@ export type RouteKey = keyof typeof ROUTES;
  * here so routing never imports the telemetry client. The telemetry layer reads
  * this value; routing only produces it.
  */
-export type RouteKind = 'session' | 'card_deep_link';
+export type RouteKind = 'session' | 'card_deep_link' | 'account';
 
-/** Maps an internal {@link RouteKey} to its telemetry {@link RouteKind}. */
+/**
+ * Maps an internal {@link RouteKey} to its telemetry {@link RouteKind}. The
+ * account routes (callback / profile) are not feed-telemetry surfaces; they map
+ * to the `account` kind, which the feed telemetry layer does not emit for.
+ */
 export const routeKindFor: Record<RouteKey, RouteKind> = {
   session: 'session',
   cardDeepLink: 'card_deep_link',
+  authCallback: 'account',
+  profile: 'account',
 } as const;
 
 /**

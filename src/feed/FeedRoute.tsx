@@ -39,9 +39,11 @@ import {
 import type { TelemetrySource } from '../telemetry/telemetryEvents';
 import { useFeedTelemetry } from '../telemetry/useFeedTelemetry';
 import { ExplanationViewedProvider } from '../ui/feedRegistry';
+import { useOptionalAuth } from '../auth/AuthProvider';
 import type { FeedBatchSource } from './feedDeck';
 import FeedScreen from './FeedScreen';
 import FirstRunNotice from './FirstRunNotice';
+import { useRecordGamePlay } from './useRecordGamePlay';
 
 export interface FeedRouteProps {
   /** Test seam: telemetry client. Defaults to the real `/api/event` client. */
@@ -124,6 +126,17 @@ export default function FeedRoute({
     observeFeedOpened();
   }, [observeFeedOpened]);
 
+  // Accounts pivot: record each resolved card as a `game_plays` row for the
+  // signed-in user, best-effort, off the SAME resolution path Phase-4 scoring
+  // uses (FeedScreen's `onCardScored` seam). Anonymous telemetry above is
+  // untouched. `RequireAuth` gates `/`, so in production there is always a user;
+  // the recorder no-ops when there isn't (e.g. a directly-mounted test feed).
+  const auth = useOptionalAuth();
+  const recordGamePlay = useRecordGamePlay({
+    userId: auth?.user?.id ?? null,
+    getCardById,
+  });
+
   return (
     <>
       {/* The gate fires Card_Explanation_Viewed through this seam (no telemetry
@@ -141,6 +154,7 @@ export default function FeedRoute({
           onCardSkipped={telemetry.onCardSkipped}
           onCardAbandoned={telemetry.onCardAbandoned}
           onCardResolved={telemetry.onCardResolved}
+          onCardScored={recordGamePlay}
         />
       </ExplanationViewedProvider>
       <FirstRunNotice />

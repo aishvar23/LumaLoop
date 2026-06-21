@@ -48,6 +48,7 @@ import { getAnonymousUserId } from '../telemetry/anonymousUser';
 import { resolveCategoryTheme } from '../ui/categoryTheme';
 import { feedRegistry } from '../ui/feedRegistry';
 import { CardScoreProvider } from './cardScoreContext';
+import type { CardScore } from './scoring';
 import type { FeedBatchSource } from './feedDeck';
 import FeedScoreHud from './FeedScoreHud';
 import type { ScoreStore } from './scoreStore';
@@ -111,6 +112,15 @@ export type FeedScreenProps = {
    * itself never advances on resolve; seam for #108 telemetry (`Card_Resolved`).
    */
   onCardResolved?: (index: number, resolution: CardResolution) => void;
+  /**
+   * Notified once per local resolution WITH the Phase-4 per-card score that the
+   * SAME resolution path just computed (the HUD's points/streak for this card).
+   * This is the accounts-pivot seam (a `game_plays` row is recorded from it) — it
+   * rides the existing `handleResolve` flow, not a parallel observer, and stays
+   * template-agnostic (the score is the universal points value, no `templateType`
+   * branch). Fires at most once per index, after `onCardResolved`.
+   */
+  onCardScored?: (index: number, resolution: CardResolution, score: CardScore) => void;
   /**
    * Test seam: the Phase-4 best-run persistence store. Defaults to the real
    * best-effort `localStorage` store; pass `null` to disable persistence (tests).
@@ -184,6 +194,7 @@ export default function FeedScreen({
   onCardSkipped,
   onCardAbandoned,
   onCardResolved,
+  onCardScored,
   scoreStore,
 }: FeedScreenProps) {
   // Resolve the real persisted anonymous id ONCE per mount (Technical Design
@@ -375,9 +386,21 @@ export default function FeedScreen({
       // by the time the result card mounts via the feedback gate.
       scoreOnResolvedRef.current(index, resolution);
       onCardResolved?.(index, resolution);
+      // Accounts pivot: surface the just-computed per-card score on the SAME path
+      // so a `game_plays` row can be recorded with the HUD's points. Reads it back
+      // from the score hook (set synchronously above), so points always agree.
+      const cardScore = getCardScoreRef.current(index);
+      if (cardScore) onCardScoredRef.current?.(index, resolution, cardScore);
     },
     [onCardResolved],
   );
+
+  // Stable refs for the score lookup + the accounts-pivot seam used in the stable
+  // `handleResolve` (so it never re-creates as those props change).
+  const getCardScoreRef = useRef(score.getCardScore);
+  getCardScoreRef.current = score.getCardScore;
+  const onCardScoredRef = useRef(onCardScored);
+  onCardScoredRef.current = onCardScored;
 
   // Stable handle to the score hook's resolution folder for `handleResolve`.
   const scoreOnResolvedRef = useRef(score.onCardResolved);

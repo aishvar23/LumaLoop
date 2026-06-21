@@ -13,6 +13,9 @@
 import { Route, Routes } from 'react-router-dom';
 import { ROUTES } from './routes';
 import FeedRoute from '../feed/FeedRoute';
+import AuthCallback from '../auth/AuthCallback';
+import RequireAuth from '../auth/RequireAuth';
+import ProfilePage from '../profile/ProfilePage';
 import {
   CardDeepLinkRoutePlaceholder,
   NotFoundRoutePlaceholder,
@@ -22,10 +25,31 @@ import {
 export function AppRoutes() {
   return (
     <Routes>
-      {/* `/` is now the endless swipe feed (#107) — the default surface, with the
-          one-time first-run data notice over it. The former `/feed` preview route
-          (#105) is retired: `/` is the single source of truth for the feed. */}
-      <Route path={ROUTES.session} element={<FeedRoute />} />
+      {/* `/` is the endless swipe feed (#107), now GATED behind auth (accounts
+          pivot): {@link RequireAuth} shows the login screen when signed out, the
+          profile-creation screen when signed in without a profile, and the feed
+          (with the one-time data notice) once a profile exists. The guard is a
+          clean wrapper — it never touches the feed/session controller. */}
+      <Route
+        path={ROUTES.session}
+        element={
+          <RequireAuth>
+            <FeedRoute />
+          </RequireAuth>
+        }
+      />
+      {/* OAuth / magic-link PKCE return target — completes the exchange then
+          redirects into the app (no auth gate; it IS the auth step). */}
+      <Route path={ROUTES.authCallback} element={<AuthCallback />} />
+      {/* The signed-in user's profile + game-activity stats (auth-gated). */}
+      <Route
+        path={ROUTES.profile}
+        element={
+          <RequireAuth>
+            <ProfilePage />
+          </RequireAuth>
+        }
+      />
       <Route
         path={ROUTES.cardDeepLink}
         element={<CardDeepLinkRoutePlaceholder />}
