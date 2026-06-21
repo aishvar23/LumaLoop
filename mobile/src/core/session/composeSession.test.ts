@@ -205,6 +205,21 @@ describe('composeSession — ordering constraints', () => {
     }
   });
 
+  it('stays non-decreasing in difficulty at every bias level', () => {
+    for (const mode of MODES) {
+      for (const seed of seeds) {
+        for (const difficultyBias of [0, 0.25, 0.5, 0.75, 1]) {
+          const ranks = cardsFor(
+            composeSession({ mode, ...seed, difficultyBias }),
+          ).map((c) => DIFFICULTY_RANK[c.difficulty]);
+          for (let i = 1; i < ranks.length; i++) {
+            expect(ranks[i] >= ranks[i - 1]).toBe(true);
+          }
+        }
+      }
+    }
+  });
+
   it('spreads across more than one category when the catalog allows', () => {
     for (const mode of MODES) {
       for (const seed of seeds) {
@@ -214,6 +229,75 @@ describe('composeSession — ordering constraints', () => {
         expect(categories.size).toBeGreaterThan(1);
       }
     }
+  });
+});
+
+describe('composeSession — progressive difficulty bias', () => {
+  const biasSeeds: Array<{ anonymousUserId: string; day: string }> = [];
+  for (const u of ['a', 'b', 'c', 'd', 'e', 'f']) {
+    for (const day of ['2026-06-16', '2026-06-17', '2026-09-01', '2027-01-01']) {
+      biasSeeds.push({ anonymousUserId: `user-${u}`, day });
+    }
+  }
+
+  const meanRank = (ids: readonly string[]): number => {
+    const ranks = cardsFor(ids).map((c) => DIFFICULTY_RANK[c.difficulty]);
+    return ranks.reduce((sum, r) => sum + r, 0) / ranks.length;
+  };
+
+  it('defaults to the original behaviour (omitted bias === bias 0)', () => {
+    for (const mode of MODES) {
+      const omitted = composeSession({ mode, anonymousUserId: 'u', day: '2026-06-16' });
+      const explicitZero = composeSession({
+        mode,
+        anonymousUserId: 'u',
+        day: '2026-06-16',
+        difficultyBias: 0,
+      });
+      expect(omitted).toEqual(explicitZero);
+    }
+  });
+
+  it('skews harder as the bias rises (mean difficulty non-decreasing across bias)', () => {
+    const biases = [0, 0.5, 1];
+    const means = biases.map((difficultyBias) => {
+      const perSeed = biasSeeds.map((seed) =>
+        meanRank(composeSession({ mode: 'three_minute_reset', ...seed, difficultyBias })),
+      );
+      return perSeed.reduce((s, m) => s + m, 0) / perSeed.length;
+    });
+    for (let i = 1; i < means.length; i++) {
+      expect(means[i] >= means[i - 1]).toBe(true);
+    }
+    expect(means[means.length - 1]).toBeGreaterThan(means[0]);
+  });
+
+  it('reaches hard cards only at a positive bias (bias 0 stays easy->medium)', () => {
+    const atZero = cardsFor(
+      composeSession({ mode: 'three_minute_reset', anonymousUserId: 'u', day: '2026-06-16', difficultyBias: 0 }),
+    ).map((c) => c.difficulty);
+    expect(atZero).not.toContain('hard');
+
+    const atOne = cardsFor(
+      composeSession({ mode: 'three_minute_reset', anonymousUserId: 'u', day: '2026-06-16', difficultyBias: 1 }),
+    ).map((c) => c.difficulty);
+    expect(atOne).toContain('hard');
+  });
+
+  it('is deterministic for a fixed (user, day, mode, bias)', () => {
+    const a = composeSession({ mode: 'three_minute_reset', anonymousUserId: 'u', day: '2026-06-16', difficultyBias: 0.7 });
+    const b = composeSession({ mode: 'three_minute_reset', anonymousUserId: 'u', day: '2026-06-16', difficultyBias: 0.7 });
+    expect(a).toEqual(b);
+  });
+
+  it('clamps out-of-range bias (negative === 0, >1 === 1)', () => {
+    const zero = composeSession({ mode: 'three_minute_reset', anonymousUserId: 'u', day: '2026-06-16', difficultyBias: 0 });
+    const negative = composeSession({ mode: 'three_minute_reset', anonymousUserId: 'u', day: '2026-06-16', difficultyBias: -2 });
+    expect(negative).toEqual(zero);
+
+    const one = composeSession({ mode: 'three_minute_reset', anonymousUserId: 'u', day: '2026-06-16', difficultyBias: 1 });
+    const tooBig = composeSession({ mode: 'three_minute_reset', anonymousUserId: 'u', day: '2026-06-16', difficultyBias: 99 });
+    expect(tooBig).toEqual(one);
   });
 });
 

@@ -26,8 +26,37 @@ export const FEED_PREFETCH_THRESHOLD = 2;
 /**
  * Produces the cardIds for one batch given a seed. Injected in tests; the
  * default is a mode-shaped seeded composition over the catalog.
+ *
+ * `batchIndex` is the zero-based position of this batch in the endless stream;
+ * the default source uses it to ramp difficulty (see {@link feedDifficultyBias}
+ * and {@link defaultFeedBatchSource}). A source may ignore it.
  */
-export type FeedBatchSource = (seedUserId: string) => readonly string[];
+export type FeedBatchSource = (
+  seedUserId: string,
+  batchIndex?: number,
+) => readonly string[];
+
+/**
+ * How many batches it takes the difficulty ramp to reach full strength (bias 1).
+ * Batch 0 starts easy (bias 0) and each later batch nudges harder, plateauing at
+ * `hard` once `batchIndex >= FEED_RAMP_BATCHES`. Tuned so a user eases in over
+ * the first several batches rather than jumping to hard immediately.
+ */
+export const FEED_RAMP_BATCHES = 5;
+
+/**
+ * The progressive difficulty bias for a given batch — a pure, monotonic ramp in
+ * `[0, 1]`: `0` at batch 0 (easiest first impression), climbing linearly to `1`
+ * by {@link FEED_RAMP_BATCHES} and staying there. Fed to `composeSession`'s
+ * `difficultyBias`, which is template-agnostic (reads only `card.difficulty`).
+ */
+export function feedDifficultyBias(batchIndex: number | undefined): number {
+  if (batchIndex == null || !Number.isFinite(batchIndex) || batchIndex <= 0) {
+    return 0;
+  }
+  if (batchIndex >= FEED_RAMP_BATCHES) return 1;
+  return batchIndex / FEED_RAMP_BATCHES;
+}
 
 /** The materialised endless stream so far, plus how many batches produced it. */
 export interface FeedDeckState {
@@ -48,9 +77,19 @@ export function feedBatchSeedUserId(anonymousUserId: string, batchIndex: number)
   return batchIndex === 0 ? anonymousUserId : `${anonymousUserId}#feed-${batchIndex}`;
 }
 
-/** Default batch source: a seeded, mode-shaped composition over the catalog. */
-export const defaultFeedBatchSource: FeedBatchSource = (seedUserId) =>
-  composeSession({ mode: FEED_BATCH_MODE, anonymousUserId: seedUserId });
+/**
+ * Default batch source: a seeded, mode-shaped composition over the catalog,
+ * ramped by `batchIndex` so the endless feed starts easy and gets harder as the
+ * user keeps playing (the progressive difficulty ramp). The bias is the only
+ * per-batch ramp input; ordering within a batch stays the composer's job, and
+ * the composer stays template-agnostic.
+ */
+export const defaultFeedBatchSource: FeedBatchSource = (seedUserId, batchIndex) =>
+  composeSession({
+    mode: FEED_BATCH_MODE,
+    anonymousUserId: seedUserId,
+    difficultyBias: feedDifficultyBias(batchIndex),
+  });
 
 /**
  * Append one more batch to the deck, avoiding an exact back-to-back repeat at
@@ -64,7 +103,7 @@ export function appendNextBatch(
   source: FeedBatchSource = defaultFeedBatchSource,
 ): FeedDeckState {
   const seed = feedBatchSeedUserId(anonymousUserId, state.batchesUsed);
-  const batch = source(seed);
+  const batch = source(seed, state.batchesUsed);
   if (batch.length === 0) return state;
 
   let next = [...batch];

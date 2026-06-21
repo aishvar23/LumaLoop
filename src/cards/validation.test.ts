@@ -1,5 +1,8 @@
 import {
   ALLOWED_EVIDENCE_TIERS,
+  MAX_CHAIN_STEPS,
+  MAX_SEQUENCE_LENGTH,
+  MAX_STEP_LOGIC_STEPS,
   MAX_TIME_LIMIT_MS,
   MIN_TIME_LIMIT_MS,
   ValidationRule,
@@ -477,7 +480,7 @@ describe('validateCatalog', () => {
     );
   });
 
-  it('rejects a memory_sequence whose length is outside [3, 6]', () => {
+  it('rejects a memory_sequence whose length is below [3, 8]', () => {
     const card = validMemorySequence();
     // Two in-grid coords — valid coordinates, but a length below the minimum.
     card.config = {
@@ -487,6 +490,51 @@ describe('validateCatalog', () => {
         { row: 1, column: 1 },
       ],
     };
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('accepts a memory_sequence at the raised max length (8)', () => {
+    const card = validMemorySequence();
+    // 8 in-grid coords on a 3x3 grid (reuse the diagonal; coordinates may repeat
+    // across the watch order — only the per-coord grid bounds are enforced).
+    card.config = {
+      ...card.config,
+      sequence: [
+        { row: 0, column: 0 },
+        { row: 1, column: 1 },
+        { row: 2, column: 2 },
+        { row: 0, column: 1 },
+        { row: 1, column: 2 },
+        { row: 2, column: 0 },
+        { row: 0, column: 2 },
+        { row: 1, column: 0 },
+      ],
+    };
+    expect(card.config.sequence).toHaveLength(MAX_SEQUENCE_LENGTH);
+    expect(validateCatalog([card]).valid).toBe(true);
+  });
+
+  it('rejects a memory_sequence above the raised max length (9)', () => {
+    const card = validMemorySequence();
+    card.config = {
+      ...card.config,
+      sequence: [
+        { row: 0, column: 0 },
+        { row: 1, column: 1 },
+        { row: 2, column: 2 },
+        { row: 0, column: 1 },
+        { row: 1, column: 2 },
+        { row: 2, column: 0 },
+        { row: 0, column: 2 },
+        { row: 1, column: 0 },
+        { row: 2, column: 1 },
+      ],
+    };
+    expect(card.config.sequence.length).toBeGreaterThan(MAX_SEQUENCE_LENGTH);
     const result = validateCatalog([card]);
     expect(result.valid).toBe(false);
     expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
@@ -510,6 +558,32 @@ describe('validateCatalog', () => {
       ...card.config,
       steps: [card.config.steps[0]],
     };
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('accepts a pattern_chain at the raised max step count (5)', () => {
+    const card = validPatternChain();
+    const step = card.config.steps[0];
+    card.config = {
+      ...card.config,
+      steps: [step, step, step, step, step],
+    };
+    expect(card.config.steps).toHaveLength(MAX_CHAIN_STEPS);
+    expect(validateCatalog([card]).valid).toBe(true);
+  });
+
+  it('rejects a pattern_chain above the raised max step count (6)', () => {
+    const card = validPatternChain();
+    const step = card.config.steps[0];
+    card.config = {
+      ...card.config,
+      steps: [step, step, step, step, step, step],
+    };
+    expect(card.config.steps.length).toBeGreaterThan(MAX_CHAIN_STEPS);
     const result = validateCatalog([card]);
     expect(result.valid).toBe(false);
     expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
@@ -571,6 +645,32 @@ describe('validateCatalog', () => {
       ...card.config,
       steps: [card.config.steps[0]],
     };
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('accepts a step_logic at the raised max step count (5)', () => {
+    const card = validStepLogic();
+    const step = card.config.steps[0];
+    card.config = {
+      ...card.config,
+      steps: [step, step, step, step, step],
+    };
+    expect(card.config.steps).toHaveLength(MAX_STEP_LOGIC_STEPS);
+    expect(validateCatalog([card]).valid).toBe(true);
+  });
+
+  it('rejects a step_logic above the raised max step count (6)', () => {
+    const card = validStepLogic();
+    const step = card.config.steps[0];
+    card.config = {
+      ...card.config,
+      steps: [step, step, step, step, step, step],
+    };
+    expect(card.config.steps.length).toBeGreaterThan(MAX_STEP_LOGIC_STEPS);
     const result = validateCatalog([card]);
     expect(result.valid).toBe(false);
     expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
