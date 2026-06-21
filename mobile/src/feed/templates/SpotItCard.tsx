@@ -31,7 +31,16 @@ import {
   evaluateSpotItTap,
   isAnomalyCell,
 } from '../../core/templates/spotIt/spotItEvaluator';
-import { colors, fontSize, radius, space, TAP_TARGET_MIN } from './tokens';
+import {
+  colors,
+  elevation,
+  fontSize,
+  fontWeight,
+  lineHeight,
+  radius,
+  space,
+  TAP_TARGET_MIN,
+} from './tokens';
 
 /**
  * The renderer accepts the shared {@link TemplateProps} plus an optional
@@ -155,7 +164,10 @@ export default function SpotItCard({
                   accessibilityRole="button"
                   accessibilityLabel={`Row ${row + 1}, column ${column + 1}: ${element}`}
                   onPress={() => handleCellTap(row, column)}
-                  style={styles.cell}
+                  style={({ pressed }) => [
+                    styles.cell,
+                    pressed && styles.cellPressed,
+                  ]}
                 >
                   <Text style={styles.cellText}>{element}</Text>
                 </Pressable>
@@ -180,16 +192,24 @@ SpotItCard.displayName = 'SpotItCard';
 
 const styles = StyleSheet.create({
   section: {
-    gap: space.md,
+    gap: space.lg,
   },
   prompt: {
     color: colors.text,
-    fontSize: fontSize.lg,
-    fontWeight: '700',
+    fontSize: fontSize.hero,
+    fontWeight: fontWeight.heavy,
+    lineHeight: fontSize.hero * lineHeight.tight,
   },
+  // The grid reads as a deliberate game board: a rounded, bordered panel that
+  // holds the tappable cells (MP3 #135).
   grid: {
     gap: space.sm,
     width: '100%',
+    padding: space.sm,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
   },
   row: {
     flexDirection: 'row',
@@ -205,11 +225,17 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceRaised,
+    ...elevation.tile,
+  },
+  cellPressed: {
+    backgroundColor: colors.surfacePressed,
+    borderColor: colors.borderStrong,
+    transform: [{ scale: 0.96 }],
   },
   cellText: {
     color: colors.text,
-    fontSize: fontSize.lg,
+    fontSize: fontSize.xl,
   },
   status: {
     minHeight: fontSize.md,

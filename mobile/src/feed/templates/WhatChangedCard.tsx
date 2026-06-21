@@ -45,7 +45,16 @@ import type {
 } from '../../core/templates/contract';
 import { useCardTimer } from '../../core/templates/useCardTimer';
 import { evaluateWhatChangedSelection } from '../../core/templates/whatChanged/whatChangedEvaluator';
-import { colors, fontSize, radius, space, TAP_TARGET_MIN } from './tokens';
+import {
+  colors,
+  elevation,
+  fontSize,
+  fontWeight,
+  lineHeight,
+  radius,
+  space,
+  TAP_TARGET_MIN,
+} from './tokens';
 
 /**
  * The renderer accepts the shared {@link TemplateProps} plus an optional
@@ -254,10 +263,16 @@ function WhatChangedAnswer({
               accessibilityState={{ selected: isSelected }}
               accessibilityLabel={option.label}
               onPress={() => handleSelect(option.id)}
-              style={[styles.option, isSelected && styles.optionSelected]}
+              style={({ pressed }) => [
+                styles.option,
+                pressed && styles.optionPressed,
+                isSelected && styles.optionSelected,
+              ]}
             >
               {/* Non-colour selected cue: an explicit ▸ marker, not hue alone. */}
-              <Text style={styles.optionText}>
+              <Text
+                style={[styles.optionText, isSelected && styles.optionTextSelected]}
+              >
                 {isSelected ? '▸ ' : ''}
                 {option.label}
               </Text>
@@ -304,12 +319,13 @@ function PatternStrip({
 
 const styles = StyleSheet.create({
   section: {
-    gap: space.md,
+    gap: space.lg,
   },
   prompt: {
     color: colors.text,
-    fontSize: fontSize.lg,
-    fontWeight: '700',
+    fontSize: fontSize.hero,
+    fontWeight: fontWeight.heavy,
+    lineHeight: fontSize.hero * lineHeight.tight,
   },
   pattern: {
     flexDirection: 'row',
@@ -326,25 +342,33 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceRaised,
+    ...elevation.tile,
   },
   tileText: {
     color: colors.text,
-    fontSize: fontSize.lg,
+    fontSize: fontSize.xl,
   },
   options: {
-    gap: space.sm,
+    gap: space.md,
     width: '100%',
   },
+  // Options read as tappable chips/cards: elevated, rounded, generous targets.
   option: {
-    minHeight: TAP_TARGET_MIN,
+    minHeight: TAP_TARGET_MIN + 4,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: space.md,
+    paddingVertical: space.md,
+    paddingHorizontal: space.lg,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceRaised,
+    ...elevation.tile,
+  },
+  optionPressed: {
+    backgroundColor: colors.surfacePressed,
+    transform: [{ scale: 0.98 }],
   },
   optionSelected: {
     borderColor: colors.borderStrong,
@@ -353,6 +377,10 @@ const styles = StyleSheet.create({
   optionText: {
     color: colors.text,
     fontSize: fontSize.md,
+    fontWeight: fontWeight.medium,
+  },
+  optionTextSelected: {
+    fontWeight: fontWeight.bold,
   },
   status: {
     minHeight: fontSize.md,

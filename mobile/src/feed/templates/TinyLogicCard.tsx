@@ -39,7 +39,16 @@ import type { TinyLogicCard as TinyLogicCardType } from '../../core/cards/types'
 import type { CardResolution, TemplateProps } from '../../core/templates/contract';
 import { useCardTimer } from '../../core/templates/useCardTimer';
 import { evaluateTinyLogicSelection } from '../../core/templates/tinyLogic/tinyLogicEvaluator';
-import { colors, fontSize, radius, space, TAP_TARGET_MIN } from './tokens';
+import {
+  colors,
+  elevation,
+  fontSize,
+  fontWeight,
+  lineHeight,
+  radius,
+  space,
+  TAP_TARGET_MIN,
+} from './tokens';
 
 /**
  * The renderer accepts the shared {@link TemplateProps} plus an optional injectable
@@ -180,10 +189,16 @@ export default function TinyLogicCard({
               accessibilityState={{ selected: isSelected }}
               accessibilityLabel={option.label}
               onPress={() => handleSelect(option.id)}
-              style={[styles.option, isSelected && styles.optionSelected]}
+              style={({ pressed }) => [
+                styles.option,
+                pressed && styles.optionPressed,
+                isSelected && styles.optionSelected,
+              ]}
             >
               {/* Non-colour selected cue: an explicit ▸ marker, not hue alone. */}
-              <Text style={styles.optionText}>
+              <Text
+                style={[styles.optionText, isSelected && styles.optionTextSelected]}
+              >
                 {isSelected ? '▸ ' : ''}
                 {option.label}
               </Text>
@@ -205,26 +220,34 @@ TinyLogicCard.displayName = 'TinyLogicCard';
 
 const styles = StyleSheet.create({
   section: {
-    gap: space.md,
+    gap: space.lg,
   },
   stem: {
     color: colors.text,
-    fontSize: fontSize.lg,
-    fontWeight: '700',
+    fontSize: fontSize.hero,
+    fontWeight: fontWeight.heavy,
+    lineHeight: fontSize.hero * lineHeight.tight,
   },
   options: {
-    gap: space.sm,
+    gap: space.md,
     width: '100%',
   },
+  // Options read as tappable cards: elevated, rounded, generous targets.
   option: {
-    minHeight: TAP_TARGET_MIN,
+    minHeight: TAP_TARGET_MIN + 4,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: space.md,
+    paddingVertical: space.md,
+    paddingHorizontal: space.lg,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceRaised,
+    ...elevation.tile,
+  },
+  optionPressed: {
+    backgroundColor: colors.surfacePressed,
+    transform: [{ scale: 0.98 }],
   },
   optionSelected: {
     borderColor: colors.borderStrong,
@@ -233,6 +256,10 @@ const styles = StyleSheet.create({
   optionText: {
     color: colors.text,
     fontSize: fontSize.md,
+    fontWeight: fontWeight.medium,
+  },
+  optionTextSelected: {
+    fontWeight: fontWeight.bold,
   },
   status: {
     minHeight: fontSize.md,

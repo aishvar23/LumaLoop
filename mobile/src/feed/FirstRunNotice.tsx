@@ -28,7 +28,16 @@
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { colors, fontSize, radius, space, TAP_TARGET_MIN } from './templates/tokens';
+import {
+  colors,
+  elevation,
+  fontSize,
+  fontWeight,
+  lineHeight,
+  radius,
+  space,
+  TAP_TARGET_MIN,
+} from './templates/tokens';
 import { createDataNoticeStore, type DataNoticeStore } from './dataNoticeStore';
 
 /**
@@ -169,37 +178,39 @@ const styles = StyleSheet.create({
   dialog: {
     width: '100%',
     maxWidth: 360,
-    gap: space.md,
-    padding: space.lg,
-    borderRadius: radius.md,
+    gap: space.lg,
+    padding: space.xl,
+    borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceRaised,
+    ...elevation.card,
   },
   heading: {
     color: colors.text,
     fontSize: fontSize.lg,
-    fontWeight: '600',
+    fontWeight: fontWeight.bold,
   },
   body: {
     color: colors.text,
     fontSize: fontSize.sm,
-    lineHeight: fontSize.sm * 1.5,
+    lineHeight: fontSize.sm * lineHeight.relaxed,
   },
   button: {
     minHeight: TAP_TARGET_MIN,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: space.lg,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     backgroundColor: colors.accent,
   },
   buttonPressed: {
     opacity: 0.85,
+    transform: [{ scale: 0.98 }],
   },
   buttonLabel: {
     color: colors.accentContrast,
     fontSize: fontSize.md,
-    fontWeight: '600',
+    fontWeight: fontWeight.bold,
   },
 });
