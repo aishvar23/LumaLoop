@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StyleSheet } from 'react-native';
 import { v4 as uuidV4 } from 'uuid';
 
@@ -32,6 +33,10 @@ import { useFeedTelemetry } from './src/telemetry/useFeedTelemetry';
  *
  * `GestureHandlerRootView` wraps the tree so native gesture handlers work app-wide
  * (gesture-handler docs); it must be the root view and fill the screen.
+ *
+ * MP2 (ADO #134): `SafeAreaProvider` wraps the tree so the full-screen feed can read
+ * the device safe-area insets and pad each immersive slide's CONTENT clear of the
+ * notch/home indicator while the dark background still extends edge-to-edge.
  */
 export default function App() {
   // Resolve the best-effort anonymous id once (AsyncStorage-backed, §10). The feed
@@ -49,12 +54,14 @@ export default function App() {
 
   return (
     <GestureHandlerRootView style={styles.root}>
-      <FirstRunNotice>
-        {anonymousUserId !== null ? (
-          <TelemetryFeed anonymousUserId={anonymousUserId} />
-        ) : null}
-      </FirstRunNotice>
-      <StatusBar style="light" />
+      <SafeAreaProvider>
+        <FirstRunNotice>
+          {anonymousUserId !== null ? (
+            <TelemetryFeed anonymousUserId={anonymousUserId} />
+          ) : null}
+        </FirstRunNotice>
+        <StatusBar style="light" />
+      </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }

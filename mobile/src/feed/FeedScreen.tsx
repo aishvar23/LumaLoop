@@ -3,8 +3,10 @@
  * docs/FEED_DIRECTION.md §3.1). The native counterpart of the web
  * `src/feed/FeedScreen.tsx`: one game fills the viewport, native vertical swipe is
  * the next/prev gesture, and a snapping `FlatList` (`pagingEnabled` + per-item
- * height) settles each game to the top. There is no progress bar and no "N of M"
- * — the feed is endless.
+ * height) settles each game to one full viewport. The game content is CENTERED in
+ * the middle of that immersive, full-bleed slide (MP2, #134) — TikTok/Reels-style,
+ * not pinned to the top. There is no progress bar and no "N of M" — the feed is
+ * endless.
  *
  * Separation of concerns (CLAUDE.md §4): this surface owns ONLY presentation,
  * paging, and which card is active. {@link useFeedController} owns the endless deck
@@ -45,6 +47,10 @@ import {
   type ListRenderItemInfo,
   type ViewToken,
 } from 'react-native';
+import {
+  useSafeAreaInsets,
+  type EdgeInsets,
+} from 'react-native-safe-area-context';
 
 import { getCardById as getCatalogCardById } from '../core/cards/catalog';
 import type { LiquidCard } from '../core/cards/types';
@@ -180,6 +186,12 @@ export default function FeedScreen({
   // Fallback keeps per-item layout non-zero in headless test envs where the
   // window dimensions can report 0 (real devices always report a real height).
   const slideHeight = windowHeight || 800;
+
+  // MP2 (#134): device safe-area insets. Each full-bleed slide spans the whole
+  // viewport over the feed's edge-to-edge dark background, but pads its CENTERED
+  // content clear of the notch/home indicator. The padding lives INSIDE the
+  // fixed-height slide, so paging geometry (`slideHeight`) is unaffected.
+  const insets = useSafeAreaInsets();
 
   const nowFn = now ?? Date.now;
   // A per-mount feed instance id + a single "active at" stamp: the `elapsedMs`
@@ -329,6 +341,7 @@ export default function FeedScreen({
         index={index}
         cardId={cardId}
         height={slideHeight}
+        insets={insets}
         windowed={Math.abs(index - activeIndex) <= WINDOW_RADIUS}
         active={index === activeIndex}
         registry={registry}
@@ -343,6 +356,7 @@ export default function FeedScreen({
     ),
     [
       slideHeight,
+      insets,
       activeIndex,
       registry,
       getCardById,
@@ -389,6 +403,13 @@ type FeedSlideProps = {
   index: number;
   cardId: string;
   height: number;
+  /**
+   * Device safe-area insets (MP2, #134). Padded INSIDE the fixed-height slide so
+   * the centered content clears the notch/home indicator while the dark slide
+   * background stays full-bleed. Same value on every slide (real game + windowed
+   * placeholder) so paging geometry is identical.
+   */
+  insets: EdgeInsets;
   /** Whether this slide is close enough to the active card to mount its game. */
   windowed: boolean;
   /**
@@ -426,6 +447,7 @@ const FeedSlide = memo(function FeedSlide({
   index,
   cardId,
   height,
+  insets,
   windowed,
   active,
   registry,
@@ -470,33 +492,45 @@ const FeedSlide = memo(function FeedSlide({
     };
     const Game = Renderer as TemplateRenderer<LiquidCard>;
     return (
-      <View style={[styles.slide, { height }]} testID={`feed-slide-${index}`}>
+      <View
+        style={[styles.slide, slideInsetStyle(insets), { height }]}
+        testID={`feed-slide-${index}`}
+      >
         {/* creatorHandle already includes the leading `@` (catalog convention). */}
         <Text style={styles.byline} testID={`feed-byline-${index}`}>
           {card.creatorHandle}
         </Text>
+        {/* MP2 (#134): center the game (and, via the gate, the feedback step)
+            vertically + horizontally in the slide. The full-width inner wrapper
+            keeps games spanning the padded content box rather than collapsing to
+            their intrinsic width under `alignItems: 'center'`. */}
         <View style={styles.game} testID={`feed-game-${index}`}>
-          <Game
-            // #106: until engaged, the renderer's timer stays disarmed.
-            key={`${feedId}:${index}`}
-            card={timerGatedCard(card, engaged)}
-            context={context}
-            // Activation signal (#128 review fix): only the focused slide is
-            // active. Renderers with a timed PRE-phase (what_changed's preview)
-            // hold until this is true, so a pre-mounted slide's preview cannot
-            // elapse off-screen. Template-agnostic; most renderers ignore it.
-            isActive={active}
-            onAttempt={handleAttempt}
-            onResolve={(resolution: CardResolution) => onResolve(index, resolution)}
-            onExplanationViewed={() => onExplanationViewed(index, cardId)}
-          />
+          <View style={styles.gameContent}>
+            <Game
+              // #106: until engaged, the renderer's timer stays disarmed.
+              key={`${feedId}:${index}`}
+              card={timerGatedCard(card, engaged)}
+              context={context}
+              // Activation signal (#128 review fix): only the focused slide is
+              // active. Renderers with a timed PRE-phase (what_changed's preview)
+              // hold until this is true, so a pre-mounted slide's preview cannot
+              // elapse off-screen. Template-agnostic; most renderers ignore it.
+              isActive={active}
+              onAttempt={handleAttempt}
+              onResolve={(resolution: CardResolution) => onResolve(index, resolution)}
+              onExplanationViewed={() => onExplanationViewed(index, cardId)}
+            />
+          </View>
         </View>
       </View>
     );
   }
 
   return (
-    <View style={[styles.slide, { height }]} testID={`feed-slide-${index}`}>
+    <View
+      style={[styles.slide, slideInsetStyle(insets), { height }]}
+      testID={`feed-slide-${index}`}
+    >
       <View style={styles.placeholder} testID={`feed-placeholder-${index}`}>
         {/* Decorative only — hidden from screen readers (off-screen filler). */}
         <Text
@@ -511,23 +545,57 @@ const FeedSlide = memo(function FeedSlide({
   );
 });
 
+/** App dark background — the full-bleed immersive slide surface (Design §7). */
+const PAGE_BACKGROUND = '#0b0b0f';
+/** Base horizontal slide padding so centered games aren't edge-to-edge cramped. */
+const SLIDE_PADDING_X = 20;
+/** Base vertical slide padding, stacked ON TOP of the device safe-area insets. */
+const SLIDE_PADDING_Y = 32;
+
+/**
+ * MP2 (#134): the inset-aware padding for a full-bleed slide. The device safe-area
+ * insets are added to the base padding so the slide's CONTENT clears the notch/home
+ * indicator, while the slide's dark background still fills edge-to-edge. Applied to
+ * BOTH the real game slide and the windowed placeholder so their inner geometry
+ * matches; padding lives inside the fixed-height slide, so paging is unaffected.
+ */
+function slideInsetStyle(insets: EdgeInsets) {
+  return {
+    paddingTop: SLIDE_PADDING_Y + insets.top,
+    paddingBottom: SLIDE_PADDING_Y + insets.bottom,
+    paddingLeft: SLIDE_PADDING_X + insets.left,
+    paddingRight: SLIDE_PADDING_X + insets.right,
+  };
+}
+
 const styles = StyleSheet.create({
   list: {
     flex: 1,
-    backgroundColor: '#0b0b0f',
+    backgroundColor: PAGE_BACKGROUND,
   },
   slide: {
     width: '100%',
-    paddingHorizontal: 20,
-    paddingVertical: 32,
+    // Each slide carries the dark background too, so the feed stays full-bleed
+    // immersive edge-to-edge even as windowed slides mount/unmount.
+    backgroundColor: PAGE_BACKGROUND,
   },
   byline: {
     color: '#9aa0aa',
     fontSize: 15,
     fontWeight: '600',
   },
+  // MP2 (#134): center the game content in the middle of the viewport, not pinned
+  // to the top — TikTok/Reels-style. Template-agnostic: centering happens here at
+  // the slide/feed level, never per game.
   game: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Full-width box inside the centered game container, so games (and the feedback
+  // step) span the padded content width instead of shrinking to intrinsic width.
+  gameContent: {
+    width: '100%',
   },
   placeholder: {
     flex: 1,
