@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { StyleSheet } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { v4 as uuidV4 } from 'uuid';
 
 import FeedScreen from './src/feed/FeedScreen';
@@ -10,35 +10,65 @@ import FirstRunNotice from './src/feed/FirstRunNotice';
 import { createTelemetryClient } from './src/telemetry/telemetryClient';
 import { ensureAnonymousUserId } from './src/telemetry/anonymousUser';
 import { useFeedTelemetry } from './src/telemetry/useFeedTelemetry';
+import { AuthProvider, useAuth, useOptionalAuth } from './src/auth/AuthProvider';
+import RequireAuth from './src/auth/RequireAuth';
+import ProfilePage from './src/profile/ProfilePage';
+import { useRecordGamePlay } from './src/feed/useRecordGamePlay';
+import { getCardById as getCatalogCardById } from './src/core/cards/catalog';
+import { colors, fontSize, fontWeight } from './src/feed/templates/tokens';
 
 /**
  * LumaLoop mobile (React Native + Expo).
  *
- * The app opens straight into the endless, full-screen vertical swipe feed of
- * mini-games (M3, docs/FEED_DIRECTION.md §3.1), driven by the pure logic ported
- * in M2 and the four real renderers from M4. M5 (ADO #129) wires the RN telemetry
- * client onto the feed's lifecycle seams so the native app emits the §6 feed
- * events to the SAME deployed ingestion as the web (`/api/event` → Supabase).
+ * ACCOUNTS PIVOT (mobile): the app is now gated behind a Supabase account + profile,
+ * mirroring the web app. {@link AuthProvider} owns the session/profile lifecycle and
+ * {@link RequireAuth} renders one of three surfaces BEFORE the feed: signed-out →
+ * LoginScreen; signed-in w/o profile → ProfileCreationScreen; else → the feed. The
+ * feed/session controller stays auth-decoupled (CLAUDE.md §4) — auth wraps it, the
+ * engine never depends on it.
+ *
+ * The app opens into the endless, full-screen vertical swipe feed of mini-games (M3,
+ * docs/FEED_DIRECTION.md §3.1), driven by the pure logic ported in M2 and the real
+ * renderers from M4. M5 wires the RN telemetry client onto the feed's lifecycle
+ * seams so the native app emits the §6 feed events to the SAME deployed ingestion as
+ * the web (`/api/event` → Supabase). The accounts pivot ADDS a best-effort
+ * `game_plays` write per resolution for the signed-in user, off the feed's
+ * `onCardScored` seam — anonymous telemetry is untouched.
  *
  * Anonymous identity (Technical Design §10) is AsyncStorage-persisted and resolves
  * asynchronously; the feed mounts only once it is resolved so the deck seed and the
- * telemetry `anonymousUserId` agree on one stable id per launch (a fast read — a
- * brief blank frame, no spinner ceremony for the prototype).
+ * telemetry `anonymousUserId` agree on one stable id per launch.
  *
- * M6 (ADO #130): the one-time first-run anonymous-data notice (FEED_DIRECTION.md
- * §3.6, Technical Design §21.8) now gates the feed. {@link FirstRunNotice} wraps
- * the feed, shows the REQUIRED non-assessment notice ONCE over the first view, and
- * persists the acknowledgement (best-effort AsyncStorage) so it never shows again.
- * It owns no feed progression — the feed renders unchanged behind it.
+ * {@link FirstRunNotice} shows the REQUIRED non-assessment notice ONCE over the
+ * first view of the feed (behind the auth gate) and persists the acknowledgement.
  *
- * `GestureHandlerRootView` wraps the tree so native gesture handlers work app-wide
- * (gesture-handler docs); it must be the root view and fill the screen.
- *
- * MP2 (ADO #134): `SafeAreaProvider` wraps the tree so the full-screen feed can read
- * the device safe-area insets and pad each immersive slide's CONTENT clear of the
- * notch/home indicator while the dark background still extends edge-to-edge.
+ * `GestureHandlerRootView` + `SafeAreaProvider` wrap the whole tree so native
+ * gesture handlers and safe-area insets work app-wide.
  */
 export default function App() {
+  return (
+    <GestureHandlerRootView style={styles.root}>
+      <SafeAreaProvider>
+        <AuthProvider>
+          <RequireAuth>
+            <FeedApp />
+          </RequireAuth>
+        </AuthProvider>
+        <StatusBar style="light" />
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
+  );
+}
+
+/**
+ * The signed-in app surface: the first-run notice + the feed, with a simple
+ * router-less toggle to the profile screen (native has no React Router). A small
+ * "You" button overlays the feed; tapping it shows {@link ProfilePage}, which has a
+ * Back affordance to return.
+ */
+function FeedApp() {
+  const [view, setView] = useState<'feed' | 'profile'>('feed');
+
   // Resolve the best-effort anonymous id once (AsyncStorage-backed, §10). The feed
   // waits for it so the deck seed and telemetry identity share one stable id.
   const [anonymousUserId, setAnonymousUserId] = useState<string | null>(null);
@@ -52,31 +82,50 @@ export default function App() {
     };
   }, []);
 
+  if (view === 'profile') {
+    return <ProfilePage onBack={() => setView('feed')} />;
+  }
+
   return (
-    <GestureHandlerRootView style={styles.root}>
-      <SafeAreaProvider>
-        <FirstRunNotice>
-          {anonymousUserId !== null ? (
-            <TelemetryFeed anonymousUserId={anonymousUserId} />
-          ) : null}
-        </FirstRunNotice>
-        <StatusBar style="light" />
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    <View style={styles.root}>
+      <FirstRunNotice>
+        {anonymousUserId !== null ? (
+          <TelemetryFeed anonymousUserId={anonymousUserId} />
+        ) : null}
+      </FirstRunNotice>
+      <YouButton onPress={() => setView('profile')} />
+    </View>
+  );
+}
+
+/** A small overlay entry to the profile screen (the native /you equivalent). */
+function YouButton({ onPress }: { onPress: () => void }) {
+  const { profile } = useAuth();
+  const monogram = (
+    profile?.display_name?.trim()?.[0] ??
+    profile?.handle?.trim()?.[0] ??
+    '?'
+  ).toUpperCase();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Your profile"
+      testID="open-profile"
+      onPress={onPress}
+      style={styles.youButton}
+    >
+      <Text style={styles.youButtonText}>{monogram}</Text>
+    </Pressable>
   );
 }
 
 /**
- * The feed with telemetry wired (M5). Owns the per-launch telemetry client and the
- * single feed instance id (`feedId`) shared by the feed's per-card start context
- * and the telemetry `sessionId` envelope, then forwards the M3 FeedScreen seam
- * callbacks to the instrumentation. Created with stable per-mount values so the
- * client and feedId never churn across renders.
+ * The feed with telemetry wired (M5) + the accounts-pivot `game_plays` recorder.
+ * Owns the per-launch telemetry client and the single feed instance id (`feedId`)
+ * shared by the feed's per-card start context and the telemetry `sessionId`
+ * envelope, then forwards the M3 FeedScreen seam callbacks to the instrumentation.
  */
 function TelemetryFeed({ anonymousUserId }: { anonymousUserId: string }) {
-  // One client + one feed id per launch. The client uses production defaults:
-  // AsyncStorage retry queue, `fetch` transport, and the absolute Vercel endpoint
-  // resolved from `EXPO_PUBLIC_API_BASE_URL`.
   const [client] = useState(() => createTelemetryClient());
   const [feedId] = useState(() => uuidV4());
 
@@ -94,6 +143,17 @@ function TelemetryFeed({ anonymousUserId }: { anonymousUserId: string }) {
   useEffect(() => {
     observeFeedOpened();
   }, [observeFeedOpened]);
+
+  // Accounts pivot: record each resolved card as a `game_plays` row for the
+  // signed-in user, best-effort, off the SAME resolution path Phase-4 scoring uses
+  // (FeedScreen's `onCardScored` seam). Anonymous telemetry is untouched. The feed
+  // is gated by RequireAuth, so in production there is always a user; the recorder
+  // no-ops when there isn't (defensive / tests).
+  const auth = useOptionalAuth();
+  const recordGamePlay = useRecordGamePlay({
+    userId: auth?.user?.id ?? null,
+    getCardById: getCatalogCardById,
+  });
 
   const handlers = useMemo(
     () => ({
@@ -117,6 +177,7 @@ function TelemetryFeed({ anonymousUserId }: { anonymousUserId: string }) {
       onCardSkipped={handlers.onCardSkipped}
       onCardAbandoned={handlers.onCardAbandoned}
       onCardExplanationViewed={handlers.onCardExplanationViewed}
+      onCardScored={recordGamePlay}
     />
   );
 }
@@ -125,5 +186,26 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: '#0b0b0f',
+  },
+  youButton: {
+    position: 'absolute',
+    top: 52,
+    right: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.avatar,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+  },
+  youButtonText: {
+    color: colors.accentContrast,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.bold,
   },
 });

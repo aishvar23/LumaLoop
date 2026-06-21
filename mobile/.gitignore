@@ -30,8 +30,12 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
-.env*.local
+# local env files — never commit real keys. `.env.example` is the only tracked
+# env file (placeholders only); everything else (incl. `.env`, `.env.development`,
+# `.env.production`, `.env.local`) is ignored.
+.env
+.env.*
+!.env.example
 
 # typescript
 *.tsbuildinfo

@@ -20,6 +20,7 @@ import { FlatList, StyleSheet, type ViewToken } from 'react-native';
 
 import type { LiquidCard, SpotItCard } from '../core/cards/types';
 import type { CardResolution, TemplateProps } from '../core/templates/contract';
+import type { CardScore } from '../core/feed/scoring';
 import { useCardTimer } from '../core/templates/useCardTimer';
 import type { FeedBatchSource } from '../core/feed/feedDeck';
 import FeedScreen from './FeedScreen';
@@ -135,6 +136,7 @@ type LifecycleHandlers = {
   onCardAbandoned?: (i: number, cardId: string) => void;
   onCardResolved?: (i: number, r: CardResolution) => void;
   onCardExplanationViewed?: (i: number, cardId: string) => void;
+  onCardScored?: (i: number, r: CardResolution, score: CardScore) => void;
 };
 
 function renderFeed(
@@ -153,6 +155,7 @@ function renderFeed(
       onCardAbandoned={extra?.onCardAbandoned}
       onCardResolved={extra?.onCardResolved}
       onCardExplanationViewed={extra?.onCardExplanationViewed}
+      onCardScored={extra?.onCardScored}
       // Phase 4: disable best-run persistence so tests don't race an async store
       // read/write (no AsyncStorage side effects across cases).
       scoreStore={null}
@@ -358,6 +361,30 @@ describe('FeedScreen (native)', () => {
     snapTo(1, 'b0-1');
     expect(onCardSkipped).not.toHaveBeenCalled();
     expect(onCardAbandoned).not.toHaveBeenCalled();
+  });
+
+  it('accounts pivot: onCardScored fires after a resolution with that card\'s score (#106)', () => {
+    const onCardResolved = jest.fn();
+    const onCardScored = jest.fn();
+    renderFeed({ onCardResolved, onCardScored });
+
+    fireEvent.press(screen.getByTestId('engage-b0-0'));
+    fireEvent.press(screen.getByTestId('resolve-b0-0'));
+
+    expect(onCardResolved).toHaveBeenCalledTimes(1);
+    expect(onCardScored).toHaveBeenCalledTimes(1);
+    const [index, resolution, score] = onCardScored.mock.calls[0] as [
+      number,
+      CardResolution,
+      CardScore,
+    ];
+    expect(index).toBe(0);
+    expect(resolution).toEqual(
+      expect.objectContaining({ cardId: 'b0-0', isCorrect: true }),
+    );
+    // A correct resolution earns points; the score object shape is forwarded.
+    expect(score.correct).toBe(true);
+    expect(typeof score.points).toBe('number');
   });
 
   it('single-tap engage+resolve fires onCardResolved EXACTLY once — no phantom timeout (#106)', () => {

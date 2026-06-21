@@ -76,6 +76,7 @@ import type { RendererRegistry, TemplateRenderer } from './rendererRegistry';
 import { feedRegistry } from './FeedbackGate';
 import type { FeedBatchSource } from '../core/feed/feedDeck';
 import { CardScoreProvider } from './cardScoreContext';
+import type { CardScore } from '../core/feed/scoring';
 import FeedScoreHud from './FeedScoreHud';
 import type { ScoreStore } from './scoreStore';
 import { useFeedController } from './useFeedController';
@@ -162,6 +163,19 @@ export type FeedScreenProps = {
    */
   onCardExplanationViewed?: (index: number, cardId: string) => void;
   /**
+   * Accounts pivot: notified once per resolution that ALSO produced a Phase-4
+   * score, AFTER {@link onCardResolved}, with that card's points (the SAME value
+   * the HUD/result card show — not a recomputation). The signed-in `game_plays`
+   * recorder rides this seam (see `useRecordGamePlay`); a resolution with no score
+   * (should not happen) is not forwarded. Template-agnostic: the feed never
+   * branches on `templateType`. Fires at most once per index.
+   */
+  onCardScored?: (
+    index: number,
+    resolution: CardResolution,
+    score: CardScore,
+  ) => void;
+  /**
    * Test seam: the Phase-4 best-run persistence store. Defaults to the real
    * best-effort AsyncStorage store; pass `null` to disable persistence (tests).
    */
@@ -206,6 +220,7 @@ export default function FeedScreen({
   onCardAbandoned,
   onCardResolved,
   onCardExplanationViewed,
+  onCardScored,
   scoreStore,
 }: FeedScreenProps) {
   const { height: windowHeight } = useWindowDimensions();
@@ -240,6 +255,12 @@ export default function FeedScreen({
   const score = useFeedScore({ getCardById, store: scoreStore });
   const scoreOnResolvedRef = useRef(score.onCardResolved);
   scoreOnResolvedRef.current = score.onCardResolved;
+  // Accounts pivot: stable handles to read this card's score + forward it to the
+  // `onCardScored` seam (the signed-in `game_plays` recorder), mirroring web.
+  const getCardScoreRef = useRef(score.getCardScore);
+  getCardScoreRef.current = score.getCardScore;
+  const onCardScoredRef = useRef(onCardScored);
+  onCardScoredRef.current = onCardScored;
 
   // Stable handle to `setActiveIndex` for the once-created viewability callback
   // (`VirtualizedList` does not support changing `onViewableItemsChanged` on the
@@ -337,6 +358,10 @@ export default function FeedScreen({
       // by the time the result card renders via the feedback gate.
       scoreOnResolvedRef.current(index, resolution);
       onCardResolved?.(index, resolution);
+      // Accounts pivot: forward this card's score (read AFTER folding it in) to the
+      // `onCardScored` seam so the signed-in `game_plays` recorder persists the row.
+      const cardScore = getCardScoreRef.current(index);
+      if (cardScore) onCardScoredRef.current?.(index, resolution, cardScore);
     },
     [onCardResolved],
   );

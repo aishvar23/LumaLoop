@@ -87,14 +87,35 @@ Apple requires an Apple Developer account.
 
 ---
 
-## 5. Mobile (Expo) — later follow-up
+## 5. Mobile (Expo) — implemented
 
-The Expo app will use a custom URL scheme deep link for the OAuth return:
+The Expo app (`mobile/`) now mirrors the web accounts pivot: it gates the feed
+behind a Supabase account + profile and records `game_plays` for the signed-in
+user. It uses the **same** Supabase project as the web app and a custom URL
+scheme deep link for the OAuth/magic-link return.
 
-- App scheme (set in `mobile/app.json`): `lumaloop` → redirect `lumaloop://auth/callback`.
-- Add `lumaloop://auth/callback` to the Supabase **Redirect URLs** allowlist (§0).
-- Native Google/Apple sign-in may also need platform client IDs (iOS) configured
-  in the respective consoles. Documented when the mobile auth PR lands.
+**Owner checklist for mobile sign-in to work end-to-end:**
+
+1. **Redirect URL allowlist (required).** App scheme (set in `mobile/app.json`):
+   `lumaloop` → redirect `lumaloop://auth/callback`. Add
+   `lumaloop://auth/callback` to Supabase → **Authentication → URL Configuration →
+   Redirect URLs** (§0). Without it, OAuth and magic-link sign-in are rejected.
+2. **Env.** Set `EXPO_PUBLIC_SUPABASE_URL` + `EXPO_PUBLIC_SUPABASE_ANON_KEY` in
+   `mobile/.env` / `.env.development` (see `mobile/.env.example`). These are the
+   same public values as web (anon key is not a secret; RLS is the boundary).
+3. **Providers.** The same provider config as §1–§4 applies (one Supabase
+   project). Email magic link works once §0 + the `lumaloop://` redirect are set.
+4. **Apple (iOS).** The app uses the **native** Sign in with Apple sheet
+   (`expo-apple-authentication`) → `signInWithIdToken`. Enabling it for a real
+   build needs the Apple **Services ID** configured in Supabase (§4) and the
+   `usesAppleSignIn`/entitlement in a dev/standalone build (Expo Go cannot run
+   native Apple sign-in; use a development build to test it). Google/Facebook use
+   the system auth browser (`expo-web-browser`) + PKCE exchange and need no extra
+   native client IDs for the browser flow.
+
+> Cannot be verified from CI here: real OAuth and the iOS Simulator deep-link
+> round-trip. The flow is covered by unit tests with the Supabase client + the
+> browser/Apple/deep-link seams mocked; the owner must verify on a device.
 
 ---
 
