@@ -19,9 +19,9 @@ describe('authored card catalog', () => {
     expect(result.valid).toBe(true);
   });
 
-  it('contains 20-30 cards total', () => {
+  it('contains 20-40 cards total', () => {
     expect(catalog.length).toBeGreaterThanOrEqual(20);
-    expect(catalog.length).toBeLessThanOrEqual(30);
+    expect(catalog.length).toBeLessThanOrEqual(40);
   });
 
   it('has at least 5 cards for every template', () => {
