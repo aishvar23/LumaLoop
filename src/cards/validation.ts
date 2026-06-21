@@ -212,9 +212,10 @@ function validateTinyLogicAnswer(card: TinyLogicCard): ValidationError[] {
   return [];
 }
 
-/** Inclusive bounds for a memory_sequence's reproduction length (Tech #137). */
+/** Inclusive bounds for a memory_sequence's reproduction length (Tech #137).
+ * Upper bound raised 6 -> 8 to allow genuinely hard cards (difficulty ramp). */
 export const MIN_SEQUENCE_LENGTH = 3;
-export const MAX_SEQUENCE_LENGTH = 6;
+export const MAX_SEQUENCE_LENGTH = 8;
 
 function validateMemorySequenceAnswer(
   card: MemorySequenceCard,
@@ -270,9 +271,10 @@ function validateMemorySequenceAnswer(
   return errors;
 }
 
-/** Inclusive bounds for a pattern_chain's number of steps (Tech #138). */
+/** Inclusive bounds for a pattern_chain's number of steps (Tech #138).
+ * Upper bound raised 3 -> 5 to allow genuinely hard cards (difficulty ramp). */
 export const MIN_CHAIN_STEPS = 2;
-export const MAX_CHAIN_STEPS = 3;
+export const MAX_CHAIN_STEPS = 5;
 
 function validatePatternChainAnswer(
   card: PatternChainCard,
@@ -326,9 +328,10 @@ function validatePatternChainAnswer(
   return errors;
 }
 
-/** Inclusive bounds for a step_logic's number of linked sub-questions (Tech #139). */
+/** Inclusive bounds for a step_logic's number of linked sub-questions (Tech #139).
+ * Upper bound raised 3 -> 5 to allow genuinely hard cards (difficulty ramp). */
 export const MIN_STEP_LOGIC_STEPS = 2;
-export const MAX_STEP_LOGIC_STEPS = 3;
+export const MAX_STEP_LOGIC_STEPS = 5;
 
 function validateStepLogicAnswer(card: StepLogicCard): ValidationError[] {
   const { premise, steps } = card.config;

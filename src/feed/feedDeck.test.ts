@@ -5,12 +5,16 @@
  */
 import { describe, expect, it } from 'vitest';
 
+import { catalog } from '../cards/catalog';
+import type { Difficulty } from '../cards/types';
 import {
   EMPTY_FEED_DECK,
+  FEED_RAMP_BATCHES,
   appendNextBatch,
   defaultFeedBatchSource,
   ensureDeckLength,
   feedBatchSeedUserId,
+  feedDifficultyBias,
   type FeedBatchSource,
 } from './feedDeck';
 
@@ -20,11 +24,53 @@ const fakeSource: FeedBatchSource = (seed) => {
   return [`b${n}-0`, `b${n}-1`, `b${n}-2`];
 };
 
+const DIFFICULTY_RANK: Record<Difficulty, number> = { easy: 0, medium: 1, hard: 2 };
+const cardById = new Map(catalog.map((c) => [c.cardId, c]));
+const meanRank = (ids: readonly string[]): number => {
+  const ranks = ids.map((id) => DIFFICULTY_RANK[cardById.get(id)!.difficulty]);
+  return ranks.reduce((s, r) => s + r, 0) / ranks.length;
+};
+
 describe('feedBatchSeedUserId', () => {
   it('keeps batch 0 plain and suffixes later batches', () => {
     expect(feedBatchSeedUserId('anon', 0)).toBe('anon');
     expect(feedBatchSeedUserId('anon', 1)).toBe('anon#feed-1');
     expect(feedBatchSeedUserId('anon', 5)).toBe('anon#feed-5');
+  });
+});
+
+describe('feedDifficultyBias (progressive ramp curve)', () => {
+  it('starts at 0 for batch 0 (easiest first impression)', () => {
+    expect(feedDifficultyBias(0)).toBe(0);
+    expect(feedDifficultyBias(-1)).toBe(0); // defensive clamp
+  });
+
+  it('plateaus at 1 once the ramp completes', () => {
+    expect(feedDifficultyBias(FEED_RAMP_BATCHES)).toBe(1);
+    expect(feedDifficultyBias(FEED_RAMP_BATCHES + 10)).toBe(1);
+  });
+
+  it('is monotonically non-decreasing across batches', () => {
+    let prev = -1;
+    for (let i = 0; i <= FEED_RAMP_BATCHES + 3; i++) {
+      const bias = feedDifficultyBias(i);
+      expect(bias).toBeGreaterThanOrEqual(prev);
+      expect(bias).toBeGreaterThanOrEqual(0);
+      expect(bias).toBeLessThanOrEqual(1);
+      prev = bias;
+    }
+  });
+
+  it('passes the per-batch index through to the source', () => {
+    const seen: number[] = [];
+    const recording: FeedBatchSource = (_seed, batchIndex = -1) => {
+      seen.push(batchIndex);
+      return [`b${batchIndex}`];
+    };
+    const s1 = appendNextBatch(EMPTY_FEED_DECK, 'anon', recording);
+    const s2 = appendNextBatch(s1, 'anon', recording);
+    appendNextBatch(s2, 'anon', recording);
+    expect(seen).toEqual([0, 1, 2]);
   });
 });
 
@@ -107,5 +153,23 @@ describe('defaultFeedBatchSource (real catalog composition)', () => {
     for (let i = 1; i < grown.cards.length; i += 1) {
       expect(grown.cards[i]).not.toBe(grown.cards[i - 1]);
     }
+  });
+
+  it('ramps difficulty across the endless stream: early skews easier than late', () => {
+    // Grow well past the ramp plateau so early and late windows differ, then
+    // compare the mean difficulty of the first window vs. the last window. The
+    // ramp lives in the composer (bias per batch), so this is the end-to-end
+    // check that the user starts easy and gets harder as they keep playing.
+    const grown = ensureDeckLength(EMPTY_FEED_DECK, 60, 'anon-ramp');
+    const window = 12;
+    const early = grown.cards.slice(0, window);
+    const late = grown.cards.slice(-window);
+    expect(meanRank(late)).toBeGreaterThan(meanRank(early));
+  });
+
+  it('is deterministic end-to-end (same anon id ⇒ same ramped stream)', () => {
+    const a = ensureDeckLength(EMPTY_FEED_DECK, 50, 'anon-det');
+    const b = ensureDeckLength(EMPTY_FEED_DECK, 50, 'anon-det');
+    expect(a.cards).toEqual(b.cards);
   });
 });

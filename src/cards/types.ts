@@ -174,7 +174,7 @@ export type MemorySequenceCard = LiquidCardBase & {
     columns: number;
     /**
      * The ordered tiles that flash during WATCH — also the correct reproduction
-     * order. Length 3–6; every coordinate must lie inside the `rows × columns`
+     * order. Length 3–8; every coordinate must lie inside the `rows × columns`
      * grid (enforced by catalog validation).
      */
     sequence: ReadonlyArray<GridCoordinate>;
@@ -222,7 +222,7 @@ export type PatternChainCard = LiquidCardBase & {
     sequence: ReadonlyArray<string>;
     /**
      * The ordered "pick the next item" steps. Each step offers `options` and
-     * names the `correctOptionId` that continues the pattern. Length 2–3
+     * names the `correctOptionId` that continues the pattern. Length 2–5
      * (enforced by catalog validation); `correctOptionId` must be one of that
      * step's `options`.
      */
@@ -249,7 +249,7 @@ export type StepLogicStep = {
 };
 
 /**
- * Answer a short chain of 2–3 LINKED multiple-choice sub-questions that build on
+ * Answer a short chain of 2–5 LINKED multiple-choice sub-questions that build on
  * a shared `premise` — a MULTI-STEP logical-reasoning mechanic (logical_reasoning).
  *
  * The renderer shows the `premise` throughout, then presents each step's `stem`
@@ -272,7 +272,7 @@ export type StepLogicCard = LiquidCardBase & {
     premise: string;
     /**
      * The ordered linked sub-questions. Each step offers `options` and names the
-     * `correctOptionId` that answers its `stem`. Length 2–3 (enforced by catalog
+     * `correctOptionId` that answers its `stem`. Length 2–5 (enforced by catalog
      * validation); `correctOptionId` must be one of that step's `options`.
      */
     steps: ReadonlyArray<StepLogicStep>;
