@@ -1,8 +1,12 @@
 /**
- * Tests for the native Tiny Logic renderer (ADO #128). Single-phase multiple
- * choice: a correct pick resolves CORRECT silently, a wrong pick resolves INCORRECT
- * and reveals the explanation, `onAttempt` fires once with TTI, and the time limit
+ * Tests for the native Tiny Logic renderer (ADO #128; #133). Single-phase multiple
+ * choice: a correct pick resolves CORRECT, a wrong pick resolves INCORRECT and
+ * records the distractor, `onAttempt` fires once with TTI, and the time limit
  * resolves TIMEOUT. Correctness + distractor come from the pure evaluator.
+ *
+ * #133: the renderer NO LONGER reveals the card's explanation itself (that is the
+ * feed-level FeedbackGate's uniform job now), so no `tl-explanation` and no
+ * `onExplanationViewed` from the renderer on any outcome.
  */
 import { fireEvent, render, screen, act } from '@testing-library/react-native';
 
@@ -47,7 +51,7 @@ function context(): CardStartContext {
   };
 }
 
-it('resolves CORRECT silently (no explanation) and fires onAttempt once with TTI', () => {
+it('resolves CORRECT (no in-renderer explanation) and fires onAttempt once with TTI', () => {
   const onAttempt = jest.fn();
   const onResolve = jest.fn<void, [CardResolution]>();
   const onExplanationViewed = jest.fn();
@@ -74,12 +78,13 @@ it('resolves CORRECT silently (no explanation) and fires onAttempt once with TTI
     isCorrect: true,
     signals: { selected_option_id: 'opt-b', distractor_option_id: '' },
   });
-  // No explanation on a correct answer — and so no explanation-viewed seam (#129).
+  // The renderer never reveals the explanation itself, nor fires the seam (#133) —
+  // the feed-level FeedbackGate owns the uniform explanation step.
   expect(screen.queryByTestId('tl-explanation')).toBeNull();
   expect(onExplanationViewed).not.toHaveBeenCalled();
 });
 
-it('resolves INCORRECT on a wrong pick, records the distractor, and reveals the explanation', () => {
+it('resolves INCORRECT on a wrong pick, records the distractor, and shows no in-renderer explanation', () => {
   const onResolve = jest.fn<void, [CardResolution]>();
   const onExplanationViewed = jest.fn();
   let t = ACTIVE_AT;
@@ -102,16 +107,16 @@ it('resolves INCORRECT on a wrong pick, records the distractor, and reveals the 
     isCorrect: false,
     signals: { selected_option_id: 'opt-c', distractor_option_id: 'opt-c' },
   });
-  // Explanation revealed after the error, with the card's own polite copy.
-  expect(screen.getByTestId('tl-explanation')).toBeOnTheScreen();
-  expect(screen.getByText('Here is why')).toBeOnTheScreen();
-  // Revealing the explanation fires the M5 telemetry seam exactly once (#129).
-  expect(onExplanationViewed).toHaveBeenCalledTimes(1);
+  // #133: the renderer no longer reveals the explanation or fires the seam — that
+  // is the uniform FeedbackGate's job now (covered in FeedbackGate.test.tsx).
+  expect(screen.queryByTestId('tl-explanation')).toBeNull();
+  expect(screen.queryByText('Here is why')).toBeNull();
+  expect(onExplanationViewed).not.toHaveBeenCalled();
 
   // A second tap on a finished card is inert.
   fireEvent.press(screen.getByTestId('tl-option-opt-b'));
   expect(onResolve).toHaveBeenCalledTimes(1);
-  expect(onExplanationViewed).toHaveBeenCalledTimes(1);
+  expect(onExplanationViewed).not.toHaveBeenCalled();
 });
 
 it('resolves TIMEOUT when the time limit elapses with no selection', () => {

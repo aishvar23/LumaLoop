@@ -11,8 +11,9 @@
  * + active index; the per-template renderers own card interaction. FeedScreen
  * resolves a renderer for each card via the injected {@link RendererRegistry} only
  * — there is NO switch on `templateType` anywhere, so adding a new game never
- * touches this file (CLAUDE.md §6). It defaults to the {@link defaultRendererRegistry}
- * of the four real native renderers (M4); tests inject a stub/fake registry.
+ * touches this file (CLAUDE.md §6). It defaults to the {@link feedRegistry} — the
+ * four real native renderers, each behind the uniform feedback/explanation
+ * {@link FeedbackGate} (#133); tests inject a stub/fake registry.
  *
  * Active-card detection: a game becomes ACTIVE when it snaps into view, detected
  * via `onViewableItemsChanged`; FeedScreen calls `setActiveIndex`, which
@@ -48,8 +49,9 @@ import {
 import { getCardById as getCatalogCardById } from '../core/cards/catalog';
 import type { LiquidCard } from '../core/cards/types';
 import type { CardResolution, CardStartContext } from '../core/templates/contract';
-import { defaultRendererRegistry, resolveRenderer } from './rendererRegistry';
+import { resolveRenderer } from './rendererRegistry';
 import type { RendererRegistry, TemplateRenderer } from './rendererRegistry';
+import { feedRegistry } from './FeedbackGate';
 import type { FeedBatchSource } from '../core/feed/feedDeck';
 import { useFeedController } from './useFeedController';
 
@@ -74,8 +76,9 @@ const DEFAULT_ANONYMOUS_USER_ID = 'anonymous';
 export type FeedScreenProps = {
   /**
    * Test/wiring seam: maps each `templateType` to its renderer (dependency
-   * inversion). Defaults to the {@link defaultRendererRegistry} of the four real
-   * native renderers (M4); tests inject a stub/fake. Must be referentially stable.
+   * inversion). Defaults to the {@link feedRegistry} — the four real native
+   * renderers, each behind the uniform feedback/explanation gate (#133); tests
+   * inject a stub/fake. Must be referentially stable.
    */
   registry?: RendererRegistry;
   /** Test seam: deterministic feed batch source. Defaults to seeded catalog. */
@@ -123,11 +126,13 @@ export type FeedScreenProps = {
    */
   onCardResolved?: (index: number, resolution: CardResolution) => void;
   /**
-   * Notified when a game first reveals its explanation as post-resolution feedback
-   * (Design §9.4) — e.g. `tiny_logic` on a wrong commit. Template-agnostic: the
-   * feed forwards the renderer's optional `onExplanationViewed` seam without
-   * branching on type, so renderers that never reveal an explanation never fire.
-   * Seam for M5 telemetry (`Card_Explanation_Viewed`).
+   * Notified when a game's explanation first becomes visible as post-resolution
+   * feedback (Design §8.2/§9.4). As of #133 this is the UNIFORM feedback step the
+   * feed-level {@link FeedbackGate} shows for EVERY resolution (correct/incorrect/
+   * timeout), not a per-renderer reveal — so it fires once per played card on the
+   * active slide. Template-agnostic: the feed forwards the gate's
+   * `onExplanationViewed` seam without branching on type. Seam for M5 telemetry
+   * (`Card_Explanation_Viewed`).
    */
   onCardExplanationViewed?: (index: number, cardId: string) => void;
 };
@@ -158,7 +163,7 @@ function makeFeedId(anonymousUserId: string, stamp: number): string {
 }
 
 export default function FeedScreen({
-  registry = defaultRendererRegistry,
+  registry = feedRegistry,
   source,
   anonymousUserId = DEFAULT_ANONYMOUS_USER_ID,
   getCardById = getCatalogCardById,
@@ -402,7 +407,11 @@ type FeedSlideProps = {
   /** Notify the feed that this game was engaged (first interaction). */
   onEngage: (index: number, cardId: string) => void;
   onResolve: (index: number, resolution: CardResolution) => void;
-  /** Notify the feed that this game revealed its explanation (#129, M5). */
+  /**
+   * Notify the feed that this game revealed its explanation (#129, M5). Now fired
+   * by the feed-level {@link FeedbackGate} when the uniform feedback/explanation
+   * step becomes visible (#133), not by the renderers themselves.
+   */
   onExplanationViewed: (index: number, cardId: string) => void;
 };
 
