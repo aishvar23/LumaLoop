@@ -52,6 +52,7 @@ export default function TinyLogicCard({
   context,
   onAttempt,
   onResolve,
+  onExplanationViewed,
   now = Date.now,
 }: TinyLogicCardProps) {
   const { config } = card;
@@ -117,7 +118,12 @@ export default function TinyLogicCard({
       );
 
       // Explanation-after-error: reveal the explanation only on a wrong commit.
-      if (!isCorrect) setShowExplanation(true);
+      // Revealing it is the `Card_Explanation_Viewed` moment (#129, M5); fire the
+      // optional telemetry seam once here (the wrong commit happens at most once).
+      if (!isCorrect) {
+        setShowExplanation(true);
+        onExplanationViewed?.();
+      }
 
       timer.resolve({
         cardId: card.cardId,
@@ -143,6 +149,7 @@ export default function TinyLogicCard({
       context.interactionEnabledAtMs,
       now,
       onAttempt,
+      onExplanationViewed,
       timer,
     ],
   );

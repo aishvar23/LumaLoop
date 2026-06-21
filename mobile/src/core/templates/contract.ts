@@ -63,6 +63,13 @@ export type CardResolution = {
  * until `isActive` is true, otherwise a pre-mounted slide's preview could elapse
  * before the user ever swipes to it. Omitted ≡ active, so a renderer rendered
  * standalone (tests, isolation) behaves exactly as before.
+ *
+ * `onExplanationViewed` is the telemetry seam (ADO #129, M5) a renderer fires when
+ * it first reveals the card's explanation as post-resolution feedback (Design
+ * §9.4) — e.g. `tiny_logic` on a wrong commit. It is OPTIONAL and template-AGNOSTIC:
+ * the feed passes the same callback to every renderer and most never reveal an
+ * explanation (so never call it); omitting it is a no-op. The feed maps it to the
+ * `Card_Explanation_Viewed` event. A renderer must call it at most once per card.
  */
 export type TemplateProps<TCard extends LiquidCard> = {
   card: TCard;
@@ -70,4 +77,5 @@ export type TemplateProps<TCard extends LiquidCard> = {
   isActive?: boolean;
   onAttempt: (signals?: Record<string, number | string | boolean>) => void;
   onResolve: (resolution: CardResolution) => void;
+  onExplanationViewed?: () => void;
 };

@@ -122,6 +122,14 @@ export type FeedScreenProps = {
    * itself never advances on resolve; seam for M5 telemetry (`Card_Resolved`).
    */
   onCardResolved?: (index: number, resolution: CardResolution) => void;
+  /**
+   * Notified when a game first reveals its explanation as post-resolution feedback
+   * (Design §9.4) — e.g. `tiny_logic` on a wrong commit. Template-agnostic: the
+   * feed forwards the renderer's optional `onExplanationViewed` seam without
+   * branching on type, so renderers that never reveal an explanation never fire.
+   * Seam for M5 telemetry (`Card_Explanation_Viewed`).
+   */
+  onCardExplanationViewed?: (index: number, cardId: string) => void;
 };
 
 /**
@@ -161,6 +169,7 @@ export default function FeedScreen({
   onCardSkipped,
   onCardAbandoned,
   onCardResolved,
+  onCardExplanationViewed,
 }: FeedScreenProps) {
   const { height: windowHeight } = useWindowDimensions();
   // Fallback keeps per-item layout non-zero in headless test envs where the
@@ -229,6 +238,8 @@ export default function FeedScreen({
   onCardAbandonedRef.current = onCardAbandoned;
   const onCardActiveRef = useRef(onCardActive);
   onCardActiveRef.current = onCardActive;
+  const onCardExplanationViewedRef = useRef(onCardExplanationViewed);
+  onCardExplanationViewedRef.current = onCardExplanationViewed;
 
   // A game becoming ACTIVE (snapping into view) is its `Card_Rendered` moment —
   // distinct from mounting. Fire the activation seam for the first card on mount
@@ -300,6 +311,13 @@ export default function FeedScreen({
     }
   }, [activeIndex]);
 
+  // Forward a renderer's explanation reveal (#129, M5) to the feed-level seam via
+  // a stable callback reading the live ref, so FeedSlide stays referentially
+  // stable and never re-renders just because the parent's handler identity moved.
+  const handleExplanationViewed = useCallback((index: number, cardId: string) => {
+    onCardExplanationViewedRef.current?.(index, cardId);
+  }, []);
+
   const renderItem = useCallback(
     ({ item: cardId, index }: ListRenderItemInfo<string>) => (
       <FeedSlide
@@ -315,6 +333,7 @@ export default function FeedScreen({
         now={nowFn}
         onEngage={handleEngage}
         onResolve={handleResolve}
+        onExplanationViewed={handleExplanationViewed}
       />
     ),
     [
@@ -327,6 +346,7 @@ export default function FeedScreen({
       nowFn,
       handleEngage,
       handleResolve,
+      handleExplanationViewed,
     ],
   );
 
@@ -382,6 +402,8 @@ type FeedSlideProps = {
   /** Notify the feed that this game was engaged (first interaction). */
   onEngage: (index: number, cardId: string) => void;
   onResolve: (index: number, resolution: CardResolution) => void;
+  /** Notify the feed that this game revealed its explanation (#129, M5). */
+  onExplanationViewed: (index: number, cardId: string) => void;
 };
 
 /**
@@ -404,6 +426,7 @@ const FeedSlide = memo(function FeedSlide({
   now,
   onEngage,
   onResolve,
+  onExplanationViewed,
 }: FeedSlideProps) {
   const card = windowed ? getCardById(cardId) : undefined;
   const Renderer = card ? resolveRenderer(registry, card) : undefined;
@@ -456,6 +479,7 @@ const FeedSlide = memo(function FeedSlide({
             isActive={active}
             onAttempt={handleAttempt}
             onResolve={(resolution: CardResolution) => onResolve(index, resolution)}
+            onExplanationViewed={() => onExplanationViewed(index, cardId)}
           />
         </View>
       </View>
