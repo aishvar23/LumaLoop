@@ -26,6 +26,7 @@ import MemorySequenceCard from '../templates/memorySequence/MemorySequenceCard';
 import PatternChainCard from '../templates/patternChain/PatternChainCard';
 import RuleFlipCard from '../templates/ruleFlip/RuleFlipCard';
 import SpotItCard from '../templates/spotIt/SpotItCard';
+import StepLogicCard from '../templates/stepLogic/StepLogicCard';
 import TinyLogicCard from '../templates/tinyLogic/TinyLogicCard';
 import WhatChangedCard from '../templates/whatChanged/WhatChangedCard';
 
@@ -95,4 +96,5 @@ export const defaultRendererRegistry: RendererRegistry = {
   tiny_logic: TinyLogicCard,
   memory_sequence: MemorySequenceCard,
   pattern_chain: PatternChainCard,
+  step_logic: StepLogicCard,
 };
