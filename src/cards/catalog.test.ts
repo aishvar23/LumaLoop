@@ -17,13 +17,13 @@ describe('authored card catalog', () => {
     expect(result.valid).toBe(true);
   });
 
-  it('contains 20-40 cards total', () => {
-    // The upper bound grows as new templates land (each adds a small card set);
-    // it stays a guardrail against an unbounded prototype catalog. Raised to 40
-    // as the three multi-step mechanics (memory_sequence, pattern_chain,
-    // step_logic) added their card sets.
+  it('contains 20-100 cards total', () => {
+    // The upper bound grows as the endless feed needs a deeper pool; it stays a
+    // guardrail against an unbounded prototype catalog. Raised to 100 in Phase 2
+    // (content blast) as every mechanic roughly doubled its card set to feed the
+    // progressive difficulty ramp.
     expect(catalog.length).toBeGreaterThanOrEqual(20);
-    expect(catalog.length).toBeLessThanOrEqual(40);
+    expect(catalog.length).toBeLessThanOrEqual(100);
   });
 
   it('has at least 5 cards for every template', () => {
@@ -32,6 +32,9 @@ describe('authored card catalog', () => {
       'what_changed',
       'rule_flip',
       'tiny_logic',
+      'memory_sequence',
+      'pattern_chain',
+      'step_logic',
     ];
     for (const template of templates) {
       const count = catalog.filter(
@@ -41,6 +44,35 @@ describe('authored card catalog', () => {
         count,
         `template "${template}" should have >= 5 cards, got ${count}`,
       ).toBeGreaterThanOrEqual(5);
+    }
+  });
+
+  it('has a strong hard-tier ceiling for the difficulty ramp', () => {
+    // The endless feed ramps easy -> hard; a healthy hard pool keeps the top of
+    // the ramp from repeating. Assert a meaningful share of hard cards overall
+    // and at least one hard card in every template.
+    const templates: TemplateType[] = [
+      'spot_it',
+      'what_changed',
+      'rule_flip',
+      'tiny_logic',
+      'memory_sequence',
+      'pattern_chain',
+      'step_logic',
+    ];
+    const hardCount = catalog.filter((card) => card.difficulty === 'hard').length;
+    expect(
+      hardCount,
+      `catalog should carry a strong hard ceiling, got ${hardCount}`,
+    ).toBeGreaterThanOrEqual(15);
+    for (const template of templates) {
+      const hardForTemplate = catalog.filter(
+        (card) => card.templateType === template && card.difficulty === 'hard',
+      ).length;
+      expect(
+        hardForTemplate,
+        `template "${template}" should have >= 1 hard card, got ${hardForTemplate}`,
+      ).toBeGreaterThanOrEqual(1);
     }
   });
 
@@ -60,6 +92,9 @@ describe('authored card catalog', () => {
       'what_changed',
       'rule_flip',
       'tiny_logic',
+      'memory_sequence',
+      'pattern_chain',
+      'step_logic',
     ];
     for (const template of templates) {
       const perTemplate = new Set(
