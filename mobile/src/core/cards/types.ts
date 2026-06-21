@@ -55,7 +55,8 @@ export type TemplateType =
   | 'spot_it'
   | 'what_changed'
   | 'rule_flip'
-  | 'tiny_logic';
+  | 'tiny_logic'
+  | 'memory_sequence';
 
 export type Difficulty = 'easy' | 'medium' | 'hard';
 
@@ -149,6 +150,44 @@ export type TinyLogicCard = LiquidCardBase & {
 };
 
 /**
+ * A single tile coordinate within a {@link MemorySequenceCard} grid. `row` and
+ * `column` are zero-based indices into the `rows × columns` grid.
+ */
+export type GridCoordinate = { row: number; column: number };
+
+/**
+ * Watch a sequence of tiles flash, then reproduce the order by tapping
+ * (working memory).
+ *
+ * The renderer runs two phases it owns itself: a non-interactive WATCH phase
+ * where the tiles in `sequence` flash one-by-one (`flashMs` lit, `gapMs`
+ * between), then a REPRODUCE phase where the player taps the tiles back in the
+ * same order. The shared `timeLimitMs` applies to the REPRODUCE phase only — the
+ * watch period must not penalize the player, mirroring `what_changed`'s preview.
+ */
+export type MemorySequenceCard = LiquidCardBase & {
+  templateType: 'memory_sequence';
+  config: {
+    /** Grid height (number of rows), positive. */
+    rows: number;
+    /** Grid width (number of columns), positive. */
+    columns: number;
+    /**
+     * The ordered tiles that flash during WATCH — also the correct reproduction
+     * order. Length 3–6; every coordinate must lie inside the `rows × columns`
+     * grid (enforced by catalog validation).
+     */
+    sequence: ReadonlyArray<GridCoordinate>;
+    /** How long each tile stays lit during the WATCH phase, in ms. */
+    flashMs: number;
+    /** Dark gap between consecutive flashes during the WATCH phase, in ms. */
+    gapMs: number;
+    /** Countdown for the REPRODUCE phase only (5–30s; see validation). */
+    timeLimitMs: number;
+  };
+};
+
+/**
  * The discriminated union of every card. Narrow on `templateType` to access a
  * card's typed `config`. Adding a template means adding a member here (step 2).
  */
@@ -156,7 +195,8 @@ export type LiquidCard =
   | SpotItCard
   | WhatChangedCard
   | RuleFlipCard
-  | TinyLogicCard;
+  | TinyLogicCard
+  | MemorySequenceCard;
 
 /**
  * The categories each template is allowed to map to (Technical Design §11).
@@ -177,4 +217,5 @@ export const templateCategoryMap: Readonly<
   what_changed: Object.freeze(['working_memory', 'visual_attention'] as const),
   rule_flip: Object.freeze(['cognitive_flexibility', 'processing_speed'] as const),
   tiny_logic: Object.freeze(['logical_reasoning', 'pattern_recognition'] as const),
+  memory_sequence: Object.freeze(['working_memory'] as const),
 }) satisfies Readonly<Record<TemplateType, readonly ChallengeCategory[]>>;
