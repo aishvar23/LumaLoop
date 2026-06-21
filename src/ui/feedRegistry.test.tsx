@@ -151,6 +151,43 @@ describe('FeedbackGate — while the card is in play', () => {
     expect(onAttempt).toHaveBeenCalledWith({ touched: true });
     expect(onResolve).not.toHaveBeenCalled();
   });
+
+  it('forwards the feed ACTIVATION signal (isActive) to the inner renderer (#137)', () => {
+    // The real renderers are wrapped by this gate, so a dropped `isActive` would
+    // leave their timed pre-phase ungated in production. Probe the value the gate
+    // hands the inner renderer.
+    function Probe({ isActive }: TemplateProps<LiquidCard>) {
+      return <span data-testid="probe">{isActive ? 'active' : 'inactive'}</span>;
+    }
+    const Gate = withFeedbackGate(Probe);
+    const ctx = {
+      sessionId: 's',
+      cardIndex: 0,
+      activeAtMs: 0,
+      interactionEnabledAtMs: 0,
+    };
+    const { rerender } = render(
+      <Gate
+        card={tinyLogicCard()}
+        context={ctx}
+        isActive={false}
+        onAttempt={vi.fn()}
+        onResolve={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId('probe')).toHaveTextContent('inactive');
+
+    rerender(
+      <Gate
+        card={tinyLogicCard()}
+        context={ctx}
+        isActive
+        onAttempt={vi.fn()}
+        onResolve={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId('probe')).toHaveTextContent('active');
+  });
 });
 
 // ---------------------------------------------------------------------------

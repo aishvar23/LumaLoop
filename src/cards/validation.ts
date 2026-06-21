@@ -21,6 +21,7 @@ import {
   templateCategoryMap,
   type EvidenceTier,
   type LiquidCard,
+  type MemorySequenceCard,
   type RuleFlipCard,
   type SpotItCard,
   type TemplateType,
@@ -95,6 +96,7 @@ const templateAnswerValidators: {
   what_changed: validateWhatChangedAnswer,
   rule_flip: validateRuleFlipAnswer,
   tiny_logic: validateTinyLogicAnswer,
+  memory_sequence: validateMemorySequenceAnswer,
 };
 
 /**
@@ -204,6 +206,64 @@ function validateTinyLogicAnswer(card: TinyLogicCard): ValidationError[] {
     ];
   }
   return [];
+}
+
+/** Inclusive bounds for a memory_sequence's reproduction length (Tech #137). */
+export const MIN_SEQUENCE_LENGTH = 3;
+export const MAX_SEQUENCE_LENGTH = 6;
+
+function validateMemorySequenceAnswer(
+  card: MemorySequenceCard,
+): ValidationError[] {
+  const { rows, columns, sequence } = card.config;
+  const errors: ValidationError[] = [];
+
+  if (rows <= 0 || columns <= 0) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `memory_sequence grid must have positive dimensions, got ${rows}x${columns}`,
+      ),
+    );
+  }
+
+  if (sequence.length === 0) {
+    errors.push(answerError(card.cardId, 'memory_sequence has an empty sequence'));
+    return errors;
+  }
+
+  if (
+    sequence.length < MIN_SEQUENCE_LENGTH ||
+    sequence.length > MAX_SEQUENCE_LENGTH
+  ) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `memory_sequence length ${sequence.length} is outside [${MIN_SEQUENCE_LENGTH}, ${MAX_SEQUENCE_LENGTH}]`,
+      ),
+    );
+  }
+
+  // Every flashed/reproduced coordinate must lie inside the grid.
+  sequence.forEach((coord, index) => {
+    if (
+      !Number.isInteger(coord.row) ||
+      coord.row < 0 ||
+      coord.row >= rows ||
+      !Number.isInteger(coord.column) ||
+      coord.column < 0 ||
+      coord.column >= columns
+    ) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `memory_sequence step ${index} (${coord.row}, ${coord.column}) is outside grid bounds [0, ${rows - 1}] x [0, ${columns - 1}]`,
+        ),
+      );
+    }
+  });
+
+  return errors;
 }
 
 /**

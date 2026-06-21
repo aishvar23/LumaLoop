@@ -11,11 +11,13 @@ import { describe, expect, it } from 'vitest';
 
 import type {
   LiquidCard,
+  MemorySequenceCard,
   RuleFlipCard,
   SpotItCard,
   TinyLogicCard,
   WhatChangedCard,
 } from '../cards/types';
+import MemorySequenceCardRenderer from '../templates/memorySequence/MemorySequenceCard';
 import RuleFlipCardRenderer from '../templates/ruleFlip/RuleFlipCard';
 import SpotItCardRenderer from '../templates/spotIt/SpotItCard';
 import TinyLogicCardRenderer from '../templates/tinyLogic/TinyLogicCard';
@@ -128,6 +130,34 @@ function tinyLogicCard(): TinyLogicCard {
   };
 }
 
+function memorySequenceCard(): MemorySequenceCard {
+  return {
+    cardId: 'ms-1',
+    creatorHandle: '@test',
+    templateType: 'memory_sequence',
+    category: 'working_memory',
+    difficulty: 'easy',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 12,
+    prompt: 'Reproduce the flashed order',
+    puzzleDna: { mechanic: 'm', inputMode: 'sequence', measuredSignals: ['recall'] },
+    explanation: { title: 't', body: 'b' },
+    config: {
+      rows: 3,
+      columns: 3,
+      sequence: [
+        { row: 0, column: 0 },
+        { row: 1, column: 1 },
+        { row: 2, column: 2 },
+      ],
+      flashMs: 500,
+      gapMs: 250,
+      timeLimitMs: 12_000,
+    },
+  };
+}
+
 describe('defaultRendererRegistry', () => {
   it('wires the spot_it renderer', () => {
     expect(defaultRendererRegistry.spot_it).toBe(SpotItCardRenderer);
@@ -143,6 +173,12 @@ describe('defaultRendererRegistry', () => {
 
   it('wires the tiny_logic renderer', () => {
     expect(defaultRendererRegistry.tiny_logic).toBe(TinyLogicCardRenderer);
+  });
+
+  it('wires the memory_sequence renderer', () => {
+    expect(defaultRendererRegistry.memory_sequence).toBe(
+      MemorySequenceCardRenderer,
+    );
   });
 
   it('resolves the spot_it card to its renderer', () => {
@@ -166,6 +202,12 @@ describe('defaultRendererRegistry', () => {
   it('resolves the tiny_logic card to its renderer', () => {
     expect(resolveRenderer(defaultRendererRegistry, tinyLogicCard())).toBe(
       TinyLogicCardRenderer,
+    );
+  });
+
+  it('resolves the memory_sequence card to its renderer', () => {
+    expect(resolveRenderer(defaultRendererRegistry, memorySequenceCard())).toBe(
+      MemorySequenceCardRenderer,
     );
   });
 

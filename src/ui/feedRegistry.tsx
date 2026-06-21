@@ -86,6 +86,7 @@ export function withFeedbackGate(
   function FeedbackGate({
     card,
     context,
+    isActive,
     onAttempt,
     onResolve,
   }: TemplateProps<LiquidCard>) {
@@ -129,6 +130,11 @@ export function withFeedbackGate(
       <Inner
         card={card}
         context={context}
+        // Forward the feed's ACTIVATION signal verbatim (#137): renderers with a
+        // timed PRE-phase (memory_sequence's watch, what_changed's preview) hold
+        // until they are the focused slide, so a pre-mounted off-screen card does
+        // not run its pre-phase early. Template-agnostic; most renderers ignore it.
+        isActive={isActive}
         onAttempt={onAttempt}
         // Capture only — do NOT advance. The card stays put until "Next".
         onResolve={setResolution}

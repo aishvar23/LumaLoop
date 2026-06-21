@@ -22,6 +22,7 @@ import type { ComponentType, ReactNode } from 'react';
 
 import type { LiquidCard, TemplateType } from '../cards/types';
 import type { TemplateProps } from '../templates/contract';
+import MemorySequenceCard from '../templates/memorySequence/MemorySequenceCard';
 import RuleFlipCard from '../templates/ruleFlip/RuleFlipCard';
 import SpotItCard from '../templates/spotIt/SpotItCard';
 import TinyLogicCard from '../templates/tinyLogic/TinyLogicCard';
@@ -91,4 +92,5 @@ export const defaultRendererRegistry: RendererRegistry = {
   what_changed: WhatChangedCard,
   rule_flip: RuleFlipCard,
   tiny_logic: TinyLogicCard,
+  memory_sequence: MemorySequenceCard,
 };

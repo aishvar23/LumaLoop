@@ -81,21 +81,37 @@ type RenderOpts = {
   card?: WhatChangedCardType;
   context?: CardStartContext;
   now?: () => number;
+  isActive?: boolean;
 };
 
 function renderCard(opts: RenderOpts = {}) {
   const onAttempt = vi.fn();
   const onResolve = vi.fn();
-  render(
+  const card = opts.card ?? whatChangedCard();
+  const context = opts.context ?? startContext();
+  const now = opts.now;
+  const { rerender } = render(
     <WhatChangedCard
-      card={opts.card ?? whatChangedCard()}
-      context={opts.context ?? startContext()}
+      card={card}
+      context={context}
       onAttempt={onAttempt}
       onResolve={onResolve}
-      now={opts.now}
+      now={now}
+      isActive={opts.isActive}
     />,
   );
-  return { onAttempt, onResolve };
+  const setActive = (isActive: boolean) =>
+    rerender(
+      <WhatChangedCard
+        card={card}
+        context={context}
+        onAttempt={onAttempt}
+        onResolve={onResolve}
+        now={now}
+        isActive={isActive}
+      />,
+    );
+  return { onAttempt, onResolve, setActive };
 }
 
 /** Drive the renderer-owned preview→answer transition by `previewMs`. */
@@ -160,6 +176,51 @@ describe('preview phase', () => {
 
     // The before-pattern strip is gone once the answer phase begins.
     expect(screen.queryByTestId('wc-before-0')).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isActive gates the preview — a pre-mounted (off-screen) slide must HOLD in the
+// preview and not advance until it becomes the focused slide (feed BLOCKER repro).
+// ---------------------------------------------------------------------------
+
+describe('isActive gating', () => {
+  it('does not advance the preview while inactive', () => {
+    renderCard({ now: () => 1_000, isActive: false });
+
+    // Even well past `previewMs`, a pre-mounted slide stays in the preview and
+    // never reveals the options — so the working-memory mechanic is preserved.
+    act(() => void vi.advanceTimersByTime(2_000 * 10));
+    expect(screen.getByTestId('wc-before-0')).toBeInTheDocument();
+    expect(screen.queryByTestId('wc-option-opt-2')).not.toBeInTheDocument();
+  });
+
+  it('runs the preview ONLY on activation, then TTI still excludes the preview', () => {
+    let clock = 1_000;
+    const { onAttempt, onResolve, setActive } = renderCard({
+      now: () => clock,
+      isActive: false,
+    });
+
+    // Pre-mounted off-screen: the preview countdown has not started.
+    act(() => void vi.advanceTimersByTime(2_000 * 5));
+    expect(screen.queryByTestId('wc-option-opt-2')).not.toBeInTheDocument();
+
+    // Becomes the active slide: the preview countdown now arms from this instant.
+    clock = 5_000; // activation instant — preview origin
+    setActive(true);
+    clock = 7_000; // answer phase begins 2_000ms (previewMs) after activation
+    advancePreview(2_000);
+    expect(screen.getByTestId('wc-option-opt-2')).toBeInTheDocument();
+
+    // Selecting after activation: TTI is measured from the answer-phase start, so
+    // it EXCLUDES the preview window even though the slide was mounted earlier.
+    clock = 8_000; // 1_000ms into the answer phase
+    selectOption('opt-2');
+    expect(onAttempt).toHaveBeenCalledWith({ time_to_interaction: 1_000 });
+    const resolution = lastResolution(onResolve);
+    expect(resolution.resolutionType).toBe('correct');
+    expect(resolution.interactionElapsedMs).toBe(1_000); // 8_000 - answerStart 7_000
   });
 });
 
