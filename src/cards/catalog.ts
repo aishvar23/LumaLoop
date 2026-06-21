@@ -28,6 +28,7 @@
 import type {
   LiquidCard,
   MemorySequenceCard,
+  PatternChainCard,
   RuleFlipCard,
   SpotItCard,
   TinyLogicCard,
@@ -1035,6 +1036,151 @@ const memorySequenceCards: MemorySequenceCard[] = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// pattern_chain — continue a visible sequence by picking the next item, then the
+// next (2-3 ordered steps; each pick reveals the next). Category allowed:
+// pattern_recognition. Each step names a correctOptionId among its options.
+// ---------------------------------------------------------------------------
+
+const patternChainCards: PatternChainCard[] = [
+  {
+    cardId: 'patternchain-001',
+    creatorHandle: '@sequencesmith',
+    templateType: 'pattern_chain',
+    category: 'pattern_recognition',
+    difficulty: 'easy',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 14,
+    prompt: 'Continue the count-by-twos: pick the next number, then the next.',
+    puzzleDna: {
+      mechanic: 'sequence-continuation',
+      inputMode: 'choice',
+      measuredSignals: ['accuracy', 'pattern_extension'],
+    },
+    explanation: {
+      title: 'Add two each time',
+      body: 'The sequence climbs by two: 2, 4, 6, 8 — so 10 comes next, then 12. Spotting the constant step lets you extend it as far as you like.',
+    },
+    shareText: 'Extended a count-by-twos chain without a slip.',
+    config: {
+      sequence: ['2', '4', '6', '8'],
+      steps: [
+        {
+          options: [
+            { id: 's1-9', label: '9' },
+            { id: 's1-10', label: '10' },
+            { id: 's1-12', label: '12' },
+          ],
+          correctOptionId: 's1-10',
+        },
+        {
+          options: [
+            { id: 's2-11', label: '11' },
+            { id: 's2-12', label: '12' },
+            { id: 's2-14', label: '14' },
+          ],
+          correctOptionId: 's2-12',
+        },
+      ],
+      timeLimitMs: 14000,
+    },
+  },
+  {
+    cardId: 'patternchain-002',
+    creatorHandle: '@glyphloop',
+    templateType: 'pattern_chain',
+    category: 'pattern_recognition',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 18,
+    prompt: 'The arrows rotate a quarter-turn clockwise. Pick the next two.',
+    puzzleDna: {
+      mechanic: 'sequence-continuation',
+      inputMode: 'choice',
+      measuredSignals: ['accuracy', 'pattern_extension'],
+    },
+    explanation: {
+      title: 'Quarter-turn clockwise',
+      body: 'Each arrow turns 90° clockwise: up → right → down, so the next is left (←), then back to up (↑). Tracking the rotation, not the shape, is the key.',
+    },
+    config: {
+      sequence: ['↑', '→', '↓'],
+      steps: [
+        {
+          options: [
+            { id: 's1-left', label: '←' },
+            { id: 's1-up', label: '↑' },
+            { id: 's1-down', label: '↓' },
+          ],
+          correctOptionId: 's1-left',
+        },
+        {
+          options: [
+            { id: 's2-right', label: '→' },
+            { id: 's2-up', label: '↑' },
+            { id: 's2-left', label: '←' },
+          ],
+          correctOptionId: 's2-up',
+        },
+      ],
+      timeLimitMs: 18000,
+    },
+  },
+  {
+    cardId: 'patternchain-003',
+    creatorHandle: '@sequencesmith',
+    templateType: 'pattern_chain',
+    category: 'pattern_recognition',
+    difficulty: 'hard',
+    evidenceTier: 'entertainment_only',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 26,
+    prompt: 'Fibonacci: each term is the sum of the two before it. Pick the next three.',
+    puzzleDna: {
+      mechanic: 'sequence-continuation',
+      inputMode: 'choice',
+      measuredSignals: ['accuracy', 'pattern_extension'],
+    },
+    explanation: {
+      title: 'Sum the previous two',
+      body: 'Every term adds the two before it: 3+5=8, 5+8=13, 8+13=21. Carrying the running pair forward is what makes the longer chain solvable.',
+    },
+    shareText: 'Carried a Fibonacci chain three terms forward.',
+    config: {
+      sequence: ['1', '1', '2', '3', '5'],
+      steps: [
+        {
+          options: [
+            { id: 's1-7', label: '7' },
+            { id: 's1-8', label: '8' },
+            { id: 's1-10', label: '10' },
+          ],
+          correctOptionId: 's1-8',
+        },
+        {
+          options: [
+            { id: 's2-11', label: '11' },
+            { id: 's2-13', label: '13' },
+            { id: 's2-15', label: '15' },
+          ],
+          correctOptionId: 's2-13',
+        },
+        {
+          options: [
+            { id: 's3-18', label: '18' },
+            { id: 's3-21', label: '21' },
+            { id: 's3-24', label: '24' },
+          ],
+          correctOptionId: 's3-21',
+        },
+      ],
+      timeLimitMs: 28000,
+    },
+  },
+];
+
 /**
  * The complete authored catalog. Order groups cards by template for
  * readability; session selection / shuffling is the engine's concern, not the
@@ -1047,6 +1193,7 @@ export const catalog: readonly LiquidCard[] = [
   ...ruleFlipCards,
   ...tinyLogicCards,
   ...memorySequenceCards,
+  ...patternChainCards,
 ];
 
 /**

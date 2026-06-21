@@ -22,6 +22,7 @@ import {
   type EvidenceTier,
   type LiquidCard,
   type MemorySequenceCard,
+  type PatternChainCard,
   type RuleFlipCard,
   type SpotItCard,
   type TemplateType,
@@ -97,6 +98,7 @@ const templateAnswerValidators: {
   rule_flip: validateRuleFlipAnswer,
   tiny_logic: validateTinyLogicAnswer,
   memory_sequence: validateMemorySequenceAnswer,
+  pattern_chain: validatePatternChainAnswer,
 };
 
 /**
@@ -258,6 +260,62 @@ function validateMemorySequenceAnswer(
         answerError(
           card.cardId,
           `memory_sequence step ${index} (${coord.row}, ${coord.column}) is outside grid bounds [0, ${rows - 1}] x [0, ${columns - 1}]`,
+        ),
+      );
+    }
+  });
+
+  return errors;
+}
+
+/** Inclusive bounds for a pattern_chain's number of steps (Tech #138). */
+export const MIN_CHAIN_STEPS = 2;
+export const MAX_CHAIN_STEPS = 3;
+
+function validatePatternChainAnswer(
+  card: PatternChainCard,
+): ValidationError[] {
+  const { sequence, steps } = card.config;
+  const errors: ValidationError[] = [];
+
+  if (sequence.length === 0) {
+    errors.push(
+      answerError(card.cardId, 'pattern_chain has an empty visible sequence'),
+    );
+  }
+
+  if (steps.length < MIN_CHAIN_STEPS || steps.length > MAX_CHAIN_STEPS) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `pattern_chain step count ${steps.length} is outside [${MIN_CHAIN_STEPS}, ${MAX_CHAIN_STEPS}]`,
+      ),
+    );
+  }
+
+  // Every step must offer options and name a correct option that is among them.
+  steps.forEach((step, index) => {
+    if (step.options.length === 0) {
+      errors.push(
+        answerError(card.cardId, `pattern_chain step ${index} has no options`),
+      );
+      return;
+    }
+    if (!step.options.some((option) => option.id === step.correctOptionId)) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `pattern_chain step ${index} correctOptionId "${step.correctOptionId}" is not among its options`,
+        ),
+      );
+    }
+    // Option ids must be unique within a step so a pick maps to one option.
+    const ids = step.options.map((option) => option.id);
+    if (new Set(ids).size !== ids.length) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `pattern_chain step ${index} has duplicate option ids`,
         ),
       );
     }

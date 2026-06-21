@@ -12,12 +12,14 @@ import { describe, expect, it } from 'vitest';
 import type {
   LiquidCard,
   MemorySequenceCard,
+  PatternChainCard,
   RuleFlipCard,
   SpotItCard,
   TinyLogicCard,
   WhatChangedCard,
 } from '../cards/types';
 import MemorySequenceCardRenderer from '../templates/memorySequence/MemorySequenceCard';
+import PatternChainCardRenderer from '../templates/patternChain/PatternChainCard';
 import RuleFlipCardRenderer from '../templates/ruleFlip/RuleFlipCard';
 import SpotItCardRenderer from '../templates/spotIt/SpotItCard';
 import TinyLogicCardRenderer from '../templates/tinyLogic/TinyLogicCard';
@@ -158,6 +160,42 @@ function memorySequenceCard(): MemorySequenceCard {
   };
 }
 
+function patternChainCard(): PatternChainCard {
+  return {
+    cardId: 'pc-1',
+    creatorHandle: '@test',
+    templateType: 'pattern_chain',
+    category: 'pattern_recognition',
+    difficulty: 'easy',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 14,
+    prompt: 'Continue the sequence',
+    puzzleDna: { mechanic: 'm', inputMode: 'choice', measuredSignals: ['correct'] },
+    explanation: { title: 't', body: 'b' },
+    config: {
+      sequence: ['2', '4', '6'],
+      steps: [
+        {
+          options: [
+            { id: 'a', label: '7' },
+            { id: 'b', label: '8' },
+          ],
+          correctOptionId: 'b',
+        },
+        {
+          options: [
+            { id: 'a', label: '9' },
+            { id: 'b', label: '10' },
+          ],
+          correctOptionId: 'b',
+        },
+      ],
+      timeLimitMs: 14_000,
+    },
+  };
+}
+
 describe('defaultRendererRegistry', () => {
   it('wires the spot_it renderer', () => {
     expect(defaultRendererRegistry.spot_it).toBe(SpotItCardRenderer);
@@ -178,6 +216,12 @@ describe('defaultRendererRegistry', () => {
   it('wires the memory_sequence renderer', () => {
     expect(defaultRendererRegistry.memory_sequence).toBe(
       MemorySequenceCardRenderer,
+    );
+  });
+
+  it('wires the pattern_chain renderer', () => {
+    expect(defaultRendererRegistry.pattern_chain).toBe(
+      PatternChainCardRenderer,
     );
   });
 
@@ -208,6 +252,12 @@ describe('defaultRendererRegistry', () => {
   it('resolves the memory_sequence card to its renderer', () => {
     expect(resolveRenderer(defaultRendererRegistry, memorySequenceCard())).toBe(
       MemorySequenceCardRenderer,
+    );
+  });
+
+  it('resolves the pattern_chain card to its renderer', () => {
+    expect(resolveRenderer(defaultRendererRegistry, patternChainCard())).toBe(
+      PatternChainCardRenderer,
     );
   });
 
