@@ -17,11 +17,13 @@ describe('authored card catalog', () => {
     expect(result.valid).toBe(true);
   });
 
-  it('contains 20-35 cards total', () => {
+  it('contains 20-40 cards total', () => {
     // The upper bound grows as new templates land (each adds a small card set);
-    // it stays a guardrail against an unbounded prototype catalog.
+    // it stays a guardrail against an unbounded prototype catalog. Raised to 40
+    // as the three multi-step mechanics (memory_sequence, pattern_chain,
+    // step_logic) added their card sets.
     expect(catalog.length).toBeGreaterThanOrEqual(20);
-    expect(catalog.length).toBeLessThanOrEqual(35);
+    expect(catalog.length).toBeLessThanOrEqual(40);
   });
 
   it('has at least 5 cards for every template', () => {

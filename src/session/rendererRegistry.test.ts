@@ -15,6 +15,7 @@ import type {
   PatternChainCard,
   RuleFlipCard,
   SpotItCard,
+  StepLogicCard,
   TinyLogicCard,
   WhatChangedCard,
 } from '../cards/types';
@@ -22,6 +23,7 @@ import MemorySequenceCardRenderer from '../templates/memorySequence/MemorySequen
 import PatternChainCardRenderer from '../templates/patternChain/PatternChainCard';
 import RuleFlipCardRenderer from '../templates/ruleFlip/RuleFlipCard';
 import SpotItCardRenderer from '../templates/spotIt/SpotItCard';
+import StepLogicCardRenderer from '../templates/stepLogic/StepLogicCard';
 import TinyLogicCardRenderer from '../templates/tinyLogic/TinyLogicCard';
 import WhatChangedCardRenderer from '../templates/whatChanged/WhatChangedCard';
 import { defaultRendererRegistry, resolveRenderer } from './rendererRegistry';
@@ -196,6 +198,44 @@ function patternChainCard(): PatternChainCard {
   };
 }
 
+function stepLogicCard(): StepLogicCard {
+  return {
+    cardId: 'sl-1',
+    creatorHandle: '@test',
+    templateType: 'step_logic',
+    category: 'logical_reasoning',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 18,
+    prompt: 'Work through the linked clues',
+    puzzleDna: { mechanic: 'm', inputMode: 'choice', measuredSignals: ['correct'] },
+    explanation: { title: 't', body: 'b' },
+    config: {
+      premise: 'Mia is taller than Jo. Jo is taller than Sam.',
+      steps: [
+        {
+          stem: 'Who is the tallest?',
+          options: [
+            { id: 'a', label: 'Mia' },
+            { id: 'b', label: 'Jo' },
+          ],
+          correctOptionId: 'a',
+        },
+        {
+          stem: 'Who is the shortest?',
+          options: [
+            { id: 'a', label: 'Mia' },
+            { id: 'b', label: 'Sam' },
+          ],
+          correctOptionId: 'b',
+        },
+      ],
+      timeLimitMs: 18_000,
+    },
+  };
+}
+
 describe('defaultRendererRegistry', () => {
   it('wires the spot_it renderer', () => {
     expect(defaultRendererRegistry.spot_it).toBe(SpotItCardRenderer);
@@ -223,6 +263,10 @@ describe('defaultRendererRegistry', () => {
     expect(defaultRendererRegistry.pattern_chain).toBe(
       PatternChainCardRenderer,
     );
+  });
+
+  it('wires the step_logic renderer', () => {
+    expect(defaultRendererRegistry.step_logic).toBe(StepLogicCardRenderer);
   });
 
   it('resolves the spot_it card to its renderer', () => {
@@ -258,6 +302,12 @@ describe('defaultRendererRegistry', () => {
   it('resolves the pattern_chain card to its renderer', () => {
     expect(resolveRenderer(defaultRendererRegistry, patternChainCard())).toBe(
       PatternChainCardRenderer,
+    );
+  });
+
+  it('resolves the step_logic card to its renderer', () => {
+    expect(resolveRenderer(defaultRendererRegistry, stepLogicCard())).toBe(
+      StepLogicCardRenderer,
     );
   });
 
