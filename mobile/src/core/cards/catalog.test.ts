@@ -19,9 +19,9 @@ describe('authored card catalog', () => {
     expect(result.valid).toBe(true);
   });
 
-  it('contains 20-40 cards total', () => {
+  it('contains 20-100 cards total', () => {
     expect(catalog.length).toBeGreaterThanOrEqual(20);
-    expect(catalog.length).toBeLessThanOrEqual(40);
+    expect(catalog.length).toBeLessThanOrEqual(100);
   });
 
   it('has at least 5 cards for every template', () => {
@@ -30,12 +30,35 @@ describe('authored card catalog', () => {
       'what_changed',
       'rule_flip',
       'tiny_logic',
+      'memory_sequence',
+      'pattern_chain',
+      'step_logic',
     ];
     for (const template of templates) {
       const count = catalog.filter(
         (card) => card.templateType === template,
       ).length;
       expect(count).toBeGreaterThanOrEqual(5);
+    }
+  });
+
+  it('has a strong hard-tier ceiling for the difficulty ramp', () => {
+    const templates: TemplateType[] = [
+      'spot_it',
+      'what_changed',
+      'rule_flip',
+      'tiny_logic',
+      'memory_sequence',
+      'pattern_chain',
+      'step_logic',
+    ];
+    const hardCount = catalog.filter((card) => card.difficulty === 'hard').length;
+    expect(hardCount).toBeGreaterThanOrEqual(15);
+    for (const template of templates) {
+      const hardForTemplate = catalog.filter(
+        (card) => card.templateType === template && card.difficulty === 'hard',
+      ).length;
+      expect(hardForTemplate).toBeGreaterThanOrEqual(1);
     }
   });
 
@@ -55,6 +78,9 @@ describe('authored card catalog', () => {
       'what_changed',
       'rule_flip',
       'tiny_logic',
+      'memory_sequence',
+      'pattern_chain',
+      'step_logic',
     ];
     for (const template of templates) {
       const perTemplate = new Set(
