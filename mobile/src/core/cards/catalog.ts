@@ -2566,7 +2566,7 @@ const patternChainCards: PatternChainCard[] = [
     },
     explanation: {
       title: 'Split the two threads',
-      body: 'Odd slots count up by ten (10, 20, 30) and even slots count up by five (5, 10, 15). After 30 the next slot is even: 15+5 = 20, then the odd slot 30+10 = 40.',
+      body: 'The odd slots count up by ten (10, 20, 30) and the even slots count up by five (5, 10). After 30 the next slot is even: 10+5 = 15, then the odd slot 30+10 = 40.',
     },
     config: {
       sequence: ['10', '5', '20', '10', '30'],
@@ -2577,7 +2577,7 @@ const patternChainCards: PatternChainCard[] = [
             { id: 's1-20', label: '20' },
             { id: 's1-40', label: '40' },
           ],
-          correctOptionId: 's1-20',
+          correctOptionId: 's1-15',
         },
         {
           options: [
