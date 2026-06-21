@@ -10,6 +10,7 @@ import {
   templateCategoryMap,
   type ChallengeCategory,
   type LiquidCard,
+  type MemorySequenceCard,
   type PuzzleDna,
   type RuleFlipCard,
   type SpotItCard,
@@ -150,8 +151,45 @@ function validTinyLogic(): TinyLogicCard {
   };
 }
 
+function validMemorySequence(): MemorySequenceCard {
+  return {
+    cardId: 'memseq-1',
+    creatorHandle: 'lumaloop',
+    templateType: 'memory_sequence',
+    category: 'working_memory',
+    difficulty: 'easy',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 15,
+    prompt: 'Watch the tiles flash, then tap them in order.',
+    puzzleDna: dna('sequence-recall'),
+    explanation: {
+      title: 'Working memory',
+      body: 'Reproduce the flashed order of tiles.',
+    },
+    config: {
+      rows: 3,
+      columns: 3,
+      sequence: [
+        { row: 0, column: 0 },
+        { row: 1, column: 1 },
+        { row: 2, column: 2 },
+      ],
+      flashMs: 500,
+      gapMs: 250,
+      timeLimitMs: 12000,
+    },
+  };
+}
+
 function validCatalog(): LiquidCard[] {
-  return [validSpotIt(), validWhatChanged(), validRuleFlip(), validTinyLogic()];
+  return [
+    validSpotIt(),
+    validWhatChanged(),
+    validRuleFlip(),
+    validTinyLogic(),
+    validMemorySequence(),
+  ];
 }
 
 /** Was a given rule reported for any card in the result? */
@@ -328,6 +366,56 @@ describe('validateCatalog', () => {
     );
   });
 
+  it('accepts a valid memory_sequence card', () => {
+    const result = validateCatalog([validMemorySequence()]);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
+  it('rejects a memory_sequence with an empty sequence', () => {
+    const card = validMemorySequence();
+    card.config = { ...card.config, sequence: [] };
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('rejects a memory_sequence coordinate outside the grid bounds', () => {
+    const card = validMemorySequence();
+    card.config = {
+      ...card.config,
+      sequence: [
+        { row: 0, column: 0 },
+        { row: 1, column: 1 },
+        { row: 2, column: 9 }, // column 9 is outside a 3-column grid
+      ],
+    };
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('rejects a memory_sequence whose length is outside [3, 6]', () => {
+    const card = validMemorySequence();
+    // Two tiles is below the minimum span of three.
+    card.config = {
+      ...card.config,
+      sequence: [
+        { row: 0, column: 0 },
+        { row: 1, column: 1 },
+      ],
+    };
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
   it('rejects a missing explanation', () => {
     const card = validSpotIt();
     card.explanation = { title: '', body: '' };
@@ -416,6 +504,7 @@ const ALL_TEMPLATE_TYPES: TemplateType[] = [
   'what_changed',
   'rule_flip',
   'tiny_logic',
+  'memory_sequence',
 ];
 
 const ALL_CATEGORIES: ChallengeCategory[] = [
@@ -433,6 +522,7 @@ const validCardFor: Record<TemplateType, () => LiquidCard> = {
   what_changed: validWhatChanged,
   rule_flip: validRuleFlip,
   tiny_logic: validTinyLogic,
+  memory_sequence: validMemorySequence,
 };
 
 describe('templateCategoryMap <-> validation consistency', () => {

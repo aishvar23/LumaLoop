@@ -29,6 +29,7 @@
 
 import type {
   LiquidCard,
+  MemorySequenceCard,
   RuleFlipCard,
   SpotItCard,
   TinyLogicCard,
@@ -926,6 +927,116 @@ const tinyLogicCards: TinyLogicCard[] = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// memory_sequence — watch tiles flash in order, then reproduce that order by
+// tapping. Category allowed: working_memory. Sequence length 3-6, every
+// coordinate inside the rows × columns grid.
+// ---------------------------------------------------------------------------
+
+const memorySequenceCards: MemorySequenceCard[] = [
+  {
+    cardId: 'memseq-001',
+    creatorHandle: '@lumalabs',
+    templateType: 'memory_sequence',
+    category: 'working_memory',
+    difficulty: 'easy',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 14,
+    prompt: 'Watch the three tiles light up, then tap them in the same order.',
+    puzzleDna: {
+      mechanic: 'sequence-recall',
+      inputMode: 'sequence',
+      measuredSignals: ['accuracy', 'recall'],
+    },
+    explanation: {
+      title: 'Hold the order',
+      body: 'The tiles flashed top-left, then center, then bottom-right. Re-tracing that path in order is the whole task — three steps is an easy span to hold.',
+    },
+    shareText: 'Played back a three-tile sequence without a slip.',
+    config: {
+      rows: 3,
+      columns: 3,
+      sequence: [
+        { row: 0, column: 0 },
+        { row: 1, column: 1 },
+        { row: 2, column: 2 },
+      ],
+      flashMs: 600,
+      gapMs: 300,
+      timeLimitMs: 12000,
+    },
+  },
+  {
+    cardId: 'memseq-002',
+    creatorHandle: '@memomatrix',
+    templateType: 'memory_sequence',
+    category: 'working_memory',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 18,
+    prompt: 'Memorize the four-tile flash, then reproduce it in order.',
+    puzzleDna: {
+      mechanic: 'sequence-recall',
+      inputMode: 'sequence',
+      measuredSignals: ['accuracy', 'recall'],
+    },
+    explanation: {
+      title: 'Chunk the path',
+      body: 'The order traces a zig-zag across the grid. Grouping the four taps into a shape — rather than four separate cells — makes the longer span easier to hold.',
+    },
+    config: {
+      rows: 3,
+      columns: 4,
+      sequence: [
+        { row: 0, column: 1 },
+        { row: 2, column: 0 },
+        { row: 1, column: 3 },
+        { row: 2, column: 2 },
+      ],
+      flashMs: 550,
+      gapMs: 280,
+      timeLimitMs: 16000,
+    },
+  },
+  {
+    cardId: 'memseq-003',
+    creatorHandle: '@lumalabs',
+    templateType: 'memory_sequence',
+    category: 'working_memory',
+    difficulty: 'hard',
+    evidenceTier: 'entertainment_only',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 24,
+    prompt: 'Watch the five tiles flash across the grid, then tap them back in order.',
+    puzzleDna: {
+      mechanic: 'sequence-recall',
+      inputMode: 'sequence',
+      measuredSignals: ['accuracy', 'recall'],
+    },
+    explanation: {
+      title: 'Longer spans stretch memory',
+      body: 'Five tiles on a 4×4 grid push past the comfortable span for most people. Reciting the path while it flashes — and again before you tap — is what keeps it from slipping.',
+    },
+    shareText: 'Reproduced a five-tile sequence on a 4×4 grid.',
+    config: {
+      rows: 4,
+      columns: 4,
+      sequence: [
+        { row: 0, column: 3 },
+        { row: 2, column: 1 },
+        { row: 3, column: 3 },
+        { row: 1, column: 0 },
+        { row: 3, column: 2 },
+      ],
+      flashMs: 500,
+      gapMs: 250,
+      timeLimitMs: 20000,
+    },
+  },
+];
+
 /**
  * The complete authored catalog. Order groups cards by template for
  * readability; session selection / shuffling is the engine's concern, not the
@@ -937,6 +1048,7 @@ export const catalog: readonly LiquidCard[] = [
   ...whatChangedCards,
   ...ruleFlipCards,
   ...tinyLogicCards,
+  ...memorySequenceCards,
 ];
 
 /**

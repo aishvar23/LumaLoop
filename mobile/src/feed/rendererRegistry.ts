@@ -30,6 +30,7 @@ import SpotItCard from './templates/SpotItCard';
 import WhatChangedCard from './templates/WhatChangedCard';
 import RuleFlipCard from './templates/RuleFlipCard';
 import TinyLogicCard from './templates/TinyLogicCard';
+import MemorySequenceCard from './templates/MemorySequenceCard';
 
 /**
  * A template renderer: a component that accepts {@link TemplateProps} for its
@@ -89,4 +90,5 @@ export const defaultRendererRegistry: RendererRegistry = {
   what_changed: WhatChangedCard,
   rule_flip: RuleFlipCard,
   tiny_logic: TinyLogicCard,
+  memory_sequence: MemorySequenceCard,
 };
