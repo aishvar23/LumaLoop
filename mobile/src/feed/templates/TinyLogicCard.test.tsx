@@ -50,6 +50,7 @@ function context(): CardStartContext {
 it('resolves CORRECT silently (no explanation) and fires onAttempt once with TTI', () => {
   const onAttempt = jest.fn();
   const onResolve = jest.fn<void, [CardResolution]>();
+  const onExplanationViewed = jest.fn();
   let t = ACTIVE_AT;
   render(
     <TinyLogicCard
@@ -57,6 +58,7 @@ it('resolves CORRECT silently (no explanation) and fires onAttempt once with TTI
       context={context()}
       onAttempt={onAttempt}
       onResolve={onResolve}
+      onExplanationViewed={onExplanationViewed}
       now={() => t}
     />,
   );
@@ -72,12 +74,14 @@ it('resolves CORRECT silently (no explanation) and fires onAttempt once with TTI
     isCorrect: true,
     signals: { selected_option_id: 'opt-b', distractor_option_id: '' },
   });
-  // No explanation on a correct answer.
+  // No explanation on a correct answer — and so no explanation-viewed seam (#129).
   expect(screen.queryByTestId('tl-explanation')).toBeNull();
+  expect(onExplanationViewed).not.toHaveBeenCalled();
 });
 
 it('resolves INCORRECT on a wrong pick, records the distractor, and reveals the explanation', () => {
   const onResolve = jest.fn<void, [CardResolution]>();
+  const onExplanationViewed = jest.fn();
   let t = ACTIVE_AT;
   render(
     <TinyLogicCard
@@ -85,6 +89,7 @@ it('resolves INCORRECT on a wrong pick, records the distractor, and reveals the 
       context={context()}
       onAttempt={jest.fn()}
       onResolve={onResolve}
+      onExplanationViewed={onExplanationViewed}
       now={() => t}
     />,
   );
@@ -100,10 +105,13 @@ it('resolves INCORRECT on a wrong pick, records the distractor, and reveals the 
   // Explanation revealed after the error, with the card's own polite copy.
   expect(screen.getByTestId('tl-explanation')).toBeOnTheScreen();
   expect(screen.getByText('Here is why')).toBeOnTheScreen();
+  // Revealing the explanation fires the M5 telemetry seam exactly once (#129).
+  expect(onExplanationViewed).toHaveBeenCalledTimes(1);
 
   // A second tap on a finished card is inert.
   fireEvent.press(screen.getByTestId('tl-option-opt-b'));
   expect(onResolve).toHaveBeenCalledTimes(1);
+  expect(onExplanationViewed).toHaveBeenCalledTimes(1);
 });
 
 it('resolves TIMEOUT when the time limit elapses with no selection', () => {

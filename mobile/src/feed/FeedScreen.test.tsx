@@ -104,12 +104,36 @@ const singleTapRegistry = {
   spot_it: SingleTapRenderer,
 } as unknown as RendererRegistry;
 
+/**
+ * A renderer that reveals an explanation: its engage tap fires the optional
+ * `onExplanationViewed` seam (mirrors `tiny_logic` on a wrong commit). Used to
+ * verify the feed forwards the renderer seam to its `onCardExplanationViewed`.
+ */
+function ExplainingRenderer({ card, context, onAttempt, onResolve, onExplanationViewed }: TemplateProps<LiquidCard>) {
+  return (
+    <StubRenderer
+      card={card}
+      context={context}
+      onAttempt={(s) => {
+        onAttempt(s);
+        onExplanationViewed?.();
+      }}
+      onResolve={onResolve}
+    />
+  );
+}
+
+const explainingRegistry = {
+  spot_it: ExplainingRenderer,
+} as unknown as RendererRegistry;
+
 type LifecycleHandlers = {
   onCardActive?: (i: number, cardId: string) => void;
   onCardEngaged?: (i: number, cardId: string) => void;
   onCardSkipped?: (i: number, cardId: string) => void;
   onCardAbandoned?: (i: number, cardId: string) => void;
   onCardResolved?: (i: number, r: CardResolution) => void;
+  onCardExplanationViewed?: (i: number, cardId: string) => void;
 };
 
 function renderFeed(
@@ -127,6 +151,7 @@ function renderFeed(
       onCardSkipped={extra?.onCardSkipped}
       onCardAbandoned={extra?.onCardAbandoned}
       onCardResolved={extra?.onCardResolved}
+      onCardExplanationViewed={extra?.onCardExplanationViewed}
     />,
   );
 }
@@ -399,6 +424,16 @@ describe('FeedScreen (native)', () => {
       0,
       expect.objectContaining({ cardId: 'b0-0', resolutionType: 'correct', isCorrect: true }),
     );
+  });
+
+  it('forwards a renderer explanation reveal to onCardExplanationViewed (#129)', () => {
+    const onCardExplanationViewed = jest.fn();
+    renderFeed({ onCardExplanationViewed }, explainingRegistry);
+
+    fireEvent.press(screen.getByTestId('engage-b0-0'));
+
+    expect(onCardExplanationViewed).toHaveBeenCalledTimes(1);
+    expect(onCardExplanationViewed).toHaveBeenCalledWith(0, 'b0-0');
   });
 
   it('latches skip per index — revisiting an un-engaged game never re-fires (#106)', () => {
