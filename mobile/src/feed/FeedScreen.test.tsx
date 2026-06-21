@@ -16,7 +16,7 @@ import {
   screen,
   within,
 } from '@testing-library/react-native';
-import { FlatList, type ViewToken } from 'react-native';
+import { FlatList, StyleSheet, type ViewToken } from 'react-native';
 
 import type { LiquidCard, SpotItCard } from '../core/cards/types';
 import type { CardResolution, TemplateProps } from '../core/templates/contract';
@@ -182,6 +182,36 @@ describe('FeedScreen (native)', () => {
     // The stub renders the cardId + its "engage"/"resolve" affordances.
     expect(screen.getByText('game:b0-0')).toBeOnTheScreen();
     expect(screen.getByTestId('stub-card-b0-0')).toHaveTextContent('b0-0');
+  });
+
+  it('centers the active game content in the slide (MP2 #134)', () => {
+    renderFeed();
+    // The game container centers its content vertically + horizontally so the
+    // game sits in the middle of the full-bleed slide, not pinned to the top.
+    const gameStyle = StyleSheet.flatten(
+      screen.getByTestId('feed-game-0').props.style,
+    );
+    expect(gameStyle).toEqual(
+      expect.objectContaining({
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+      }),
+    );
+  });
+
+  it('pads each full-bleed slide with the safe-area insets (MP2 #134)', () => {
+    renderFeed();
+    // The dark background extends full-bleed while the content is inset clear of
+    // the notch/home indicator (mocked zero insets + base padding under Jest).
+    const slideStyle = StyleSheet.flatten(
+      screen.getByTestId('feed-slide-0').props.style,
+    );
+    expect(slideStyle.backgroundColor).toBe('#0b0b0f');
+    expect(slideStyle.paddingTop).toBe(32);
+    expect(slideStyle.paddingBottom).toBe(32);
+    expect(slideStyle.paddingLeft).toBe(20);
+    expect(slideStyle.paddingRight).toBe(20);
   });
 
   it('shows the creator byline with no doubled @', () => {
