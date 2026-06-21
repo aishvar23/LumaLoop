@@ -38,6 +38,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { LiquidCard, TemplateType } from '../core/cards/types';
 import type { CardResolution, TemplateProps } from '../core/templates/contract';
+import { useCardScoreLookup } from './cardScoreContext';
 import CardFeedback from './CardFeedback';
 import { defaultRendererRegistry } from './rendererRegistry';
 import type { RendererRegistry, TemplateRenderer } from './rendererRegistry';
@@ -108,8 +109,20 @@ export function withFeedbackGate(
       }
     }, [showFeedback]);
 
+    // Phase 4: look up this slide's GAME-POINTS by its feed index (the score
+    // accumulator records it when the resolution fires). Null when no provider
+    // (standalone renders) → the result card omits the chip.
+    const scoreLookup = useCardScoreLookup();
+    const cardScore = scoreLookup ? scoreLookup(context.cardIndex) : null;
+
     if (showFeedback && resolution) {
-      return <CardFeedback resolution={resolution} explanation={card.explanation} />;
+      return (
+        <CardFeedback
+          resolution={resolution}
+          explanation={card.explanation}
+          cardScore={cardScore}
+        />
+      );
     }
 
     return (

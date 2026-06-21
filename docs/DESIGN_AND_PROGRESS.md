@@ -183,6 +183,18 @@ direction). PRs on GitHub `aishvar23/LumaLoop`.
   `isActive` to the web template contract (fixing the off-screen-preview class on web
   too).
 
+**F. Scoring + streaks — Phase 4 (GAME POINTS)**
+- A pure, template-agnostic scoring core (`src/feed/scoring.ts`, ported to
+  `mobile/src/core/feed/scoring.ts`): points per correct resolution weighted by speed
+  (vs. the card's `timeLimitMs`) × accuracy (attempts) × a streak-driven combo
+  multiplier; misses score 0 and break the streak. Consumes ONLY the shared
+  `CardResolution` (no `templateType` switch, no evaluator changes). An accumulator
+  hook (`useFeedScore`) folds the EXISTING `onCardResolved` seam into total/streak/
+  best-run/combo; a small accent-aware HUD (`FeedScoreHud`) and the result-card chip
+  (`CardFeedback`'s reserved slot, via `cardScoreContext`) display it. Best run +
+  cumulative points persist best-effort (localStorage / AsyncStorage), no PII, reset-
+  safe. NO new telemetry events. **GAME-POINTS framing only** (Design §7/§21.8).
+
 Every task shipped via a worker-driven loop (implement → code-review → fix → squash-
 merge → ADO Done). Review caught & fixed real bugs throughout (toolchain coupling,
 double-resolve / timer re-arm on off-screen slides, reproduce-phase timing, `@@`
@@ -196,11 +208,12 @@ Follow-ups #91, #99, #100, #101 filed (out of original scope).
 
 ## 7. Current state
 
-- `main` @ `9e6b866`. **7 game types, 37 cards.** Web 512 tests, mobile 313 tests;
-  both gates green.
+- **7 game types, 37 cards.** Web 588 tests, mobile 377 tests; both gates green.
 - **Web:** endless swipe feed at `/`, live on Vercel (behind Deployment Protection).
 - **Mobile:** full RN app, runnable on the iOS Simulator / Expo Go, all 7 games +
   telemetry wired.
+- **Scoring (Phase 4):** game-points + streak/combo layer on both apps — HUD + result-
+  card chip, best-run persistence, no new telemetry, game-points framing only.
 - **Telemetry:** pipeline verified end-to-end into Supabase (web); device delivery
   pending #82.
 

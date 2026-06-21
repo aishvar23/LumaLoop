@@ -31,6 +31,7 @@
 import { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 
+import type { CardScore } from '../core/feed/scoring';
 import type { CardResolution, ResolutionType } from '../core/templates/contract';
 import { useReducedMotion } from './useReducedMotion';
 import {
@@ -48,6 +49,12 @@ export type CardFeedbackProps = {
   resolution: CardResolution;
   /** The card's authored explanation copy (title + body). */
   explanation: { title: string; body: string };
+  /**
+   * The GAME-POINTS this card earned (Phase 4). When present, a points + streak/
+   * combo chip is shown. Omitted ≡ no scoring (standalone renders, tests) → no
+   * chip. GAME language only (Design §7/§21.8).
+   */
+  cardScore?: CardScore | null;
 };
 
 /** Per-outcome heading copy. Modest + performance-based, no trait language (Design §7). */
@@ -74,6 +81,7 @@ const OUTCOME_GLYPH: Readonly<Record<ResolutionType, string>> = {
 export default function CardFeedback({
   resolution,
   explanation,
+  cardScore,
 }: CardFeedbackProps) {
   const { resolutionType } = resolution;
   const heading = OUTCOME_HEADING[resolutionType];
@@ -152,6 +160,11 @@ export default function CardFeedback({
         </View>
       </View>
 
+      {/* Phase 4: the per-resolution GAME-POINTS chip — points earned plus the
+          current streak/combo. Shown only when a score was supplied (feed runs);
+          omitted in standalone renders. */}
+      {cardScore ? <ScoreChip cardScore={cardScore} accent={accent} /> : null}
+
       {/* Explanation state — the card's authored copy, shown for every outcome. */}
       <View
         testID="feedback-explanation"
@@ -178,6 +191,48 @@ export default function CardFeedback({
   );
 }
 CardFeedback.displayName = 'CardFeedback';
+
+/**
+ * The per-resolution GAME-POINTS chip (Phase 4). Shows points earned and, on a
+ * streak, the current run length + combo multiplier. GAME language only — "pts",
+ * "streak", "combo" — never skill/ability/IQ/trait framing (Design §7/§21.8). A
+ * miss shows a neutral, non-pressuring "Streak reset". Tinted with the outcome
+ * accent so it matches the result card.
+ */
+function ScoreChip({
+  cardScore,
+  accent,
+}: {
+  cardScore: CardScore;
+  accent: string;
+}) {
+  const { points, correct, streak, combo } = cardScore;
+  const showCombo = correct && combo > 1;
+  const meta =
+    streak > 1
+      ? `🔥 ${streak} streak${showCombo ? ` · ×${combo.toFixed(1)} combo` : ''}`
+      : null;
+  return (
+    <View style={[styles.scoreChip, { borderColor: accent }]} testID="card-score">
+      {correct ? (
+        <>
+          <Text style={styles.scorePoints} testID="card-score-points">
+            +{points} pts
+          </Text>
+          {meta ? (
+            <Text style={styles.scoreMeta} testID="card-score-streak">
+              {meta}
+            </Text>
+          ) : null}
+        </>
+      ) : (
+        <Text style={styles.scoreMeta} testID="card-score-reset">
+          Streak reset
+        </Text>
+      )}
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
   card: {
@@ -241,5 +296,27 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     fontWeight: fontWeight.medium,
     textAlign: 'center',
+  },
+  scoreChip: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    flexWrap: 'wrap',
+    gap: space.sm,
+    alignSelf: 'flex-start',
+    paddingVertical: space.xs,
+    paddingHorizontal: space.md,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+  },
+  scorePoints: {
+    color: colors.text,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.heavy,
+  },
+  scoreMeta: {
+    color: colors.textMuted,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.semibold,
   },
 });

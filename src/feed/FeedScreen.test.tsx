@@ -217,6 +217,8 @@ function renderFeed(extra?: LifecycleHandlers, registry: RendererRegistry = stub
       onCardSkipped={extra?.onCardSkipped}
       onCardAbandoned={extra?.onCardAbandoned}
       onCardResolved={extra?.onCardResolved}
+      // Phase 4: disable best-run persistence so tests don't touch localStorage.
+      scoreStore={null}
     />,
   );
 }
@@ -340,6 +342,19 @@ describe('FeedScreen', () => {
     // The feed did NOT advance — index 1 is still a windowed game, not the active
     // focus moving on. (Active stays 0; the user swipes to continue.)
     expect(screen.getByTestId('feed-game-0')).toBeInTheDocument();
+  });
+
+  it('updates the game-points HUD when a card resolves correctly (Phase 4)', () => {
+    renderFeed();
+    // At rest the HUD shows zero points and no streak pill.
+    expect(screen.getByTestId('feed-hud-points')).toHaveTextContent('0');
+    expect(screen.queryByTestId('feed-hud-streak')).not.toBeInTheDocument();
+
+    // A clean, instant correct resolution (interactionElapsedMs 1 of a 1000ms
+    // limit, single attempt, streak 1 → combo ×1) earns the full base of 100.
+    fireEvent.click(screen.getByTestId('stub-b0-0'));
+    expect(screen.getByTestId('feed-hud-points')).toHaveTextContent('100');
+    expect(screen.getByTestId('feed-hud-streak')).toHaveTextContent('1');
   });
 
   it('does NOT arm a game timer until the player engages it (#106)', () => {

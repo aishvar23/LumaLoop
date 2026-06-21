@@ -24,6 +24,7 @@
 
 import { useEffect, useState } from 'react';
 
+import type { CardScore } from '../feed/scoring';
 import type { CardResolution, ResolutionType } from '../templates/contract';
 import Button from './Button';
 import Stack from './Stack';
@@ -33,6 +34,12 @@ export type CardFeedbackProps = {
   resolution: CardResolution;
   /** The card's authored explanation copy (title + body). */
   explanation: { title: string; body: string };
+  /**
+   * The GAME-POINTS this card earned (Phase 4). When present, a points + streak/
+   * combo chip is shown in the reserved slot. Omitted ≡ no scoring (standalone
+   * renders, tests) → the chip is not shown. GAME language only (Design §7/§21.8).
+   */
+  cardScore?: CardScore | null;
   /** Advance the feed to the next card. The ONLY way out of this state. */
   onContinue: () => void;
 };
@@ -65,6 +72,7 @@ const OUTCOME_GLYPH: Readonly<Record<ResolutionType, string>> = {
 export default function CardFeedback({
   resolution,
   explanation,
+  cardScore,
   onContinue,
 }: CardFeedbackProps) {
   const { resolutionType } = resolution;
@@ -130,9 +138,10 @@ export default function CardFeedback({
           </div>
         </div>
 
-        {/* Phase-4 slot: the per-resolution score / streak chip drops in here,
-            above the explanation, with no other change to this card. Intentionally
-            empty in Phase 3 (scoring is not built yet). */}
+        {/* Phase-4 slot: the per-resolution GAME-POINTS chip — points earned plus
+            the current streak/combo — themed with the slide accent. Shown only
+            when a score was supplied (feed runs); omitted in standalone renders. */}
+        {cardScore ? <ScoreChip cardScore={cardScore} /> : null}
 
         {/* Explanation state — headed copy, not a second live region, so the
             outcome above is not double-announced. */}
@@ -153,7 +162,68 @@ export default function CardFeedback({
   );
 }
 
+/**
+ * The per-resolution GAME-POINTS chip (Phase 4). Shows points earned and, on a
+ * streak, the current run length + combo multiplier. GAME language only — "pts",
+ * "streak", "combo" — never skill/ability/IQ/trait framing (Design §7/§21.8).
+ *
+ * Accent-aware: it reads the slide's `--accent` aliases (seeded per-category on
+ * `.feed-slide`) so it matches the card it belongs to. A miss shows a neutral,
+ * non-pressuring "Streak reset" so the player understands the run broke.
+ */
+function ScoreChip({ cardScore }: { cardScore: CardScore }) {
+  const { points, correct, streak, combo } = cardScore;
+  // Combo is only meaningful (>1) once a streak builds; round for display.
+  const showCombo = correct && combo > 1;
+  const label = correct
+    ? `Plus ${points} points${streak > 1 ? `, streak ${streak}` : ''}`
+    : 'Streak reset';
+  return (
+    <div style={scoreChipStyle} data-testid="card-score" aria-label={label}>
+      {correct ? (
+        <>
+          <span style={scorePointsStyle}>+{points} pts</span>
+          {streak > 1 ? (
+            <span style={scoreMetaStyle} data-testid="card-score-streak">
+              {`🔥 ${streak} streak`}
+              {showCombo ? ` · ×${combo.toFixed(1)} combo` : ''}
+            </span>
+          ) : null}
+        </>
+      ) : (
+        <span style={scoreMetaStyle} data-testid="card-score-reset">
+          Streak reset
+        </span>
+      )}
+    </div>
+  );
+}
+
 // ── Token-driven styles (no hardcoded colours/sizes; Design tokens, #51) ──────
+
+/** The game-points chip surface — accent-tinted, sits above the explanation. */
+const scoreChipStyle = {
+  display: 'flex',
+  alignItems: 'baseline',
+  flexWrap: 'wrap',
+  gap: 'var(--space-2)',
+  padding: 'var(--space-2) var(--space-3)',
+  borderRadius: 'var(--radius-pill)',
+  border: '1px solid var(--accent, var(--color-accent))',
+  background: 'var(--accent-tint, var(--color-surface-overlay))',
+} as const;
+
+const scorePointsStyle = {
+  fontSize: 'var(--font-size-md)',
+  fontWeight: 'var(--font-weight-bold)',
+  color: 'var(--color-text)',
+} as const;
+
+const scoreMetaStyle = {
+  fontSize: 'var(--font-size-sm)',
+  fontWeight: 'var(--font-weight-semibold)',
+  color: 'var(--color-text-muted)',
+} as const;
 
 /** The tinted result-card surface (Phase 3). Surface/border are set per-outcome
  * inline so the one card serves both success and error. */
