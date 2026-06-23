@@ -99,7 +99,58 @@ describe('PrismPathCard', () => {
     expect(screen.getByTestId('pp-prompt')).toHaveTextContent('Route the beam');
     expect(screen.getByTestId('pp-mirror-m1')).toBeInTheDocument();
     expect(screen.getByTestId('pp-mirror-m2')).toBeInTheDocument();
+    expect(screen.getByTestId('pp-description-trigger')).toHaveAttribute(
+      'title',
+      expect.stringContaining('Rotate mirrors to bend the beam'),
+    );
+    expect(screen.getByTestId('pp-demo-button')).toHaveAttribute(
+      'title',
+      expect.stringContaining('adds about 5 seconds'),
+    );
     expect(screen.getByRole('status')).toHaveTextContent('Beam currently');
+  });
+
+  it('plays a separate demo without starting the attempt, then returns to the puzzle', () => {
+    const { onAttempt } = renderCard({ now: () => 1_000 });
+
+    fireEvent.click(screen.getByTestId('pp-demo-button'));
+    expect(screen.getByRole('dialog')).toHaveAccessibleName(
+      'Prism Path demonstration',
+    );
+    expect(screen.getByTestId('pp-demo-board')).toBeInTheDocument();
+    expect(screen.getByTestId('pp-demo-cell-2:1')).toHaveAttribute(
+      'data-beam',
+      'true',
+    );
+    expect(onAttempt).not.toHaveBeenCalled();
+
+    act(() => vi.advanceTimersByTime(1_300));
+    expect(screen.getByTestId('pp-demo-instruction')).toHaveTextContent(
+      'still hits a block',
+    );
+    expect(screen.getByTestId('pp-demo-cell-0:0')).toHaveAttribute(
+      'data-beam',
+      'true',
+    );
+
+    act(() => vi.advanceTimersByTime(1_300));
+    expect(screen.getByTestId('pp-demo-instruction')).toHaveTextContent(
+      'reaches the star',
+    );
+    expect(screen.getByTestId('pp-demo-cell-0:3')).toHaveAttribute(
+      'data-beam',
+      'true',
+    );
+
+    act(() => vi.advanceTimersByTime(1_600));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByTestId('pp-your-turn')).toHaveTextContent('Your turn');
+    expect(onAttempt).not.toHaveBeenCalled();
+
+    rotate('m1');
+    expect(screen.queryByTestId('pp-your-turn')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('pp-demo-button')).not.toBeInTheDocument();
+    expect(onAttempt).toHaveBeenCalledTimes(1);
   });
 
   it('fires onAttempt once on the first mirror rotation with TTI', () => {

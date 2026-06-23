@@ -23,10 +23,12 @@ import type { ComponentType, ReactNode } from 'react';
 import type { LiquidCard, TemplateType } from '../cards/types';
 import type { TemplateProps } from '../templates/contract';
 import CodeBreakCard from '../templates/codeBreak/CodeBreakCard';
+import CircuitFlowCard from '../templates/circuitFlow/CircuitFlowCard';
 import MemorySequenceCard from '../templates/memorySequence/MemorySequenceCard';
 import PatternChainCard from '../templates/patternChain/PatternChainCard';
 import PrismPathCard from '../templates/prismPath/PrismPathCard';
 import RuleFlipCard from '../templates/ruleFlip/RuleFlipCard';
+import SignalSetCard from '../templates/signalSet/SignalSetCard';
 import SpotItCard from '../templates/spotIt/SpotItCard';
 import StepLogicCard from '../templates/stepLogic/StepLogicCard';
 import TinyLogicCard from '../templates/tinyLogic/TinyLogicCard';
@@ -101,4 +103,6 @@ export const defaultRendererRegistry: RendererRegistry = {
   step_logic: StepLogicCard,
   code_break: CodeBreakCard,
   prism_path: PrismPathCard,
+  signal_set: SignalSetCard,
+  circuit_flow: CircuitFlowCard,
 };

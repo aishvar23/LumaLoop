@@ -11,7 +11,7 @@
  * anywhere in the feed, so adding a new game is a single localized registry slot,
  * never a feed edit (CLAUDE.md §6).
  *
- * M4 (ADO #128) lands the four real native renderers and registers them here as
+ * M4 (ADO #128) landed the initial native renderers and registers every shipped game here as
  * {@link defaultRendererRegistry} — the feed's new default — with no change to
  * `FeedScreen`. The template-agnostic STUB registry (see `stubRenderer.tsx`)
  * remains for the feed-lifecycle tests, which need a renderer with deterministic,
@@ -34,7 +34,9 @@ import MemorySequenceCard from './templates/MemorySequenceCard';
 import PatternChainCard from './templates/PatternChainCard';
 import StepLogicCard from './templates/StepLogicCard';
 import CodeBreakCard from './templates/CodeBreakCard';
+import CircuitFlowCard from './templates/CircuitFlowCard';
 import PrismPathCard from './templates/PrismPathCard';
+import SignalSetCard from './templates/SignalSetCard';
 
 /**
  * A template renderer: a component that accepts {@link TemplateProps} for its
@@ -99,4 +101,6 @@ export const defaultRendererRegistry: RendererRegistry = {
   step_logic: StepLogicCard,
   code_break: CodeBreakCard,
   prism_path: PrismPathCard,
+  signal_set: SignalSetCard,
+  circuit_flow: CircuitFlowCard,
 };

@@ -54,6 +54,7 @@ import {
   space,
   TAP_TARGET_MIN,
 } from './tokens';
+import { useGameTheme } from './GameTheme';
 
 /**
  * The renderer accepts the shared {@link TemplateProps} plus an optional
@@ -79,6 +80,7 @@ export default function StepLogicCard({
 }: StepLogicCardProps) {
   const { config } = card;
   const { premise, steps } = config;
+  const theme = useGameTheme();
 
   // The current step index drives which sub-question's stem + options are shown.
   // The chosen labels are mirrored into state for display + the live region; refs
@@ -185,7 +187,13 @@ export default function StepLogicCard({
       </Text>
 
       {/* The shared premise stays visible above every sub-question. */}
-      <Text testID="sl-premise" style={styles.premise}>
+      <Text
+        testID="sl-premise"
+        style={[
+          styles.premise,
+          { backgroundColor: theme.surface, borderColor: theme.border },
+        ]}
+      >
         {premise}
       </Text>
 
@@ -207,7 +215,14 @@ export default function StepLogicCard({
                 onPress={() => handlePick(option.id, option.label)}
                 style={({ pressed }) => [
                   styles.option,
-                  pressed && styles.optionPressed,
+                  {
+                    backgroundColor: theme.surfaceRaised,
+                    borderColor: theme.border,
+                  },
+                  pressed && {
+                    backgroundColor: theme.surfaceStrong,
+                    borderColor: theme.accent,
+                  },
                 ]}
               >
                 <Text style={styles.optionText}>{option.label}</Text>

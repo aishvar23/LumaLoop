@@ -24,6 +24,18 @@ describe('categoryAccents', () => {
     const accents = Object.values(categoryAccents).map((a) => a.accent);
     expect(new Set(accents).size).toBe(accents.length);
   });
+
+  it('defines semantic game surfaces for every category palette', () => {
+    for (const palette of Object.values(categoryAccents)) {
+      expect(palette.deep).toMatch(/^#/);
+      expect(palette.surface).toContain('rgba(');
+      expect(palette.surfaceRaised).toContain('rgba(');
+      expect(palette.surfaceStrong).toContain('rgba(');
+      expect(palette.border).toContain('rgba(');
+      expect(palette.glow).toContain('rgba(');
+      expect(palette.surfaceRaised).not.toBe(palette.surfaceStrong);
+    }
+  });
 });
 
 describe('categoryAccent', () => {

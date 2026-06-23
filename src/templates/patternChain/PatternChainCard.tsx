@@ -249,6 +249,10 @@ const sequenceStyle = {
   alignItems: 'center',
   gap: 'var(--space-2)',
   width: '100%',
+  padding: 'var(--space-3)',
+  borderRadius: 'var(--radius-lg)',
+  border: '1px solid var(--game-border, var(--color-border))',
+  background: 'var(--game-board, transparent)',
 } as const;
 
 const chipStyle = {
@@ -259,8 +263,8 @@ const chipStyle = {
   minWidth: 'var(--tap-target-min)',
   padding: 'var(--space-2)',
   borderRadius: 'var(--radius-md)',
-  border: '1px solid var(--color-border)',
-  background: 'var(--color-surface-raised)',
+  border: '1px solid var(--game-border, var(--color-border))',
+  background: 'var(--game-surface-raised, var(--color-surface-raised))',
   color: 'var(--color-text)',
   fontSize: 'var(--font-size-lg)',
   fontFamily: 'var(--font-sans)',
@@ -301,8 +305,8 @@ const optionStyle = {
   minWidth: 'var(--tap-target-min)',
   padding: 'var(--space-3)',
   borderRadius: 'var(--radius-md)',
-  border: '1px solid var(--color-border)',
-  background: 'var(--color-surface-raised)',
+  border: '1px solid var(--game-border, var(--color-border))',
+  background: 'var(--game-surface-raised, var(--color-surface-raised))',
   color: 'var(--color-text)',
   fontSize: 'var(--font-size-md)',
   fontFamily: 'var(--font-sans)',

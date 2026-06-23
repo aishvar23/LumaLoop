@@ -63,6 +63,29 @@ describe('CardFeedback', () => {
     expect(screen.getByText('Because of the rule.')).toBeInTheDocument();
   });
 
+  it('renders a renderer-supplied failure reason above the authored explanation', () => {
+    render(
+      <CardFeedback
+        resolution={{
+          ...makeResolution('incorrect'),
+          signals: {
+            failure_reason:
+              'Step 2 (B) was answered Match, but "Tap blue" expected No-match.',
+          },
+        }}
+        explanation={explanation}
+        onContinue={() => {}}
+      />,
+    );
+
+    expect(screen.getByTestId('card-failure-reason')).toHaveTextContent(
+      'What went wrong',
+    );
+    expect(screen.getByTestId('card-failure-reason')).toHaveTextContent(
+      'Step 2 (B)',
+    );
+  });
+
   it('announces the outcome via a polite live region after mount', async () => {
     render(
       <CardFeedback

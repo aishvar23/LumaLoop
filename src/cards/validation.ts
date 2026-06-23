@@ -20,6 +20,7 @@
 import {
   templateCategoryMap,
   type CodeBreakCard,
+  type CircuitFlowCard,
   type EvidenceTier,
   type LiquidCard,
   type MemorySequenceCard,
@@ -27,6 +28,7 @@ import {
   type PrismMirrorOrientation,
   type PrismPathCard,
   type RuleFlipCard,
+  type SignalSetCard,
   type SpotItCard,
   type StepLogicCard,
   type TemplateType,
@@ -37,11 +39,22 @@ import {
   orientationMapFromSolution,
   tracePrismPath,
 } from '../templates/prismPath/prismPathEvaluator';
+import {
+  circuitRotationsFromSolution,
+  evaluateCircuitFlow,
+} from '../templates/circuitFlow/circuitFlowEvaluator';
+import { isValidSignalTrio } from '../templates/signalSet/signalSetEvaluator';
 
 /** Inclusive lower bound for any template's `config.timeLimitMs` (5 seconds). */
 export const MIN_TIME_LIMIT_MS = 5000;
-/** Inclusive upper bound for any template's `config.timeLimitMs` (30 seconds). */
-export const MAX_TIME_LIMIT_MS = 30000;
+/** Inclusive upper bound for any template's `config.timeLimitMs` (120 seconds). */
+export const MAX_TIME_LIMIT_MS = 120000;
+/**
+ * Maximum Spot It columns that preserve the 48 px tap target in the mobile
+ * feed card. More visual-search items should be added as rows, not by making
+ * the board wider than the viewport.
+ */
+export const MAX_SPOT_IT_COLUMNS = 6;
 
 /**
  * Evidence tiers permitted in the prototype catalog. `telemetry_calibrated` and
@@ -110,6 +123,8 @@ const templateAnswerValidators: {
   step_logic: validateStepLogicAnswer,
   code_break: validateCodeBreakAnswer,
   prism_path: validatePrismPathAnswer,
+  signal_set: validateSignalSetAnswer,
+  circuit_flow: validateCircuitFlowAnswer,
 };
 
 /**
@@ -143,6 +158,14 @@ function validateSpotItAnswer(card: SpotItCard): ValidationError[] {
       answerError(
         card.cardId,
         `spot_it grid must have positive dimensions, got ${rows}x${columns}`,
+      ),
+    );
+  }
+  if (columns > MAX_SPOT_IT_COLUMNS) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `spot_it columns ${columns} exceeds the mobile-safe maximum ${MAX_SPOT_IT_COLUMNS}`,
       ),
     );
   }
@@ -693,6 +716,215 @@ function validatePrismPathAnswer(card: PrismPathCard): ValidationError[] {
   return errors;
 }
 
+export const MIN_SIGNAL_TILES = 6;
+export const MAX_SIGNAL_TILES = 9;
+
+function validateSignalSetAnswer(card: SignalSetCard): ValidationError[] {
+  const { tiles, solutionIds } = card.config;
+  const errors: ValidationError[] = [];
+  if (tiles.length < MIN_SIGNAL_TILES || tiles.length > MAX_SIGNAL_TILES) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `signal_set tile count ${tiles.length} is outside [${MIN_SIGNAL_TILES}, ${MAX_SIGNAL_TILES}]`,
+      ),
+    );
+  }
+  const ids = tiles.map((tile) => tile.id);
+  if (
+    new Set(ids).size !== ids.length ||
+    ids.some((id) => id.trim().length === 0)
+  ) {
+    errors.push(
+      answerError(
+        card.cardId,
+        'signal_set tile ids must be unique and non-empty',
+      ),
+    );
+  }
+  const signatures = tiles.map(
+    (tile) => `${tile.shape}:${tile.fill}:${tile.count}`,
+  );
+  if (new Set(signatures).size !== signatures.length) {
+    errors.push(
+      answerError(
+        card.cardId,
+        'signal_set tiles must have unique attribute combinations',
+      ),
+    );
+  }
+  if (solutionIds.length !== 3 || new Set(solutionIds).size !== 3) {
+    errors.push(
+      answerError(
+        card.cardId,
+        'signal_set solution must contain three unique tile ids',
+      ),
+    );
+    return errors;
+  }
+  const solutionTiles = solutionIds
+    .map((id) => tiles.find((tile) => tile.id === id))
+    .filter(
+      (tile): tile is SignalSetCard['config']['tiles'][number] =>
+        tile !== undefined,
+    );
+  if (solutionTiles.length !== 3) {
+    errors.push(
+      answerError(
+        card.cardId,
+        'signal_set solution references an unknown tile',
+      ),
+    );
+  } else if (!isValidSignalTrio(solutionTiles)) {
+    errors.push(
+      answerError(
+        card.cardId,
+        'signal_set authored solution is not a valid trio',
+      ),
+    );
+  }
+  return errors;
+}
+
+export const MIN_CIRCUIT_GRID_SIZE = 2;
+export const MAX_CIRCUIT_GRID_SIZE = 4;
+
+function validateCircuitFlowAnswer(card: CircuitFlowCard): ValidationError[] {
+  const { rows, columns, sourceTileId, tiles, solution } = card.config;
+  const errors: ValidationError[] = [];
+  if (
+    !Number.isInteger(rows) ||
+    !Number.isInteger(columns) ||
+    rows < MIN_CIRCUIT_GRID_SIZE ||
+    rows > MAX_CIRCUIT_GRID_SIZE ||
+    columns < MIN_CIRCUIT_GRID_SIZE ||
+    columns > MAX_CIRCUIT_GRID_SIZE
+  ) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `circuit_flow grid ${rows}x${columns} is outside [${MIN_CIRCUIT_GRID_SIZE}, ${MAX_CIRCUIT_GRID_SIZE}]`,
+      ),
+    );
+  }
+  if (tiles.length !== rows * columns) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `circuit_flow must fill its grid (${rows * columns} tiles expected)`,
+      ),
+    );
+  }
+  const ids = tiles.map((tile) => tile.id);
+  if (
+    new Set(ids).size !== ids.length ||
+    ids.some((id) => id.trim().length === 0)
+  ) {
+    errors.push(
+      answerError(
+        card.cardId,
+        'circuit_flow tile ids must be unique and non-empty',
+      ),
+    );
+  }
+  if (!ids.includes(sourceTileId)) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `circuit_flow source "${sourceTileId}" is missing`,
+      ),
+    );
+  }
+  const coordinates = new Set<string>();
+  const validDirections = new Set(['up', 'right', 'down', 'left']);
+  for (const tile of tiles) {
+    const key = coordKey(tile.row, tile.column);
+    if (
+      !Number.isInteger(tile.row) ||
+      !Number.isInteger(tile.column) ||
+      tile.row < 0 ||
+      tile.row >= rows ||
+      tile.column < 0 ||
+      tile.column >= columns
+    ) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `circuit_flow tile "${tile.id}" is outside grid bounds`,
+        ),
+      );
+    }
+    if (coordinates.has(key)) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `circuit_flow has overlapping tiles at ${key}`,
+        ),
+      );
+    }
+    coordinates.add(key);
+    if (
+      tile.connections.length === 0 ||
+      new Set(tile.connections).size !== tile.connections.length ||
+      tile.connections.some((direction) => !validDirections.has(direction))
+    ) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `circuit_flow tile "${tile.id}" has invalid connections`,
+        ),
+      );
+    }
+    if (
+      !Number.isInteger(tile.initialRotation) ||
+      tile.initialRotation < 0 ||
+      tile.initialRotation > 3
+    ) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `circuit_flow tile "${tile.id}" has invalid initial rotation`,
+        ),
+      );
+    }
+  }
+  const solutionIds = solution.map((item) => item.tileId);
+  if (
+    solution.length !== tiles.length ||
+    new Set(solutionIds).size !== solution.length ||
+    solution.some(
+      (item) =>
+        !ids.includes(item.tileId) ||
+        !Number.isInteger(item.rotation) ||
+        item.rotation < 0 ||
+        item.rotation > 3,
+    )
+  ) {
+    errors.push(
+      answerError(
+        card.cardId,
+        'circuit_flow solution must set every tile once with a valid rotation',
+      ),
+    );
+  }
+  if (errors.length === 0) {
+    const result = evaluateCircuitFlow(
+      card.config,
+      circuitRotationsFromSolution(solution),
+      0,
+    );
+    if (!result.isCorrect) {
+      errors.push(
+        answerError(
+          card.cardId,
+          'circuit_flow authored solution is not fully connected',
+        ),
+      );
+    }
+  }
+  return errors;
+}
+
 /**
  * Validates a single card's template-agnostic rules plus its template-specific
  * correct answer. Catalog-wide rules (unique `cardId`) are checked separately by
@@ -734,7 +966,7 @@ function validateCard(card: LiquidCard): ValidationError[] {
     });
   }
 
-  // Per-template time limit between 5s and 30s inclusive. The finiteness guard
+  // Per-template time limit between 5s and 120s inclusive. The finiteness guard
   // leads so a NaN/Infinity timeLimitMs is rejected rather than slipping past
   // the range comparisons (both `< MIN` and `> MAX` are false for NaN).
   const timeLimitMs = card.config.timeLimitMs;

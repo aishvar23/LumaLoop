@@ -45,6 +45,7 @@ export default function SpotItCard({
 }: SpotItCardProps) {
   const { config } = card;
   const { rows, columns, baseElement, anomalyElement } = config;
+  const columnGap = columns >= 6 ? 'var(--space-1)' : 'var(--space-2)';
 
   // Per-card interaction bookkeeping lives in refs so taps don't depend on
   // render timing. `falseTaps` is mirrored into state purely to drive the
@@ -138,7 +139,11 @@ export default function SpotItCard({
       <div
         role="group"
         aria-label={`${rows} by ${columns} grid; tap the one element that is different`}
-        style={{ ...gridStyle, gridTemplateColumns: `repeat(${columns}, 1fr)` }}
+        style={{
+          ...gridStyle,
+          gap: columnGap,
+          gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+        }}
       >
         {Array.from({ length: rows }, (_, row) =>
           Array.from({ length: columns }, (_, column) => {
@@ -153,7 +158,9 @@ export default function SpotItCard({
                 onClick={() => handleCellTap(row, column)}
                 style={cellStyle}
               >
-                <span aria-hidden="true">{element}</span>
+                <span aria-hidden="true" style={cellTextStyleFor(element)}>
+                  {element}
+                </span>
               </button>
             );
           }),
@@ -188,6 +195,10 @@ const gridStyle = {
   display: 'grid',
   gap: 'var(--space-2)',
   width: '100%',
+  padding: 'var(--space-2)',
+  borderRadius: 'var(--radius-lg)',
+  border: '1px solid var(--game-border, var(--color-border))',
+  background: 'var(--game-board, transparent)',
 } as const;
 
 const cellStyle = {
@@ -199,12 +210,39 @@ const cellStyle = {
   aspectRatio: '1 / 1',
   padding: 'var(--space-2)',
   borderRadius: 'var(--radius-md)',
-  border: '1px solid var(--color-border)',
-  background: 'var(--color-surface-raised)',
-  color: 'var(--color-text)',
+  border: '1px solid var(--game-border, var(--color-border))',
+  background: 'var(--game-surface-raised, var(--color-surface-raised))',
+  color: 'var(--accent, var(--color-text))',
   fontSize: 'var(--font-size-lg)',
   fontFamily: 'var(--font-sans)',
+  overflow: 'hidden',
   cursor: 'pointer',
+} as const;
+
+function cellTextStyleFor(element: string) {
+  const glyphLength = Array.from(element).length;
+  if (glyphLength >= 3) return cellTextLongStyle;
+  if (glyphLength === 2) return cellTextMediumStyle;
+  return cellTextBaseStyle;
+}
+
+const cellTextBaseStyle = {
+  display: 'block',
+  maxWidth: '100%',
+  lineHeight: 1,
+  whiteSpace: 'nowrap',
+} as const;
+
+const cellTextMediumStyle = {
+  ...cellTextBaseStyle,
+  fontSize: 'clamp(0.9rem, 4.2vw, 1.25rem)',
+  letterSpacing: '-0.02em',
+} as const;
+
+const cellTextLongStyle = {
+  ...cellTextBaseStyle,
+  fontSize: 'clamp(0.72rem, 3.4vw, 0.95rem)',
+  letterSpacing: '-0.04em',
 } as const;
 
 const liveRegionStyle = {

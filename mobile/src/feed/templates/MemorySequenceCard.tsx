@@ -66,6 +66,7 @@ import {
   space,
   TAP_TARGET_MIN,
 } from './tokens';
+import { useGameTheme } from './GameTheme';
 
 /**
  * The renderer accepts the shared {@link TemplateProps} plus an optional
@@ -196,14 +197,25 @@ function WatchGrid({
   sequence: ReadonlyArray<GridCoordinate>;
   litStep: number | null;
 }) {
+  const theme = useGameTheme();
+  const compact = isCompactMemoryGrid(rows);
   const litCoord = litStep !== null ? sequence[litStep] : undefined;
   return (
     <View
+      testID="ms-watch-grid"
       accessibilityLabel={`Watch the sequence on a ${rows} by ${columns} grid`}
-      style={styles.grid}
+      style={[
+        styles.grid,
+        compact && styles.compactGrid,
+        { backgroundColor: theme.surface, borderColor: theme.border },
+      ]}
     >
       {Array.from({ length: rows }, (_, row) => (
-        <View key={`row-${row}`} style={styles.row}>
+        <View
+          key={`row-${row}`}
+          testID={`ms-watch-row-${row}`}
+          style={[styles.row, compact && styles.compactRow]}
+        >
           {Array.from({ length: columns }, (_, column) => {
             const isLit =
               litCoord !== undefined &&
@@ -218,7 +230,19 @@ function WatchGrid({
                     ? `Row ${row + 1}, column ${column + 1}: lit`
                     : `Row ${row + 1}, column ${column + 1}`
                 }
-                style={[styles.cell, isLit && styles.cellLit]}
+                style={[
+                  styles.cell,
+                  compact && styles.compactCell,
+                  {
+                    backgroundColor: theme.surfaceRaised,
+                    borderColor: theme.border,
+                  },
+                  isLit && {
+                    backgroundColor: theme.accent,
+                    borderColor: theme.accent,
+                    transform: [{ scale: 1.04 }],
+                  },
+                ]}
               >
                 {/* Non-colour lit cue: an explicit ● glyph, not hue alone. */}
                 <Text style={styles.cellText}>{isLit ? '●' : ''}</Text>
@@ -255,8 +279,10 @@ function MemorySequenceReproduce({
   onResolve,
   now,
 }: MemorySequenceReproduceProps) {
+  const theme = useGameTheme();
   const { config } = card;
   const { rows, columns, sequence } = config;
+  const compact = isCompactMemoryGrid(rows);
 
   // Interaction bookkeeping lives in refs so taps don't depend on render timing.
   // `tapped` is mirrored into state to drive the live-region progress; a ref
@@ -357,24 +383,69 @@ function MemorySequenceReproduce({
   return (
     <>
       <View
+        testID="ms-reproduce-grid"
         accessibilityLabel={`Tap the ${sequence.length} tiles in the order they flashed`}
-        style={styles.grid}
+        style={[
+          styles.grid,
+          compact && styles.compactGrid,
+          { backgroundColor: theme.surface, borderColor: theme.border },
+        ]}
       >
         {Array.from({ length: rows }, (_, row) => (
-          <View key={`row-${row}`} style={styles.row}>
-            {Array.from({ length: columns }, (_, column) => (
-              <Pressable
-                key={`${row}-${column}`}
-                testID={`ms-tile-${row}-${column}`}
-                accessibilityRole="button"
-                accessibilityLabel={`Row ${row + 1}, column ${column + 1}`}
-                onPress={() => handleTileTap(row, column)}
-                style={({ pressed }) => [
-                  styles.cell,
-                  pressed && styles.cellPressed,
-                ]}
-              />
-            ))}
+          <View
+            key={`row-${row}`}
+            testID={`ms-reproduce-row-${row}`}
+            style={[styles.row, compact && styles.compactRow]}
+          >
+            {Array.from({ length: columns }, (_, column) => {
+              const selectionSteps = tapped.flatMap((coordinate, index) =>
+                coordinate.row === row && coordinate.column === column
+                  ? [index + 1]
+                  : [],
+              );
+              const isSelected = selectionSteps.length > 0;
+              const latestStep = selectionSteps[selectionSteps.length - 1];
+              const selectionLabel = selectionSteps.join(', ');
+              return (
+                <Pressable
+                  key={`${row}-${column}`}
+                  testID={`ms-tile-${row}-${column}`}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isSelected }}
+                  accessibilityLabel={
+                    isSelected
+                      ? `Row ${row + 1}, column ${column + 1}: selected at ${selectionSteps.length === 1 ? 'step' : 'steps'} ${selectionLabel}`
+                      : `Row ${row + 1}, column ${column + 1}`
+                  }
+                  onPress={() => handleTileTap(row, column)}
+                  style={({ pressed }) => [
+                    styles.cell,
+                    compact && styles.compactCell,
+                    {
+                      backgroundColor: theme.surfaceRaised,
+                      borderColor: theme.border,
+                    },
+                    isSelected && {
+                      backgroundColor: theme.accent,
+                      borderColor: theme.accent,
+                    },
+                    pressed && {
+                      backgroundColor: theme.surfaceStrong,
+                      borderColor: theme.accent,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.selectionStep,
+                      isSelected && styles.selectionStepVisible,
+                    ]}
+                  >
+                    {isSelected ? latestStep : ''}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
         ))}
       </View>
@@ -389,6 +460,10 @@ function MemorySequenceReproduce({
       </Text>
     </>
   );
+}
+
+function isCompactMemoryGrid(rows: number): boolean {
+  return rows >= 5;
 }
 
 const styles = StyleSheet.create({
@@ -412,9 +487,18 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: 'rgba(255, 255, 255, 0.02)',
   },
+  compactGrid: {
+    maxWidth: 360,
+    alignSelf: 'center',
+    gap: space.xs,
+    padding: space.xs,
+  },
   row: {
     flexDirection: 'row',
     gap: space.sm,
+  },
+  compactRow: {
+    gap: space.xs,
   },
   cell: {
     flex: 1,
@@ -428,6 +512,10 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surfaceRaised,
     ...elevation.tile,
+  },
+  compactCell: {
+    minHeight: TAP_TARGET_MIN,
+    minWidth: TAP_TARGET_MIN,
   },
   // The lit cell during WATCH: a stronger accent surface + border so the flash
   // is visible. Pairs with the ● glyph / "lit" label, never colour alone. Phase 5:
@@ -448,6 +536,14 @@ const styles = StyleSheet.create({
     color: colors.accentContrast,
     fontSize: fontSize.xl,
     fontWeight: fontWeight.bold,
+  },
+  selectionStep: {
+    color: 'transparent',
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.heavy,
+  },
+  selectionStepVisible: {
+    color: colors.accentContrast,
   },
   status: {
     minHeight: fontSize.md,

@@ -5,6 +5,7 @@ import {
   MAX_CODE_LENGTH,
   MAX_PRISM_GRID_SIZE,
   MAX_SEQUENCE_LENGTH,
+  MAX_SPOT_IT_COLUMNS,
   MAX_STEP_LOGIC_STEPS,
   MAX_TIME_LIMIT_MS,
   MIN_CODE_GUESSES,
@@ -19,12 +20,14 @@ import {
   templateCategoryMap,
   type ChallengeCategory,
   type CodeBreakCard,
+  type CircuitFlowCard,
   type LiquidCard,
   type MemorySequenceCard,
   type PatternChainCard,
   type PrismPathCard,
   type PuzzleDna,
   type RuleFlipCard,
+  type SignalSetCard,
   type SpotItCard,
   type StepLogicCard,
   type TemplateType,
@@ -337,6 +340,92 @@ function validPrismPath(): PrismPathCard {
   };
 }
 
+function validSignalSet(): SignalSetCard {
+  return {
+    cardId: 'signalset-1',
+    creatorHandle: '@test',
+    templateType: 'signal_set',
+    category: 'pattern_recognition',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 20,
+    prompt: 'Pick a valid trio.',
+    puzzleDna: dna('attribute-triad'),
+    explanation: { title: 'Triad', body: 'All same or all different.' },
+    config: {
+      tiles: [
+        { id: 'a', shape: 'circle', fill: 'solid', count: 1 },
+        { id: 'b', shape: 'triangle', fill: 'striped', count: 2 },
+        { id: 'c', shape: 'diamond', fill: 'outline', count: 3 },
+        { id: 'd', shape: 'circle', fill: 'outline', count: 2 },
+        { id: 'e', shape: 'triangle', fill: 'solid', count: 3 },
+        { id: 'f', shape: 'diamond', fill: 'striped', count: 1 },
+      ],
+      solutionIds: ['a', 'b', 'c'],
+      timeLimitMs: 20000,
+    },
+  };
+}
+
+function validCircuitFlow(): CircuitFlowCard {
+  return {
+    cardId: 'circuit-1',
+    creatorHandle: '@test',
+    templateType: 'circuit_flow',
+    category: 'logical_reasoning',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 20,
+    prompt: 'Connect every tile.',
+    puzzleDna: dna('rotating-network'),
+    explanation: { title: 'Circuit', body: 'Every arm meets a neighbor.' },
+    config: {
+      rows: 2,
+      columns: 2,
+      sourceTileId: 'a',
+      tiles: [
+        {
+          id: 'a',
+          row: 0,
+          column: 0,
+          connections: ['right', 'down'],
+          initialRotation: 1,
+        },
+        {
+          id: 'b',
+          row: 0,
+          column: 1,
+          connections: ['left'],
+          initialRotation: 2,
+        },
+        {
+          id: 'c',
+          row: 1,
+          column: 0,
+          connections: ['up', 'right'],
+          initialRotation: 3,
+        },
+        {
+          id: 'd',
+          row: 1,
+          column: 1,
+          connections: ['left'],
+          initialRotation: 1,
+        },
+      ],
+      solution: [
+        { tileId: 'a', rotation: 0 },
+        { tileId: 'b', rotation: 0 },
+        { tileId: 'c', rotation: 0 },
+        { tileId: 'd', rotation: 0 },
+      ],
+      timeLimitMs: 20000,
+    },
+  };
+}
+
 function validCatalog(): LiquidCard[] {
   return [
     validSpotIt(),
@@ -348,6 +437,8 @@ function validCatalog(): LiquidCard[] {
     validStepLogic(),
     validCodeBreak(),
     validPrismPath(),
+    validSignalSet(),
+    validCircuitFlow(),
   ];
 }
 
@@ -368,6 +459,31 @@ describe('validateCatalog', () => {
 
   it('accepts an empty catalog (nothing to violate)', () => {
     expect(validateCatalog([])).toEqual({ valid: true, errors: [] });
+  });
+
+  it('rejects a signal_set whose canonical trio breaks an attribute rule', () => {
+    const card = validSignalSet();
+    card.config = { ...card.config, solutionIds: ['a', 'b', 'd'] };
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('rejects a circuit_flow whose authored solution leaves loose arms', () => {
+    const card = validCircuitFlow();
+    card.config = {
+      ...card.config,
+      solution: card.config.solution.map((item) =>
+        item.tileId === 'a' ? { ...item, rotation: 1 as const } : item,
+      ),
+    };
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
   });
 
   it('rejects a duplicate cardId', () => {
@@ -478,6 +594,16 @@ describe('validateCatalog', () => {
   it('rejects a spot_it anomalyColumn outside the grid bounds', () => {
     const card = validSpotIt();
     card.config.anomalyColumn = card.config.columns; // one past the last column
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('rejects a spot_it board wider than the mobile-safe column limit', () => {
+    const card = validSpotIt();
+    card.config.columns = MAX_SPOT_IT_COLUMNS + 1;
     const result = validateCatalog([card]);
     expect(result.valid).toBe(false);
     expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
@@ -1045,7 +1171,6 @@ describe('validateCatalog', () => {
     );
   });
 });
-
 // ---------------------------------------------------------------------------
 // templateCategoryMap <-> VALID_CATEGORY_FOR_TEMPLATE consistency (§17 item 7).
 //
@@ -1069,6 +1194,8 @@ const ALL_TEMPLATE_TYPES: TemplateType[] = [
   'step_logic',
   'code_break',
   'prism_path',
+  'signal_set',
+  'circuit_flow',
 ];
 
 const ALL_CATEGORIES: ChallengeCategory[] = [
@@ -1091,6 +1218,8 @@ const validCardFor: Record<TemplateType, () => LiquidCard> = {
   step_logic: validStepLogic,
   code_break: validCodeBreak,
   prism_path: validPrismPath,
+  signal_set: validSignalSet,
+  circuit_flow: validCircuitFlow,
 };
 
 describe('templateCategoryMap <-> validation consistency', () => {

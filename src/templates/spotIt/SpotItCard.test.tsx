@@ -116,6 +116,66 @@ describe('grid rendering', () => {
     // Accessible label carries position + content, not colour.
     expect(anomaly).toHaveAccessibleName('Row 2, column 3: A7X');
   });
+
+  it('uses a compact, shrink-safe grid for six-column boards', () => {
+    renderCard({
+      card: spotItCard({ columns: 6, anomalyColumn: 5 }),
+    });
+
+    expect(screen.getByRole('group')).toHaveStyle({
+      gap: 'var(--space-1)',
+      gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
+    });
+    expect(screen.getByTestId('spot-cell-0-5')).toBeInTheDocument();
+  });
+
+  it('shrinks two-character code glyphs below the single-glyph size', () => {
+    renderCard({
+      card: spotItCard({
+        rows: 1,
+        columns: 2,
+        baseElement: 'M7',
+        anomalyElement: 'MN',
+        anomalyRow: 0,
+        anomalyColumn: 1,
+      }),
+    });
+
+    const ordinaryText = screen.getByTestId('spot-cell-0-0').querySelector('span');
+    const anomalyText = screen.getByTestId('spot-cell-0-1').querySelector('span');
+    expect(ordinaryText).toHaveStyle({
+      fontSize: 'clamp(0.9rem, 4.2vw, 1.25rem)',
+      letterSpacing: '-0.02em',
+    });
+    expect(anomalyText).toHaveStyle({
+      fontSize: 'clamp(0.9rem, 4.2vw, 1.25rem)',
+      letterSpacing: '-0.02em',
+    });
+  });
+
+  it('shrinks three-character code glyphs aggressively so they fit inside each tile', () => {
+    renderCard({
+      card: spotItCard({
+        rows: 1,
+        columns: 2,
+        baseElement: 'M7N',
+        anomalyElement: 'MN7',
+        anomalyRow: 0,
+        anomalyColumn: 1,
+      }),
+    });
+
+    const ordinaryText = screen.getByTestId('spot-cell-0-0').querySelector('span');
+    const anomalyText = screen.getByTestId('spot-cell-0-1').querySelector('span');
+    expect(ordinaryText).toHaveStyle({
+      fontSize: 'clamp(0.72rem, 3.4vw, 0.95rem)',
+      letterSpacing: '-0.04em',
+    });
+    expect(anomalyText).toHaveStyle({
+      fontSize: 'clamp(0.72rem, 3.4vw, 0.95rem)',
+      letterSpacing: '-0.04em',
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
