@@ -97,7 +97,43 @@ describe('PrismPathCard', () => {
     expect(screen.getByTestId('pp-prompt')).toHaveTextContent('Route the beam');
     expect(screen.getByTestId('pp-board')).toBeOnTheScreen();
     expect(screen.getByTestId('pp-mirror-m1')).toBeOnTheScreen();
+    expect(screen.getByTestId('pp-description-trigger').props.accessibilityHint).toContain(
+      'Rotate mirrors to bend the beam',
+    );
+    expect(screen.getByTestId('pp-demo-button').props.accessibilityHint).toContain(
+      'adds about 5 seconds',
+    );
     expect(screen.getByTestId('pp-status')).toHaveTextContent(/Beam currently/);
+  });
+
+  it('plays a separate demo without starting the attempt, then returns to the puzzle', () => {
+    const { onAttempt } = renderCard({ now: () => 1_000 });
+
+    fireEvent.press(screen.getByTestId('pp-demo-button'));
+    expect(screen.getByLabelText('Prism Path demonstration')).toBeOnTheScreen();
+    expect(screen.getByTestId('pp-demo-board')).toBeOnTheScreen();
+    expect(onAttempt).not.toHaveBeenCalled();
+
+    act(() => jest.advanceTimersByTime(1_300));
+    expect(screen.getByTestId('pp-demo-instruction')).toHaveTextContent(
+      /still hits a block/,
+    );
+
+    act(() => jest.advanceTimersByTime(1_300));
+    expect(screen.getByTestId('pp-demo-instruction')).toHaveTextContent(
+      /reaches the star/,
+    );
+    expect(screen.getByTestId('pp-demo-cell-0:3')).toBeOnTheScreen();
+
+    act(() => jest.advanceTimersByTime(1_600));
+    expect(screen.queryByTestId('pp-demo-instruction')).toBeNull();
+    expect(screen.getByTestId('pp-your-turn')).toHaveTextContent(/Your turn/);
+    expect(onAttempt).not.toHaveBeenCalled();
+
+    rotate('m1');
+    expect(screen.queryByTestId('pp-your-turn')).toBeNull();
+    expect(screen.queryByTestId('pp-demo-button')).toBeNull();
+    expect(onAttempt).toHaveBeenCalledTimes(1);
   });
 
   it('fires onAttempt once on the first mirror rotation with TTI', () => {

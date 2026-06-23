@@ -178,9 +178,10 @@ function WatchGrid({
   const litCoord = litStep !== null ? sequence[litStep] : undefined;
   return (
     <div
+      data-testid="ms-watch-grid"
       role="group"
       aria-label={`Watch the sequence on a ${rows} by ${columns} grid`}
-      style={{ ...gridStyle, gridTemplateColumns: `repeat(${columns}, 1fr)` }}
+      style={memoryGridStyleFor(rows, columns)}
     >
       {Array.from({ length: rows }, (_, row) =>
         Array.from({ length: columns }, (_, column) => {
@@ -325,21 +326,39 @@ function MemorySequenceReproduce({
   return (
     <>
       <div
+        data-testid="ms-reproduce-grid"
         role="group"
         aria-label={`Tap the ${sequence.length} tiles in the order they flashed`}
-        style={{ ...gridStyle, gridTemplateColumns: `repeat(${columns}, 1fr)` }}
+        style={memoryGridStyleFor(rows, columns)}
       >
         {Array.from({ length: rows }, (_, row) =>
-          Array.from({ length: columns }, (_, column) => (
-            <button
-              key={`${row}-${column}`}
-              type="button"
-              data-testid={`ms-tile-${row}-${column}`}
-              aria-label={`Row ${row + 1}, column ${column + 1}`}
-              onClick={() => handleTileTap(row, column)}
-              style={cellStyle}
-            />
-          )),
+          Array.from({ length: columns }, (_, column) => {
+            const selectionSteps = tapped.flatMap((coordinate, index) =>
+              coordinate.row === row && coordinate.column === column
+                ? [index + 1]
+                : [],
+            );
+            const isSelected = selectionSteps.length > 0;
+            const latestStep = selectionSteps[selectionSteps.length - 1];
+            const selectionLabel = selectionSteps.join(', ');
+            return (
+              <button
+                key={`${row}-${column}`}
+                type="button"
+                data-testid={`ms-tile-${row}-${column}`}
+                aria-pressed={isSelected}
+                aria-label={
+                  isSelected
+                    ? `Row ${row + 1}, column ${column + 1}: selected at ${selectionSteps.length === 1 ? 'step' : 'steps'} ${selectionLabel}`
+                    : `Row ${row + 1}, column ${column + 1}`
+                }
+                onClick={() => handleTileTap(row, column)}
+                style={isSelected ? selectedCellStyle : cellStyle}
+              >
+                <span aria-hidden="true">{isSelected ? latestStep : ''}</span>
+              </button>
+            );
+          }),
         )}
       </div>
       <p role="status" aria-live="polite" style={liveRegionStyle}>
@@ -371,6 +390,26 @@ const gridStyle = {
   display: 'grid',
   gap: 'var(--space-2)',
   width: '100%',
+  padding: 'var(--space-2)',
+  borderRadius: 'var(--radius-lg)',
+  border: '1px solid var(--game-border, var(--color-border))',
+  background: 'var(--game-board, transparent)',
+} as const;
+
+function memoryGridStyleFor(rows: number, columns: number) {
+  const compact = rows >= 5;
+  return {
+    ...gridStyle,
+    ...(compact ? compactGridStyle : null),
+    gridTemplateColumns: `repeat(${columns}, 1fr)`,
+  } as const;
+}
+
+const compactGridStyle = {
+  maxWidth: '22.5rem',
+  marginInline: 'auto',
+  gap: 'var(--space-1)',
+  padding: 'var(--space-1)',
 } as const;
 
 const cellStyle = {
@@ -387,8 +426,8 @@ const cellStyle = {
   // rerender as a tile flashes on and off.
   borderWidth: '1px',
   borderStyle: 'solid',
-  borderColor: 'var(--color-border)',
-  background: 'var(--color-surface-raised)',
+  borderColor: 'var(--game-border, var(--color-border))',
+  background: 'var(--game-surface-raised, var(--color-surface-raised))',
   color: 'var(--color-text)',
   fontSize: 'var(--font-size-lg)',
   fontFamily: 'var(--font-sans)',
@@ -414,6 +453,18 @@ const litCellStyle = {
   background: 'var(--accent, var(--color-accent))',
   borderColor: 'var(--accent, var(--color-accent))',
   transform: 'scale(1.04)',
+} as const;
+
+// Reproduce-phase selection: the persistent accent fill makes every chosen tile
+// easy to scan, while the visible step number carries the same state without
+// relying on colour alone. Repeated taps show the most recent step; the full set
+// of steps remains in the button's accessible label.
+const selectedCellStyle = {
+  ...cellStyle,
+  background: 'var(--accent, var(--color-accent))',
+  borderColor: 'var(--accent, var(--color-accent))',
+  color: 'var(--color-accent-contrast)',
+  fontWeight: 'var(--font-weight-bold)',
 } as const;
 
 const liveRegionStyle = {

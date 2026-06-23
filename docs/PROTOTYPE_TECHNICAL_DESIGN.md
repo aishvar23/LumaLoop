@@ -160,7 +160,12 @@ export type TemplateType =
   | 'rule_flip'
   | 'tiny_logic';
 
-export type Difficulty = 'easy' | 'medium' | 'hard';
+export type Difficulty =
+  | 'extremely_easy'
+  | 'easy'
+  | 'medium'
+  | 'hard'
+  | 'extremely_hard';
 
 export type PuzzleDna = {
   mechanic: string;
@@ -460,7 +465,7 @@ Prototype catalog requirements:
 
 - 20-30 cards total
 - At least 5 cards per initial template
-- Mix easy, medium, and hard cards
+- Mix extremely easy, easy, medium, and hard cards
 - Every card must have an explanation
 - Every card must have `evidenceTier: 'mechanic_mapped'` or `entertainment_only`
 - No card may claim clinical or generalized cognitive improvement
@@ -471,7 +476,7 @@ Catalog validation should run at startup:
 - Supported `templateType`
 - Valid category for template
 - Non-empty prompt
-- Time limit between 5 and 30 seconds
+- Time limit between 5 and 120 seconds
 - Template-specific correct answer is present, such as `anomalyRow`/`anomalyColumn`, `correctOptionId`, or rule-match flags in `stimuli`
 - Explanation exists
 - `benchmark_probe` is disallowed in the prototype unless explicitly whitelisted
@@ -497,7 +502,7 @@ Selection rules:
 
 - Use a fixed seeded order per `anonymousUserId` and test day.
 - Balance categories across the session where possible.
-- Start with easier cards and ramp toward medium difficulty.
+- Start with extremely easy/easy cards and ramp toward medium difficulty.
 - Keep estimated session budget under the selected mode, but accept that the prototype is primarily card-count bounded.
 - Avoid showing more than two cards from the same template back-to-back.
 

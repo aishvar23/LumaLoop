@@ -6,6 +6,7 @@
  * answer phase begins resolves TIMEOUT.
  */
 import { fireEvent, render, screen, act } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 
 import type { WhatChangedCard as WhatChangedCardType } from '../../core/cards/types';
 import type { CardResolution, CardStartContext } from '../../core/templates/contract';
@@ -75,6 +76,31 @@ it('shows the preview first (no options) then mounts the answer options after pr
     // Answer phase: after-pattern + options mounted.
     expect(screen.getByTestId('wc-after-1')).toBeOnTheScreen();
     expect(screen.getByTestId('wc-option-opt-b')).toBeOnTheScreen();
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+it('uses a compact two-column answer grid so the card fits the feed viewport', () => {
+  jest.useFakeTimers();
+  try {
+    render(
+      <WhatChangedCard
+        card={makeCard()}
+        context={context()}
+        onAttempt={jest.fn()}
+        onResolve={jest.fn()}
+      />,
+    );
+
+    act(() => jest.advanceTimersByTime(PREVIEW_MS));
+
+    expect(StyleSheet.flatten(screen.getByTestId('wc-options').props.style)).toEqual(
+      expect.objectContaining({ flexDirection: 'row', flexWrap: 'wrap' }),
+    );
+    expect(
+      StyleSheet.flatten(screen.getByTestId('wc-option-opt-a').props.style),
+    ).toEqual(expect.objectContaining({ flexBasis: '46%', flexGrow: 1 }));
   } finally {
     jest.useRealTimers();
   }

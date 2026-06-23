@@ -41,6 +41,7 @@ import {
   space,
   TAP_TARGET_MIN,
 } from './tokens';
+import { useGameTheme } from './GameTheme';
 
 /**
  * The renderer accepts the shared {@link TemplateProps} plus an optional
@@ -61,7 +62,9 @@ export default function SpotItCard({
   now = Date.now,
 }: SpotItCardProps) {
   const { config } = card;
+  const theme = useGameTheme();
   const { rows, columns, baseElement, anomalyElement } = config;
+  const columnGap = columns >= 6 ? space.xs : space.sm;
 
   // Per-card interaction bookkeeping lives in refs so taps don't depend on render
   // timing. `falseTaps` is mirrored into state purely to drive the polite
@@ -149,14 +152,23 @@ export default function SpotItCard({
     <View style={styles.section} accessibilityLabel="Spot the anomaly">
       <Text style={styles.prompt}>{card.prompt}</Text>
       <View
+        testID="spot-grid"
         accessibilityLabel={`${rows} by ${columns} grid; tap the one element that is different`}
-        style={styles.grid}
+        style={[
+          styles.grid,
+          { backgroundColor: theme.surface, borderColor: theme.border },
+        ]}
       >
         {Array.from({ length: rows }, (_, row) => (
-          <View key={`row-${row}`} style={styles.row}>
+          <View
+            key={`row-${row}`}
+            testID={`spot-row-${row}`}
+            style={[styles.row, { gap: columnGap }]}
+          >
             {Array.from({ length: columns }, (_, column) => {
               const isAnomaly = isAnomalyCell(config, row, column);
               const element = isAnomaly ? anomalyElement : baseElement;
+              const cellTextStyle = cellTextStyleFor(element);
               return (
                 <Pressable
                   key={`${row}-${column}`}
@@ -166,10 +178,24 @@ export default function SpotItCard({
                   onPress={() => handleCellTap(row, column)}
                   style={({ pressed }) => [
                     styles.cell,
-                    pressed && styles.cellPressed,
+                    {
+                      backgroundColor: theme.surfaceRaised,
+                      borderColor: theme.border,
+                    },
+                    pressed && {
+                      backgroundColor: theme.surfaceStrong,
+                      borderColor: theme.accent,
+                    },
                   ]}
                 >
-                  <Text style={styles.cellText}>{element}</Text>
+                  <Text
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.65}
+                    style={[styles.cellText, cellTextStyle, { color: theme.accent }]}
+                  >
+                    {element}
+                  </Text>
                 </Pressable>
               );
             })}
@@ -189,6 +215,13 @@ export default function SpotItCard({
   );
 }
 SpotItCard.displayName = 'SpotItCard';
+
+function cellTextStyleFor(element: string) {
+  const glyphLength = Array.from(element).length;
+  if (glyphLength >= 3) return styles.cellTextLong;
+  if (glyphLength === 2) return styles.cellTextMedium;
+  return styles.cellTextSingle;
+}
 
 const styles = StyleSheet.create({
   section: {
@@ -213,7 +246,7 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
-    gap: space.sm,
+    width: '100%',
   },
   cell: {
     flex: 1,
@@ -222,6 +255,7 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
@@ -235,7 +269,23 @@ const styles = StyleSheet.create({
   },
   cellText: {
     color: colors.text,
+    textAlign: 'center',
+    maxWidth: '92%',
+    includeFontPadding: false,
+  },
+  cellTextSingle: {
     fontSize: fontSize.xl,
+    lineHeight: fontSize.xl * lineHeight.tight,
+  },
+  cellTextMedium: {
+    fontSize: fontSize.md,
+    lineHeight: fontSize.md * lineHeight.tight,
+    letterSpacing: -0.25,
+  },
+  cellTextLong: {
+    fontSize: fontSize.sm,
+    lineHeight: fontSize.sm * lineHeight.tight,
+    letterSpacing: -0.5,
   },
   status: {
     minHeight: fontSize.md,
