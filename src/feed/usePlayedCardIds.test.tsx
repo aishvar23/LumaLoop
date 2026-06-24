@@ -4,12 +4,17 @@ import { describe, expect, it } from 'vitest';
 import type { AuthClient } from '../auth/authClient';
 import { usePlayedCardIds } from './usePlayedCardIds';
 
-/** A from() that resolves a `user_game_scores` select/eq to scripted rows. */
+/**
+ * A from() that resolves a `user_game_scores` select/eq to scripted rows.
+ * Chainable (each `.eq()` returns the builder) and thenable (awaiting resolves
+ * to `result`), so the chained `.eq('user_id').eq('ever_correct', true)` query works.
+ */
 function clientReturning(result: { data: unknown; error: unknown }): AuthClient {
   const builder: Record<string, unknown> = {};
   Object.assign(builder, {
     select: () => builder,
-    eq: () => Promise.resolve(result),
+    eq: () => builder,
+    then: (resolve: (r: unknown) => unknown) => resolve(result),
   });
   return { from: () => builder } as unknown as AuthClient;
 }

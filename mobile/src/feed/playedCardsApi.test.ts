@@ -1,12 +1,17 @@
 import type { AuthClient } from '../auth/authClient';
 import { fetchPlayedCardIds } from './playedCardsApi';
 
-/** A from() that returns a scripted result for the chained select/eq query. */
+/**
+ * A from() that returns a scripted result for the chained select/eq query.
+ * Chainable (each `.eq()` returns the builder) and thenable (awaiting resolves
+ * to `result`), mirroring a real Supabase query builder.
+ */
 function clientReturning(result: { data: unknown; error: unknown }): AuthClient {
   const builder: Record<string, unknown> = {};
   Object.assign(builder, {
     select: () => builder,
-    eq: () => Promise.resolve(result),
+    eq: () => builder,
+    then: (resolve: (r: unknown) => unknown) => resolve(result),
   });
   return { from: () => builder } as unknown as AuthClient;
 }
@@ -64,5 +69,25 @@ describe('fetchPlayedCardIds', () => {
       'user-1',
     );
     expect([...res.cardIds]).toEqual(['ok']);
+  });
+
+  it('only retires games answered correctly (filters ever_correct = true)', async () => {
+    const eqCalls: Array<[string, unknown]> = [];
+    const builder: Record<string, unknown> = {};
+    Object.assign(builder, {
+      select: () => builder,
+      eq: (column: string, value: unknown) => {
+        eqCalls.push([column, value]);
+        return builder;
+      },
+      then: (resolve: (r: unknown) => unknown) =>
+        resolve({ data: [{ card_id: 'a' }], error: null }),
+    });
+    const client = { from: () => builder } as unknown as AuthClient;
+
+    await fetchPlayedCardIds(client, 'user-1');
+
+    expect(eqCalls).toContainEqual(['user_id', 'user-1']);
+    expect(eqCalls).toContainEqual(['ever_correct', true]);
   });
 });

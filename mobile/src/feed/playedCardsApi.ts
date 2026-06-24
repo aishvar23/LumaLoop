@@ -8,10 +8,10 @@
  * (security_invoker on the view → self-only on `game_plays`) guarantees the
  * caller only ever sees their own rows; this helper only shapes the request.
  *
- * "ALREADY PLAYED" = ANY play of that card (a row exists in `user_game_scores`,
- * i.e. `times_played >= 1`), NOT "answered correctly". Default per the task: a
- * skip-on-replay should fire once the user has engaged a game at all, regardless
- * of outcome — re-serving a game they already lost is still a repeat.
+ * "ALREADY PLAYED" = the user has ANSWERED THAT CARD CORRECTLY at least once
+ * (`user_game_scores.ever_correct = true`). A card the user played but never
+ * solved is NOT skipped — it can come back around so they get another shot;
+ * only solved games are retired from the feed.
  *
  * BEST-EFFORT / NEVER-THROWS (task constraint): gameplay must never be blocked
  * by this read. Any failure (signed out, offline, RLS, transient, malformed)
@@ -52,7 +52,8 @@ export async function fetchPlayedCardIds(
     const { data, error } = await client
       .from('user_game_scores')
       .select('card_id')
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .eq('ever_correct', true);
 
     if (error) return { cardIds: new Set<string>(), error: error.message };
 
