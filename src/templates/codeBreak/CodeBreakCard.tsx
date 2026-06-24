@@ -329,6 +329,10 @@ const historyStyle = {
   flexDirection: 'column',
   gap: 'var(--space-2)',
   width: '100%',
+  padding: 'var(--space-3)',
+  borderRadius: 'var(--radius-lg)',
+  border: '1px solid var(--game-border, var(--color-border))',
+  background: 'var(--game-board, transparent)',
   // Cap the history height so a long board scrolls instead of pushing the
   // builder off-screen on small viewports.
   maxHeight: '34vh',
@@ -357,8 +361,8 @@ const historyChipStyle = {
   minHeight: 'calc(var(--tap-target-min) * 0.7)',
   padding: 'var(--space-1)',
   borderRadius: 'var(--radius-sm)',
-  border: '1px solid var(--color-border)',
-  background: 'var(--color-surface-raised)',
+  border: '1px solid var(--game-border, var(--color-border))',
+  background: 'var(--game-surface-raised, var(--color-surface-raised))',
   color: 'var(--color-text)',
   fontSize: 'var(--font-size-md)',
   fontFamily: 'var(--font-sans)',
@@ -388,8 +392,8 @@ const slotStyle = {
   borderRadius: 'var(--radius-md)',
   borderWidth: '2px',
   borderStyle: 'dashed',
-  borderColor: 'var(--color-border)',
-  background: 'var(--color-surface-raised)',
+  borderColor: 'var(--game-border, var(--color-border))',
+  background: 'var(--game-surface-raised, var(--color-surface-raised))',
   color: 'var(--color-text)',
   fontSize: 'var(--font-size-lg)',
   fontFamily: 'var(--font-sans)',
@@ -423,8 +427,8 @@ const paletteButtonStyle = {
   minWidth: 'var(--tap-target-min)',
   padding: 'var(--space-2)',
   borderRadius: 'var(--radius-md)',
-  border: '1px solid var(--color-border)',
-  background: 'var(--color-surface-raised)',
+  border: '1px solid var(--game-border, var(--color-border))',
+  background: 'var(--game-surface-raised, var(--color-surface-raised))',
   color: 'var(--color-text)',
   fontSize: 'var(--font-size-lg)',
   fontFamily: 'var(--font-sans)',
@@ -450,7 +454,7 @@ const submitStyle = {
 
 const submitDisabledStyle = {
   ...submitStyle,
-  background: 'var(--color-surface-raised)',
+  background: 'var(--game-surface-raised, var(--color-surface-raised))',
   color: 'var(--color-text-muted)',
   cursor: 'not-allowed',
 } as const;

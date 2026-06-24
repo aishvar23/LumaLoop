@@ -7,10 +7,10 @@
  * captures the observer callback and lets a test simulate a slide snapping into
  * view (the real on-scroll signal that drives the active index → endless growth).
  */
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { LiquidCard, SpotItCard } from '../cards/types';
+import type { LiquidCard, PrismPathCard, SpotItCard } from '../cards/types';
 import type { RendererRegistry } from '../session/rendererRegistry';
 import type { CardResolution, TemplateProps } from '../templates/contract';
 import { useCardTimer } from '../templates/useCardTimer';
@@ -72,7 +72,7 @@ function makeCard(cardId: string): LiquidCard {
     creatorHandle: `@creator_${cardId}`,
     templateType: 'spot_it',
     category: 'visual_attention',
-    difficulty: 'easy',
+    difficulty: 'extremely_easy',
     evidenceTier: 'entertainment_only',
     reviewStatus: 'unreviewed',
     estimatedSeconds: 10,
@@ -90,6 +90,39 @@ function makeCard(cardId: string): LiquidCard {
     },
   };
   return card;
+}
+
+function makePrismPathCard(cardId: string): PrismPathCard {
+  return {
+    cardId,
+    creatorHandle: `@creator_${cardId}`,
+    templateType: 'prism_path',
+    category: 'logical_reasoning',
+    difficulty: 'hard',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 28,
+    prompt: 'Route the beam',
+    puzzleDna: {
+      mechanic: 'mirror-beam-routing',
+      inputMode: 'tap',
+      measuredSignals: [],
+    },
+    explanation: { title: 'Why', body: 'Because.' },
+    config: {
+      rows: 2,
+      columns: 3,
+      entry: { row: 1, column: 0 },
+      entryDirection: 'right',
+      target: { row: 0, column: 2 },
+      mirrors: [
+        { id: 'm1', row: 1, column: 1, initialOrientation: 'slash' },
+      ],
+      blockers: [],
+      solution: [{ mirrorId: 'm1', orientation: 'slash' }],
+      timeLimitMs: 10_000,
+    },
+  };
 }
 
 const fakeGetCardById = (cardId: string): LiquidCard | undefined =>
@@ -206,7 +239,10 @@ type LifecycleHandlers = {
   onCardResolved?: (i: number, r: CardResolution) => void;
 };
 
-function renderFeed(extra?: LifecycleHandlers, registry: RendererRegistry = stubRegistry) {
+function renderFeed(
+  extra?: LifecycleHandlers,
+  registry: RendererRegistry = stubRegistry,
+) {
   return render(
     <FeedScreen
       anonymousUserId="anon"
@@ -256,7 +292,7 @@ describe('FeedScreen', () => {
     // Handle is `@creator_b0-0` → monogram "C". The avatar is decorative
     // (aria-hidden); the @handle beside it carries the readable meaning.
     const byline = screen.getByTestId('feed-byline-0');
-    const author = byline.parentElement;
+    const author = byline.closest('.feed-slide__author');
     expect(author).not.toBeNull();
     expect(author).toHaveTextContent('C');
   });
@@ -265,6 +301,42 @@ describe('FeedScreen', () => {
     renderFeed();
     // category `visual_attention` → "Visual attention" (no IQ/trait language).
     expect(screen.getAllByText('Visual attention').length).toBeGreaterThan(0);
+  });
+
+  it('gives each game its own template, mechanic, and difficulty identity', () => {
+    renderFeed();
+    const game = within(screen.getByTestId('feed-game-0'));
+    expect(game.queryByText('Playable')).not.toBeInTheDocument();
+    expect(game.getByText('Spot it')).toBeInTheDocument();
+    expect(game.getByText('Scan')).toBeInTheDocument();
+    expect(game.getByLabelText('Extremely easy difficulty')).toBeInTheDocument();
+    expect(screen.getAllByText('Extremely easy').length).toBeGreaterThan(0);
+  });
+
+  it('surfaces a helpful Prism Path description on the template label', () => {
+    const prismCard = makePrismPathCard('prism-0');
+    render(
+      <FeedScreen
+        anonymousUserId="anon"
+        source={() => ['prism-0']}
+        registry={{
+          prism_path: StubRenderer as unknown as RendererRegistry['prism_path'],
+        }}
+        getCardById={() => prismCard}
+        scoreStore={null}
+      />,
+    );
+
+    const game = within(screen.getByTestId('feed-game-0'));
+    const label = game.getByLabelText(
+      /Rotate mirrors to guide a beam from IN to the star/,
+    );
+    expect(label).toHaveTextContent('Prism path');
+    expect(label).toHaveAttribute(
+      'title',
+      expect.stringContaining('Tap mirrors to flip'),
+    );
+    expect(label).toHaveAttribute('data-has-description', 'true');
   });
 
   it('only mounts games inside the active window; others are placeholders', () => {
@@ -286,6 +358,20 @@ describe('FeedScreen', () => {
     }
     // 41 advances from index 1 → index 41 still materialises a real game.
     expect(screen.getByTestId('feed-game-41')).toBeInTheDocument();
+  });
+
+  it('keeps keyboard navigation inside the snap scroller', () => {
+    renderFeed();
+    const feedScroller = scroller();
+    Object.defineProperty(feedScroller, 'clientHeight', {
+      configurable: true,
+      value: 844,
+    });
+
+    fireEvent.keyDown(feedScroller, { key: 'ArrowDown' });
+
+    expect(feedScroller.scrollTop).toBe(844);
+    expect(globalThis.scrollY).toBe(0);
   });
 
   it('clamps at the start on ArrowUp', () => {
@@ -453,7 +539,12 @@ describe('FeedScreen', () => {
     const onCardSkipped = vi.fn();
     const onCardAbandoned = vi.fn();
     const onCardResolved = vi.fn();
-    renderFeed({ onCardEngaged, onCardSkipped, onCardAbandoned, onCardResolved });
+    renderFeed({
+      onCardEngaged,
+      onCardSkipped,
+      onCardAbandoned,
+      onCardResolved,
+    });
 
     // Engaging twice still signals engagement exactly once.
     fireEvent.click(screen.getByTestId('engage-b0-0'));
@@ -570,7 +661,9 @@ describe('FeedScreen', () => {
     fireEvent.keyDown(scroller(), { key: 'ArrowUp' }); // 1 → 0: skip 1
     fireEvent.keyDown(scroller(), { key: 'ArrowDown' }); // 0 → 1: 0 is latched
 
-    const skippedZero = onCardSkipped.mock.calls.filter(([index]) => index === 0);
+    const skippedZero = onCardSkipped.mock.calls.filter(
+      ([index]) => index === 0,
+    );
     expect(skippedZero).toHaveLength(1);
   });
 });

@@ -321,8 +321,8 @@ const tileStyle = {
   minWidth: 'var(--tap-target-min)',
   padding: 'var(--space-2)',
   borderRadius: 'var(--radius-md)',
-  border: '1px solid var(--color-border)',
-  background: 'var(--color-surface-raised)',
+  border: '1px solid var(--game-border, var(--color-border))',
+  background: 'var(--game-surface-raised, var(--color-surface-raised))',
   color: 'var(--color-text)',
   fontSize: 'var(--font-size-lg)',
   fontFamily: 'var(--font-sans)',
@@ -342,8 +342,8 @@ const optionStyle = {
   minHeight: 'var(--tap-target-min)',
   padding: 'var(--space-3)',
   borderRadius: 'var(--radius-md)',
-  border: '1px solid var(--color-border)',
-  background: 'var(--color-surface-raised)',
+  border: '1px solid var(--game-border, var(--color-border))',
+  background: 'var(--game-surface-raised, var(--color-surface-raised))',
   color: 'var(--color-text)',
   fontSize: 'var(--font-size-md)',
   fontFamily: 'var(--font-sans)',
@@ -356,7 +356,7 @@ const optionStyle = {
 const optionSelectedStyle = {
   ...optionStyle,
   border: '1px solid var(--accent, var(--color-accent))',
-  background: 'var(--accent-tint, var(--color-surface-raised))',
+  background: 'var(--accent-tint, var(--game-surface-raised, var(--color-surface-raised)))',
 } as const;
 
 const liveRegionStyle = {

@@ -49,6 +49,7 @@ import {
   space,
   TAP_TARGET_MIN,
 } from './tokens';
+import { useGameTheme } from './GameTheme';
 
 /**
  * The renderer accepts the shared {@link TemplateProps} plus an optional injectable
@@ -67,6 +68,7 @@ export default function TinyLogicCard({
   now = Date.now,
 }: TinyLogicCardProps) {
   const { config } = card;
+  const theme = useGameTheme();
 
   // Interaction bookkeeping lives in refs so selections don't depend on render
   // timing. `selectedId` is mirrored into state purely to drive the pressed
@@ -191,13 +193,24 @@ export default function TinyLogicCard({
               onPress={() => handleSelect(option.id)}
               style={({ pressed }) => [
                 styles.option,
-                pressed && styles.optionPressed,
-                isSelected && styles.optionSelected,
+                {
+                  backgroundColor: theme.surfaceRaised,
+                  borderColor: theme.border,
+                },
+                pressed && { backgroundColor: theme.surfaceStrong },
+                isSelected && {
+                  backgroundColor: theme.surfaceStrong,
+                  borderColor: theme.accent,
+                },
               ]}
             >
               {/* Non-colour selected cue: an explicit ▸ marker, not hue alone. */}
               <Text
-                style={[styles.optionText, isSelected && styles.optionTextSelected]}
+                style={[
+                  styles.optionText,
+                  isSelected && styles.optionTextSelected,
+                  isSelected && { color: theme.accent },
+                ]}
               >
                 {isSelected ? '▸ ' : ''}
                 {option.label}

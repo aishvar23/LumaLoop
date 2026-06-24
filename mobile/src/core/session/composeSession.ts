@@ -26,9 +26,9 @@
  *     dayKey, mode])`, which drives one seeded Fisher-Yates shuffle of the
  *     eligible pool.
  *   - Length = `MODE_DEFAULTS[mode].maxCards` where the catalog allows.
- *   - Difficulty ramp (easy -> medium): slots are filled in ascending
+ *   - Difficulty ramp (extremely easy -> easy -> medium): slots are filled in ascending
  *     difficulty so the emitted sequence is non-decreasing in difficulty. A
- *     quota front-loads easy cards and ramps into medium; `hard` is used only
+ *     quota front-loads extremely-easy/easy cards and ramps into medium; `hard` is used only
  *     as fallback to reach the target length (Design §19 ramps "toward medium",
  *     not into hard).
  *   - Category balance: at each slot the lowest-used category is preferred, so
@@ -119,13 +119,21 @@ export type ComposeSessionParams = {
 
 /** Ascending difficulty rank used to enforce the non-decreasing ramp. */
 const DIFFICULTY_RANK: Readonly<Record<Difficulty, number>> = Object.freeze({
-  easy: 0,
-  medium: 1,
-  hard: 2,
+  extremely_easy: 0,
+  easy: 1,
+  medium: 2,
+  hard: 3,
+  extremely_hard: 4,
 });
 
 /** Difficulty tiers in ascending order — the spill order for tier fallback. */
-const DIFFICULTY_ORDER: readonly Difficulty[] = ['easy', 'medium', 'hard'];
+const DIFFICULTY_ORDER: readonly Difficulty[] = [
+  'extremely_easy',
+  'easy',
+  'medium',
+  'hard',
+  'extremely_hard',
+];
 
 /** Clamp a number into `[0, 1]` (NaN -> 0). Used to harden the difficulty bias. */
 function clamp01(value: number): number {
@@ -140,13 +148,13 @@ function clamp01(value: number): number {
  * a progressive `bias` in `[0, 1]`. Pure and deterministic — the ramp curve is
  * a function of (maxCards, bias) only.
  *
- * Shape: an easy block, then a medium block, then a hard block (so the result
- * is NON-DECREASING by construction). The block sizes slide with the bias:
+ * Shape: an introductory block, then a medium block, then a hard block (so the
+ * result is NON-DECREASING by construction). The block sizes slide with bias:
  *
- *   - `bias = 0` reproduces the original quota EXACTLY — `ceil(maxCards/2)` easy
- *     slots, the remainder medium, zero hard (verified by the existing
- *     composeSession ramp tests).
- *   - As `bias` rises, the easy block shrinks (`(1 - bias)` of its base size)
+ *   - `bias = 0` reserves `ceil(maxCards/2)` introductory slots. They request
+ *     `extremely_easy` first and spill upward to `easy` when that small authored
+ *     tier is exhausted; the remainder request medium, with zero hard.
+ *   - As `bias` rises, the introductory block shrinks (`(1 - bias)` of its size)
  *     and a hard block grows from the tail (`bias` of all slots); medium fills
  *     whatever sits between them. At `bias = 1` every slot wants `hard`.
  *
@@ -159,16 +167,16 @@ function rampDesiredDifficulties(
   bias: number,
 ): Difficulty[] {
   const b = clamp01(bias);
-  // Base easy block is half the slots (the original easy quota), shrinking with
-  // bias. Hard block grows from zero with bias. Round so bias 0 -> 0 hard and
-  // bias 1 -> all hard / no easy.
+  // Base introductory block is half the slots, shrinking with bias. It starts at
+  // extremely_easy and naturally spills into easy. Round so bias 0 -> 0 hard
+  // and bias 1 -> all hard / no introductory cards.
   const baseEasy = Math.ceil(maxCards / 2);
   const easyCount = Math.min(Math.round(baseEasy * (1 - b)), maxCards);
   const hardCount = Math.min(Math.round(maxCards * b), maxCards - easyCount);
   const mediumCount = maxCards - easyCount - hardCount;
 
   const desired: Difficulty[] = [];
-  for (let i = 0; i < easyCount; i++) desired.push('easy');
+  for (let i = 0; i < easyCount; i++) desired.push('extremely_easy');
   for (let i = 0; i < mediumCount; i++) desired.push('medium');
   for (let i = 0; i < hardCount; i++) desired.push('hard');
   return desired;
@@ -395,15 +403,17 @@ export function composeSession(params: ComposeSessionParams): readonly string[] 
 
   // Bucket the shuffled pool by difficulty, preserving seeded order within each.
   const tiers: Record<Difficulty, LiquidCard[]> = {
+    extremely_easy: [],
     easy: [],
     medium: [],
     hard: [],
+    extremely_hard: [],
   };
   for (const card of shuffled) tiers[card.difficulty].push(card);
 
-  // Ramp quota: front-load easy, ramp into medium (and, under a positive
+  // Ramp quota: front-load extremely easy/easy, ramp into medium (and, under a positive
   // difficulty bias, into hard). At the default bias 0 this is exactly the
-  // original quota — front-loaded easy ramping into medium with `hard` reached
+  // introductory quota — extremely easy/easy ramping into medium, with `hard` reached
   // only via tier spill (Design §19). The endless feed raises the bias batch
   // over batch so later batches skew harder (FEED_DIRECTION §3.1).
   const desired = rampDesiredDifficulties(maxCards, params.difficultyBias ?? 0);
@@ -414,8 +424,24 @@ export function composeSession(params: ComposeSessionParams): readonly string[] 
     totalSeconds: 0,
   };
 
+  // Realized-difficulty FLOOR: the rank of the previous slot's actual card. The
+  // ramp's `wantedDifficulty` is non-decreasing, but a slot can SPILL upward into
+  // a harder tier when its wanted tier is exhausted (or blocked by the
+  // no-3-in-a-row hard constraint). Without a floor, a *later* slot whose wanted
+  // tier still has stock could then drop BELOW that spilled card and break the
+  // non-decreasing guarantee — a case the new `extremely_easy` tier + the D2
+  // exclusion filter can produce. Clamping each slot's spill start to this floor
+  // makes the realized sequence non-decreasing BY CONSTRUCTION, independent of
+  // exhaustion/exclusion. Template-agnostic — it reads only `card.difficulty`.
+  let floor: Difficulty = DIFFICULTY_ORDER[0];
+
   for (const wantedDifficulty of desired) {
-    const order = spillOrder(wantedDifficulty);
+    // Never request a tier below what we've already realized (the floor).
+    const slotStart =
+      DIFFICULTY_RANK[wantedDifficulty] >= DIFFICULTY_RANK[floor]
+        ? wantedDifficulty
+        : floor;
+    const order = spillOrder(slotStart);
 
     // Pass 1: honor the no-3-in-a-row hard constraint, spilling into harder
     // tiers (only) when the wanted tier is empty.
@@ -435,6 +461,10 @@ export function composeSession(params: ComposeSessionParams): readonly string[] 
       (state.categoryCount.get(card.category) ?? 0) + 1,
     );
     state.totalSeconds += card.estimatedSeconds;
+    // Raise the floor to the realized difficulty — never lower it.
+    if (DIFFICULTY_RANK[card.difficulty] > DIFFICULTY_RANK[floor]) {
+      floor = card.difficulty;
+    }
   }
 
   return state.selected.map((card) => card.cardId);

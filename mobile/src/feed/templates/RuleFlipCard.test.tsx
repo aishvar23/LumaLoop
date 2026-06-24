@@ -73,6 +73,9 @@ it('flips the rule at flipAtStimulusIndex and resolves via the evaluator', () =>
 
     // Gate first: the stream has not started and no stimulus is visible.
     expect(screen.getByTestId('rf-gate-rule')).toHaveTextContent(/Vowels match/);
+    expect(screen.getByTestId('rf-demo-button').props.accessibilityHint).toContain(
+      'adds about 5 seconds',
+    );
     expect(screen.queryByTestId('rf-stimulus')).toBeNull();
 
     // Start the measured stream.
@@ -118,7 +121,57 @@ it('flips the rule at flipAtStimulusIndex and resolves via the evaluator', () =>
       pre_flip_accuracy: 1,
       post_flip_accuracy: 1,
       perseveration: 0,
+      failed_step: -1,
+      failure_reason: '',
     });
+    const actionLog = JSON.parse(resolution.signals.step_action_log as string) as Array<{
+      step: number;
+      correct: boolean;
+    }>;
+    expect(actionLog).toHaveLength(3);
+    expect(actionLog.every((item) => item.correct)).toBe(true);
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+it('plays a separate demo without starting the stream or attempt', () => {
+  jest.useFakeTimers();
+  try {
+    const onAttempt = jest.fn();
+    const onResolve = jest.fn<void, [CardResolution]>();
+    render(
+      <RuleFlipCard
+        card={makeCard()}
+        context={context()}
+        onAttempt={onAttempt}
+        onResolve={onResolve}
+        now={() => ACTIVE_AT}
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('rf-demo-button'));
+    expect(screen.getByLabelText('Rule Flip demonstration')).toBeOnTheScreen();
+    expect(screen.getByTestId('rf-demo-rule')).toHaveTextContent(
+      /Filled circles match/,
+    );
+    expect(screen.getByTestId('rf-demo-answer')).toHaveTextContent(/Match/);
+
+    act(() => jest.advanceTimersByTime(1500));
+    expect(screen.getByTestId('rf-demo-rule')).toHaveTextContent(
+      /outlined squares match/,
+    );
+    expect(screen.getByTestId('rf-demo-answer')).toHaveTextContent(/No-match/);
+
+    act(() => jest.advanceTimersByTime(1500));
+    expect(screen.getByTestId('rf-demo-stimulus')).toHaveTextContent('□');
+
+    act(() => jest.advanceTimersByTime(2000));
+    expect(screen.queryByTestId('rf-demo-rule')).toBeNull();
+    expect(screen.getByTestId('rf-your-turn')).toHaveTextContent(/Your turn/);
+    expect(screen.queryByTestId('rf-stimulus')).toBeNull();
+    expect(onAttempt).not.toHaveBeenCalled();
+    expect(onResolve).not.toHaveBeenCalled();
   } finally {
     jest.useRealTimers();
   }
@@ -196,6 +249,56 @@ it('resolves INCORRECT when responses are wrong under the active rule', () => {
       resolutionType: 'incorrect',
       isCorrect: false,
     });
+    expect(onResolve.mock.calls[0][0].signals.failed_step).toBe(1);
+    expect(onResolve.mock.calls[0][0].signals.failure_reason).toContain(
+      'Step 1 (A)',
+    );
+    expect(onResolve.mock.calls[0][0].signals.step_action_log).toContain(
+      '"step":1',
+    );
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+it('fails when only one step is wrong and names that failed step', () => {
+  jest.useFakeTimers();
+  try {
+    const onResolve = jest.fn<void, [CardResolution]>();
+    let t = ACTIVE_AT;
+    render(
+      <RuleFlipCard
+        card={makeCard()}
+        context={context()}
+        onAttempt={jest.fn()}
+        onResolve={onResolve}
+        now={() => t}
+      />,
+    );
+
+    act(() => {
+      fireEvent.press(screen.getByTestId('rf-start'));
+    });
+
+    const stepForward = () => {
+      act(() => jest.advanceTimersByTime(SHOW_MS));
+      act(() => jest.advanceTimersByTime(GAP_MS));
+    };
+
+    t = ACTIVE_AT + 300;
+    fireEvent.press(screen.getByTestId('rf-match')); // s0 correct
+    stepForward();
+    fireEvent.press(screen.getByTestId('rf-no-match')); // s1 correct pre-flip
+    stepForward();
+    fireEvent.press(screen.getByTestId('rf-no-match')); // s2 wrong post-flip
+    stepForward();
+
+    const resolution = onResolve.mock.calls[0][0];
+    expect(resolution.resolutionType).toBe('incorrect');
+    expect(resolution.isCorrect).toBe(false);
+    expect(resolution.signals.overall_accuracy).toBe(2 / 3);
+    expect(resolution.signals.failed_step).toBe(3);
+    expect(resolution.signals.failure_reason).toContain('Step 3 (C)');
   } finally {
     jest.useRealTimers();
   }

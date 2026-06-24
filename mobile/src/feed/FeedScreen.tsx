@@ -14,7 +14,7 @@
  * resolves a renderer for each card via the injected {@link RendererRegistry} only
  * — there is NO switch on `templateType` anywhere, so adding a new game never
  * touches this file (CLAUDE.md §6). It defaults to the {@link feedRegistry} — the
- * four real native renderers, each behind the uniform feedback/explanation
+ * all shipped native renderers, each behind the uniform feedback/explanation
  * {@link FeedbackGate} (#133); tests inject a stub/fake registry.
  *
  * Active-card detection: a game becomes ACTIVE when it snaps into view, detected
@@ -43,6 +43,7 @@ import {
   Animated,
   FlatList,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -65,12 +66,17 @@ import {
   PAGE_BACKGROUND,
   slideGradient,
   categoryAccent,
+  elevation,
   motion,
 } from './templates/tokens';
+import { GameThemeProvider } from './templates/GameTheme';
 import { useReducedMotion } from './useReducedMotion';
 import { getCardById as getCatalogCardById } from '../core/cards/catalog';
 import type { LiquidCard } from '../core/cards/types';
-import type { CardResolution, CardStartContext } from '../core/templates/contract';
+import type {
+  CardResolution,
+  CardStartContext,
+} from '../core/templates/contract';
 import { resolveRenderer } from './rendererRegistry';
 import type { RendererRegistry, TemplateRenderer } from './rendererRegistry';
 import { feedRegistry } from './FeedbackGate';
@@ -104,7 +110,7 @@ const DEFAULT_ANONYMOUS_USER_ID = 'anonymous';
 export type FeedScreenProps = {
   /**
    * Test/wiring seam: maps each `templateType` to its renderer (dependency
-   * inversion). Defaults to the {@link feedRegistry} — the four real native
+   * inversion). Defaults to the {@link feedRegistry} — all shipped native
    * renderers, each behind the uniform feedback/explanation gate (#133); tests
    * inject a stub/fake. Must be referentially stable.
    */
@@ -212,7 +218,9 @@ function timerGatedCard(card: LiquidCard, engaged: boolean): LiquidCard {
 
 /** A best-effort per-mount feed id; RN engines may lack `crypto.randomUUID`. */
 function makeFeedId(anonymousUserId: string, stamp: number): string {
-  return globalThis.crypto?.randomUUID?.() ?? `feed-${anonymousUserId}-${stamp}`;
+  return (
+    globalThis.crypto?.randomUUID?.() ?? `feed-${anonymousUserId}-${stamp}`
+  );
 }
 
 export default function FeedScreen({
@@ -404,9 +412,12 @@ export default function FeedScreen({
   // Forward a renderer's explanation reveal (#129, M5) to the feed-level seam via
   // a stable callback reading the live ref, so FeedSlide stays referentially
   // stable and never re-renders just because the parent's handler identity moved.
-  const handleExplanationViewed = useCallback((index: number, cardId: string) => {
-    onCardExplanationViewedRef.current?.(index, cardId);
-  }, []);
+  const handleExplanationViewed = useCallback(
+    (index: number, cardId: string) => {
+      onCardExplanationViewedRef.current?.(index, cardId);
+    },
+    [],
+  );
 
   const renderItem = useCallback(
     ({ item: cardId, index }: ListRenderItemInfo<string>) => (
@@ -576,16 +587,21 @@ const FeedSlide = memo(function FeedSlide({
       interactionEnabledAtMs: engageAtMs ?? activeAtMs,
     };
     const Game = Renderer as TemplateRenderer<LiquidCard>;
+    const gameTheme = categoryAccent(card.category);
     return (
       <View
         style={[styles.slide, slideInsetStyle(insets), { height }]}
         testID={`feed-slide-${index}`}
       >
-        <SlideBackground />
+        <SlideBackground category={card.category} />
         {/* Phase 3: a category CHIP at the top, accent-tinted from the card's
             category. The chip text carries the meaning (guardrail-safe copy, no
             IQ/trait language); colour only reinforces it. */}
-        <CategoryChip category={card.category} />
+        <FeedHeader
+          category={card.category}
+          difficulty={card.difficulty}
+          estimatedSeconds={card.estimatedSeconds}
+        />
         {/* MP2 (#134): center the game (and, via the gate, the feedback step)
             vertically + horizontally in the slide. The full-width inner wrapper
             keeps games spanning the padded content box rather than collapsing to
@@ -596,21 +612,62 @@ const FeedSlide = memo(function FeedSlide({
               mounted neighbour stays still until it snaps into view — avoiding
               the documented pre-mounted-neighbour pitfall. Visual-only: it never
               feeds back into timing/`isActive` game logic. */}
-          <ActiveEntrance active={active} style={styles.gameContent}>
-            <Game
-              // #106: until engaged, the renderer's timer stays disarmed.
-              key={`${feedId}:${index}`}
-              card={timerGatedCard(card, engaged)}
-              context={context}
-              // Activation signal (#128 review fix): only the focused slide is
-              // active. Renderers with a timed PRE-phase (what_changed's preview)
-              // hold until this is true, so a pre-mounted slide's preview cannot
-              // elapse off-screen. Template-agnostic; most renderers ignore it.
-              isActive={active}
-              onAttempt={handleAttempt}
-              onResolve={(resolution: CardResolution) => onResolve(index, resolution)}
-              onExplanationViewed={() => onExplanationViewed(index, cardId)}
+          <ActiveEntrance
+            active={active}
+            style={[
+              styles.gameContent,
+              styles.gameShell,
+              {
+                borderColor: gameTheme.border,
+                backgroundColor: '#11141d',
+                shadowColor: gameTheme.accent,
+              },
+            ]}
+          >
+            <View
+              pointerEvents="none"
+              style={[
+                styles.gameGlow,
+                { backgroundColor: gameTheme.accent },
+              ]}
             />
+            <View
+              pointerEvents="none"
+              style={[
+                styles.gameEdge,
+                { backgroundColor: gameTheme.accent },
+              ]}
+            />
+            <BoundedGameContent testID={`feed-game-scroll-${index}`}>
+              <GamePostChrome
+                templateType={card.templateType}
+                mechanic={card.puzzleDna.mechanic}
+                difficulty={card.difficulty}
+                accent={gameTheme.accent}
+              />
+              <View style={styles.gameBody}>
+                <GameThemeProvider category={card.category}>
+                  <Game
+                    // #106: until engaged, the renderer's timer stays disarmed.
+                    key={`${feedId}:${index}`}
+                    card={timerGatedCard(card, engaged)}
+                    context={context}
+                    // Activation signal (#128 review fix): only the focused slide is
+                    // active. Renderers with a timed PRE-phase (what_changed's preview)
+                    // hold until this is true, so a pre-mounted slide's preview cannot
+                    // elapse off-screen. Template-agnostic; most renderers ignore it.
+                    isActive={active}
+                    onAttempt={handleAttempt}
+                    onResolve={(resolution: CardResolution) =>
+                      onResolve(index, resolution)
+                    }
+                    onExplanationViewed={() =>
+                      onExplanationViewed(index, cardId)
+                    }
+                  />
+                </GameThemeProvider>
+              </View>
+            </BoundedGameContent>
           </ActiveEntrance>
         </View>
         {/* Per-card social surface (likes + comments) — a FEED-LAYER concern
@@ -651,6 +708,44 @@ const FeedSlide = memo(function FeedSlide({
     </View>
   );
 });
+
+/**
+ * Keeps a renderer inside the center region reserved between the feed header and
+ * creator chrome. Most games remain ordinary, non-scrolling cards; scrolling is
+ * enabled only when measured content is taller than the available viewport. This
+ * prevents a tall answer phase from covering either adjacent row without making
+ * the feed controller aware of any template's layout.
+ */
+function BoundedGameContent({
+  children,
+  testID,
+}: {
+  children: ReactNode;
+  testID: string;
+}) {
+  const [viewportHeight, setViewportHeight] = useState(0);
+  const [contentHeight, setContentHeight] = useState(0);
+  const scrollEnabled =
+    viewportHeight > 0 && contentHeight > viewportHeight + 1;
+
+  return (
+    <ScrollView
+      testID={testID}
+      style={styles.gameScroll}
+      contentContainerStyle={styles.gameScrollContent}
+      scrollEnabled={scrollEnabled}
+      nestedScrollEnabled
+      bounces={scrollEnabled}
+      showsVerticalScrollIndicator={scrollEnabled}
+      onLayout={(event) =>
+        setViewportHeight(event.nativeEvent.layout.height)
+      }
+      onContentSizeChange={(_width, height) => setContentHeight(height)}
+    >
+      {children}
+    </ScrollView>
+  );
+}
 
 /**
  * Active-card entrance (Phase 5). Fades + lifts + slightly scales its children
@@ -737,18 +832,41 @@ function ActiveEntrance({
  * never intercepts a swipe/tap or adds noise; the slide keeps its own solid
  * {@link PAGE_BACKGROUND} underneath so paging never flashes a seam.
  */
-function SlideBackground() {
+function SlideBackground({ category }: { category?: string }) {
+  const { accent, tint } = categoryAccent(category);
   return (
-    <LinearGradient
-      colors={slideGradient.colors}
-      locations={slideGradient.locations}
-      start={slideGradient.start}
-      end={slideGradient.end}
+    <View
       style={StyleSheet.absoluteFill}
       pointerEvents="none"
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-    />
+    >
+      <LinearGradient
+        colors={category ? [tint, '#10131d', '#07090e'] : slideGradient.colors}
+        locations={slideGradient.locations}
+        start={slideGradient.start}
+        end={slideGradient.end}
+        style={StyleSheet.absoluteFill}
+      />
+      {category ? (
+        <>
+          <View
+            style={[
+              styles.ambientOrb,
+              styles.ambientOrbTop,
+              { backgroundColor: accent },
+            ]}
+          />
+          <View
+            style={[
+              styles.ambientOrb,
+              styles.ambientOrbBottom,
+              { backgroundColor: accent },
+            ]}
+          />
+        </>
+      ) : null}
+    </View>
   );
 }
 
@@ -775,20 +893,20 @@ function SlideChrome({
   const { accent } = categoryAccent(category);
   return (
     <View style={styles.chrome}>
-      <Pressable
-        accessibilityRole="button"
+      <View
         accessibilityLabel={`Creator ${creatorHandle}`}
-        accessibilityHint="Creator profiles are coming soon"
-        onPress={noop}
         style={styles.bylinePressable}
       >
         <View style={[styles.avatar, { backgroundColor: accent }]}>
           <Text style={styles.avatarText}>{monogram}</Text>
         </View>
-        <Text style={styles.byline} testID={`feed-byline-${index}`}>
-          {creatorHandle}
-        </Text>
-      </Pressable>
+        <View style={styles.authorCopy}>
+          <Text style={styles.byline} testID={`feed-byline-${index}`}>
+            {creatorHandle}
+          </Text>
+          <Text style={styles.creatorCaption}>Original playable challenge</Text>
+        </View>
+      </View>
       {/* Decorative scroll affordance — the FlatList already carries the
           screen-reader swipe instruction, so hide this from assistive tech. */}
       <Text
@@ -796,19 +914,126 @@ function SlideChrome({
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
       >
-        Swipe up  ⌃
+        Swipe up ⌃
       </Text>
     </View>
   );
 }
 
-/** No-op seam for the (later-phase) tappable creator profile. */
-function noop() {}
-
 /** Format a category id ("visual_attention") into a chip label ("Visual attention"). */
 function categoryLabel(category: string): string {
   const spaced = category.replace(/_/g, ' ');
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+function difficultyLevel(difficulty: string): number {
+  if (difficulty === 'extremely_hard') return 5;
+  if (difficulty === 'hard') return 4;
+  if (difficulty === 'medium') return 3;
+  if (difficulty === 'easy') return 2;
+  return 1;
+}
+
+function templateDescription(templateType: string): string | null {
+  if (templateType === 'prism_path') {
+    return 'Rotate mirrors to guide a beam from IN to the star while avoiding blockers. Tap mirrors to flip slash direction, then fire when the preview reaches the target.';
+  }
+  return null;
+}
+
+function templateMonogram(templateType: string): string {
+  return templateType
+    .split('_')
+    .map((part) => part[0] ?? '')
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+function templateFingerprint(templateType: string): readonly boolean[] {
+  let hash = 2166136261;
+  for (const char of templateType) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return Array.from({ length: 9 }, (_, index) => {
+    const bit = (hash >>> (index % 24)) & 1;
+    return bit === 1 || index === 4;
+  });
+}
+
+function GamePostChrome({
+  templateType,
+  mechanic,
+  difficulty,
+  accent,
+}: {
+  templateType: string;
+  mechanic: string;
+  difficulty: string;
+  accent: string;
+}) {
+  const level = difficultyLevel(difficulty);
+  const fingerprint = templateFingerprint(templateType);
+  const label = categoryLabel(templateType);
+  const description = templateDescription(templateType);
+  return (
+    <View style={styles.gameKicker}>
+      <View
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        style={[styles.templateMark, { borderColor: accent }]}
+      >
+        <Text style={[styles.templateMonogram, { color: accent }]}>
+          {templateMonogram(templateType)}
+        </Text>
+        <View style={styles.fingerprint}>
+          {fingerprint.map((filled, index) => (
+            <View
+              key={index}
+              style={[
+                styles.fingerprintDot,
+                {
+                  backgroundColor: filled
+                    ? accent
+                    : 'rgba(255,255,255,0.10)',
+                },
+              ]}
+            />
+          ))}
+        </View>
+      </View>
+      <View
+        accessible={Boolean(description)}
+        accessibilityLabel={description ? `${label}. ${description}` : undefined}
+        accessibilityHint={description ?? undefined}
+        style={styles.templateCopy}
+      >
+        <Text style={styles.templateLabel}>{label}</Text>
+        <Text style={styles.mechanicLabel}>
+          {categoryLabel(mechanic.replace(/-/g, '_'))}
+        </Text>
+      </View>
+      <View
+        accessibilityLabel={`${categoryLabel(difficulty)} difficulty`}
+        style={styles.levelMeter}
+      >
+        {[1, 2, 3, 4, 5].map((step) => (
+          <View
+            key={step}
+            style={[
+              styles.levelBar,
+              {
+                height: 3 + step * 3,
+                backgroundColor:
+                  step <= level ? accent : 'rgba(255,255,255,0.12)',
+              },
+            ]}
+          />
+        ))}
+      </View>
+    </View>
+  );
 }
 
 /**
@@ -817,12 +1042,37 @@ function categoryLabel(category: string): string {
  * modest, guardrail-safe copy (no IQ/trait language). The chip text carries the
  * meaning — colour only reinforces it.
  */
-function CategoryChip({ category }: { category: string }) {
+function FeedHeader({
+  category,
+  difficulty,
+  estimatedSeconds,
+}: {
+  category: string;
+  difficulty: string;
+  estimatedSeconds: number;
+}) {
   const { accent, tint } = categoryAccent(category);
   return (
-    <View style={styles.chipRow}>
-      <View style={[styles.chip, { borderColor: accent, backgroundColor: tint }]}>
-        <Text style={styles.chipText}>{categoryLabel(category)}</Text>
+    <View style={styles.header}>
+      <View style={styles.brandRow}>
+        <View style={[styles.brandMark, { backgroundColor: accent }]}>
+          <Text style={styles.brandMarkText}>L</Text>
+        </View>
+        <Text style={styles.brandName}>LumaLoop</Text>
+        <Text style={styles.brandMode}>Discover</Text>
+      </View>
+      <View style={styles.chipRow}>
+        <View
+          style={[styles.chip, { borderColor: accent, backgroundColor: tint }]}
+        >
+          <Text style={styles.chipText}>{categoryLabel(category)}</Text>
+        </View>
+        <View style={styles.metaPill}>
+          <Text style={styles.metaPillText}>{categoryLabel(difficulty)}</Text>
+        </View>
+        <View style={styles.metaPill}>
+          <Text style={styles.metaPillText}>~{estimatedSeconds}s</Text>
+        </View>
       </View>
     </View>
   );
@@ -865,11 +1115,21 @@ const styles = StyleSheet.create({
     // (SlideBackground) layers over this solid base for depth (MP3 #135).
     backgroundColor: PAGE_BACKGROUND,
   },
+  ambientOrb: {
+    position: 'absolute',
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    opacity: 0.11,
+  },
+  ambientOrbTop: { top: 30, right: -110 },
+  ambientOrbBottom: { bottom: -80, left: -140, opacity: 0.07 },
   // MP2 (#134): center the game content in the middle of the viewport, not pinned
   // to the top — TikTok/Reels-style. Template-agnostic: centering happens here at
   // the slide/feed level, never per game.
   game: {
     flex: 1,
+    minHeight: 0,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -877,11 +1137,144 @@ const styles = StyleSheet.create({
   // step) span the padded content width instead of shrinking to intrinsic width.
   gameContent: {
     width: '100%',
+    maxHeight: '100%',
+    flexShrink: 1,
+  },
+  gameShell: {
+    position: 'relative',
+    overflow: 'hidden',
+    borderRadius: 28,
+    borderWidth: 1,
+    backgroundColor: 'rgba(18,21,31,0.86)',
+    ...elevation.card,
+  },
+  gameScroll: {
+    width: '100%',
+    maxHeight: '100%',
+    flexShrink: 1,
+  },
+  gameScrollContent: {
+    flexGrow: 1,
+    padding: space.lg,
+  },
+  gameGlow: {
+    position: 'absolute',
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    top: -125,
+    right: -70,
+    opacity: 0.16,
+  },
+  gameEdge: {
+    position: 'absolute',
+    top: 0,
+    left: 34,
+    right: 34,
+    height: 2,
+    borderBottomLeftRadius: radius.pill,
+    borderBottomRightRadius: radius.pill,
+    opacity: 0.82,
+  },
+  gameKicker: {
+    position: 'relative',
+    zIndex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: space.lg,
+    gap: space.sm,
+  },
+  templateMark: {
+    width: 54,
+    height: 38,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 7,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    backgroundColor: 'rgba(255,255,255,0.045)',
+  },
+  templateMonogram: {
+    fontSize: 11,
+    fontWeight: fontWeight.heavy,
+  },
+  fingerprint: {
+    width: 13,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 2,
+  },
+  fingerprintDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 2,
+  },
+  templateCopy: {
+    flex: 1,
+    gap: 1,
+  },
+  templateLabel: {
+    color: colors.text,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.semibold,
+  },
+  mechanicLabel: {
+    color: colors.textFaint,
+    fontSize: 10,
+  },
+  levelMeter: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 3,
+    minHeight: 12,
+  },
+  levelBar: {
+    width: 4,
+    borderRadius: radius.pill,
+  },
+  gameBody: {
+    position: 'relative',
+    zIndex: 1,
+    width: '100%',
+  },
+  header: {
+    gap: space.md,
+    marginBottom: space.md,
+    paddingRight: 86,
+  },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    minHeight: 34,
+  },
+  brandMark: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  brandMarkText: {
+    color: colors.accentContrast,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.heavy,
+  },
+  brandName: {
+    color: colors.text,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.heavy,
+  },
+  brandMode: {
+    color: colors.textMuted,
+    fontSize: fontSize.xs,
   },
   // Phase 3: the top-of-slide category chip row.
   chipRow: {
     flexDirection: 'row',
-    marginBottom: space.md,
+    alignItems: 'center',
+    gap: space.sm,
   },
   chip: {
     paddingVertical: space.xs,
@@ -893,6 +1286,19 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: fontSize.sm,
     fontWeight: fontWeight.semibold,
+  },
+  metaPill: {
+    paddingVertical: space.xs,
+    paddingHorizontal: space.sm,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.10)',
+    backgroundColor: 'rgba(255,255,255,0.045)',
+  },
+  metaPillText: {
+    color: colors.textMuted,
+    fontSize: fontSize.xs,
+    textTransform: 'capitalize',
   },
   // MP3 (#135): the bottom social chrome row — byline left, swipe cue right.
   chrome: {
@@ -908,12 +1314,14 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   avatar: {
-    width: 34,
-    height: 34,
+    width: 42,
+    height: 42,
     borderRadius: radius.pill,
     backgroundColor: colors.avatar,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.78)',
   },
   avatarText: {
     color: colors.accentContrast,
@@ -926,11 +1334,19 @@ const styles = StyleSheet.create({
     fontWeight: fontWeight.semibold,
     flexShrink: 1,
   },
+  authorCopy: { flexShrink: 1, gap: 1 },
+  creatorCaption: { color: colors.textMuted, fontSize: fontSize.xs },
   swipeHint: {
     color: colors.textFaint,
     fontSize: fontSize.sm,
     fontWeight: fontWeight.medium,
     marginLeft: space.sm,
+    paddingVertical: space.sm,
+    paddingHorizontal: space.md,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(6,8,13,0.48)',
   },
   placeholder: {
     flex: 1,

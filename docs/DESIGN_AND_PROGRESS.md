@@ -78,7 +78,7 @@ Key contract pieces:
 
 ---
 
-## 3. The games (8 mechanics)
+## 3. The games (11 mechanics)
 
 Original 4 (single-step):
 1. **Spot It** (`spot_it`, visual_attention) — tap the anomaly in a grid.
@@ -104,10 +104,22 @@ New deductive game (Phase 6, inspired by gamesforthebrain.com):
    Multi-guess, deductive, with a strong "one more try" loop — the biggest step-change
    in challenge. Easy = 3 slots/4 symbols + generous guesses; hard = 5 slots/6 symbols,
    fewer guesses, tighter clock.
+9. **Prism Path** (`prism_path`, logical_reasoning / pattern_recognition /
+   working_memory) — rotate mirrors and trace a live beam through blockers to a
+   target. The evaluator accepts any route that reaches the target, not only the
+   authored orientation key.
+10. **Signal Set** (`signal_set`, pattern_recognition / logical_reasoning) — select
+    three visual signals whose shape, fill, and count are each all identical or
+    all different. It adapts attribute-classification puzzles into an original,
+    color-independent feed interaction using glyph, fill word, and count cues.
+11. **Circuit Flow** (`circuit_flow`, logical_reasoning / pattern_recognition) —
+    rotate a compact grid of circuit tiles until every arm meets a neighbor and
+    every tile belongs to the source network. The pure evaluator performs graph
+    traversal and rejects disconnected or leaking layouts.
 
 Categories: visual_attention, working_memory, logical_reasoning, cognitive_flexibility,
 pattern_recognition, processing_speed. Catalog validated at startup (unique ids, valid
-template→category, time limits 5–30s, correct-answer present, explanation present,
+template→category, time limits 5–120s, correct-answer present, explanation present,
 evidence tier).
 
 ---
@@ -232,6 +244,49 @@ direction). PRs on GitHub `aishvar23/LumaLoop`.
   re-activating off-screen slide cannot fire phantom animations or timers. No game
   logic, evaluator, timing, or telemetry changed; core stayed in lock-step (UI-only).
 
+**H. Immersive feed + deep-puzzle pass**
+- Reworked the flat black feed into a category-lit, full-bleed stage on web and
+  native: layered gradients, restrained ambient geometry, a raised translucent
+  game surface, LumaLoop/Discover identity, compact difficulty/time metadata,
+  stronger creator attribution, and a glass-style points HUD. The shell remains
+  template-agnostic, preserves one-handed targets, and avoids fake like/comment
+  counts or non-functional social controls.
+- Extended each category palette through the actual gameplay—not just the feed
+  background. Boards, tiles, options, glyphs, active outlines, pressed states,
+  primary actions, and glow now use semantic category-color roles across all 11
+  web/native renderers, while text/glyph cues continue to carry meaning without
+  relying on color alone.
+- Added a social-feed-inspired **game identity frame** around every game: real
+  template + mechanic identity, a deterministic visual fingerprint, an authored
+  difficulty meter, accent edge lighting,
+  restrained spotlight/sheen motion, stronger control elevation, and explicit
+  keyboard focus treatment. It borrows the immersive hierarchy and low-clutter
+  principles of modern short-form feeds without a redundant “Playable” badge or
+  invented likes, comments, live status, or other non-functional social signals.
+- Added Signal Set and Circuit Flow as typed, data-driven templates with pure
+  evaluators, startup validation, five authored cards apiece, renderers, timeout
+  semantics, and web/native tests. Inspiration was researched from the general
+  all-same/all-different attribute rule and rotatable-network puzzle family; the
+  names, presentation, card data, signals, and feed-sized interactions are LumaLoop
+  originals.
+- Circuit Flow now offers a pre-attempt **Watch demo** flow on web and native. A
+  separate two-tile example demonstrates rotation, matching neighboring wires,
+  and avoiding loose ends; it closes automatically into a “Your turn” prompt.
+  Demo use does not rotate the authored puzzle, arm its timer, or emit an attempt.
+- Spot It authoring now uses one neutral instruction—“Find the odd one out.”—so
+  the prompt never names the distractor or target. All odd-one-out boards are
+  classified as **Extremely easy · 8s** as the app’s entry-level scan mechanic.
+- The beginner “What changed” symbol-newcomer cards are classified as
+  **Easy · 14s** with a short 3s preview, so simple six-symbol recall screens do
+  not surface as Hard.
+- The deepest Code Break card is classified as **Extremely hard · ~120s** with
+  exactly six guesses for a five-slot/six-symbol deduction puzzle, so it is
+  treated as a deliberate long-form challenge instead of a 30s feed tap.
+- Sequence authoring now uses neutral task-only prompts across Tiny Logic and
+  Pattern Chain. Prompts ask players to extend the sequence without naming its
+  arithmetic, rotation, interleaving, or other pattern; that rule appears only in
+  the post-answer explanation.
+
 Every task shipped via a worker-driven loop (implement → code-review → fix → squash-
 merge → ADO Done). Review caught & fixed real bugs throughout (toolchain coupling,
 double-resolve / timer re-arm on off-screen slides, reproduce-phase timing, `@@`
@@ -245,9 +300,9 @@ Follow-ups #91, #99, #100, #101 filed (out of original scope).
 
 ## 7. Current state
 
-- **7 game types, 37 cards.** Web 588 tests, mobile 377 tests; both gates green.
+- **11 game types, 101 cards.** Web 699 tests, mobile 475 tests; both gates green.
 - **Web:** endless swipe feed at `/`, live on Vercel (behind Deployment Protection).
-- **Mobile:** full RN app, runnable on the iOS Simulator / Expo Go, all 7 games +
+- **Mobile:** full RN app, runnable on the iOS Simulator / Expo Go, all 11 games +
   telemetry wired.
 - **Scoring (Phase 4):** game-points + streak/combo layer on both apps — HUD + result-
   card chip, best-run persistence, no new telemetry, game-points framing only.

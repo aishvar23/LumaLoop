@@ -105,17 +105,13 @@ export type RuleFlipRules = Pick<
 /**
  * Overall pass threshold for the card resolution.
  *
- * Design §9.3 defines Rule Flip by its four per-signal measures, not by a single
- * pass/fail verdict. But the shared `CardResolution` contract (Technical Design
- * §7) requires one `isCorrect` boolean per card so the session receipt can count
- * correct cards uniformly across templates. We therefore define a documented
- * prototype heuristic: the card resolves CORRECT iff the player answered at
- * least half of all stimuli correctly. The rich per-signal measures (pre/post
- * accuracy, switch latency, perseveration) carry the real flexibility story in
- * the resolution `signals`; this boolean only feeds the cross-template accuracy
- * tally. Named (not inlined) so the threshold is explicit and easy to revisit.
+ * Rule Flip is a step-by-step switching game: one missed or misapplied step means
+ * the sequence was not executed correctly. The rich per-signal measures
+ * (pre/post accuracy, switch latency, perseveration, and per-step logs) carry
+ * the diagnostic detail, while the shared `isCorrect` boolean is intentionally
+ * strict: every authored stimulus must be answered correctly.
  */
-export const RULE_FLIP_PASS_ACCURACY = 0.5;
+export const RULE_FLIP_PASS_ACCURACY = 1;
 
 /** Guarded ratio: 0 when the denominator is 0, so empty phases never yield NaN. */
 function ratio(numerator: number, denominator: number): number {

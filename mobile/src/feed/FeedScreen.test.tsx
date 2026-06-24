@@ -18,7 +18,11 @@ import {
 } from '@testing-library/react-native';
 import { FlatList, StyleSheet, type ViewToken } from 'react-native';
 
-import type { LiquidCard, SpotItCard } from '../core/cards/types';
+import type {
+  LiquidCard,
+  PrismPathCard,
+  SpotItCard,
+} from '../core/cards/types';
 import type { CardResolution, TemplateProps } from '../core/templates/contract';
 import type { CardScore } from '../core/feed/scoring';
 import { useCardTimer } from '../core/templates/useCardTimer';
@@ -28,6 +32,7 @@ import type { RendererRegistry } from './rendererRegistry';
 import { defaultRendererRegistry } from './rendererRegistry';
 import { feedRegistry } from './FeedbackGate';
 import { StubRenderer, stubRendererRegistry } from './stubRenderer';
+import { categoryAccents } from './templates/tokens';
 
 // --- Deterministic feed source + cards ----------------------------------------
 
@@ -45,7 +50,7 @@ function makeCard(cardId: string): LiquidCard {
     creatorHandle: `@creator_${cardId}`,
     templateType: 'spot_it',
     category: 'visual_attention',
-    difficulty: 'easy',
+    difficulty: 'extremely_easy',
     evidenceTier: 'entertainment_only',
     reviewStatus: 'unreviewed',
     estimatedSeconds: 10,
@@ -63,6 +68,39 @@ function makeCard(cardId: string): LiquidCard {
     },
   };
   return card;
+}
+
+function makePrismPathCard(cardId: string): PrismPathCard {
+  return {
+    cardId,
+    creatorHandle: `@creator_${cardId}`,
+    templateType: 'prism_path',
+    category: 'logical_reasoning',
+    difficulty: 'hard',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 28,
+    prompt: 'Route the beam',
+    puzzleDna: {
+      mechanic: 'mirror-beam-routing',
+      inputMode: 'tap',
+      measuredSignals: [],
+    },
+    explanation: { title: 'Why', body: 'Because.' },
+    config: {
+      rows: 2,
+      columns: 3,
+      entry: { row: 1, column: 0 },
+      entryDirection: 'right',
+      target: { row: 0, column: 2 },
+      mirrors: [
+        { id: 'm1', row: 1, column: 1, initialOrientation: 'slash' },
+      ],
+      blockers: [],
+      solution: [{ mirrorId: 'm1', orientation: 'slash' }],
+      timeLimitMs: 10_000,
+    },
+  };
 }
 
 const fakeGetCardById = (cardId: string): LiquidCard | undefined => makeCard(cardId);
@@ -200,9 +238,33 @@ describe('FeedScreen (native)', () => {
     expect(gameStyle).toEqual(
       expect.objectContaining({
         flex: 1,
+        minHeight: 0,
         justifyContent: 'center',
         alignItems: 'center',
       }),
+    );
+  });
+
+  it('bounds tall games between the header and creator chrome', () => {
+    renderFeed();
+    const scroller = screen.getByTestId('feed-game-scroll-0');
+
+    expect(StyleSheet.flatten(scroller.props.style)).toEqual(
+      expect.objectContaining({
+        width: '100%',
+        maxHeight: '100%',
+        flexShrink: 1,
+      }),
+    );
+    expect(scroller.props.scrollEnabled).toBe(false);
+
+    act(() => {
+      scroller.props.onLayout({ nativeEvent: { layout: { height: 300 } } });
+      scroller.props.onContentSizeChange(320, 500);
+    });
+
+    expect(screen.getByTestId('feed-game-scroll-0').props.scrollEnabled).toBe(
+      true,
     );
   });
 
@@ -231,6 +293,37 @@ describe('FeedScreen (native)', () => {
     renderFeed();
     // category `visual_attention` → "Visual attention" (no IQ/trait language).
     expect(screen.getAllByText('Visual attention').length).toBeGreaterThan(0);
+  });
+
+  it('gives each game its own template, mechanic, and difficulty identity', () => {
+    renderFeed();
+    const game = within(screen.getByTestId('feed-game-0'));
+    expect(game.queryByText('PLAYABLE')).toBeNull();
+    expect(game.getByText('Spot it')).toBeOnTheScreen();
+    expect(game.getByText('Scan')).toBeOnTheScreen();
+    expect(game.getByLabelText('Extremely easy difficulty')).toBeOnTheScreen();
+    expect(screen.getAllByText('Extremely easy').length).toBeGreaterThan(0);
+  });
+
+  it('surfaces a helpful Prism Path description on the template label', () => {
+    const prismCard = makePrismPathCard('prism-0');
+    render(
+      <FeedScreen
+        anonymousUserId="anon"
+        source={() => ['prism-0']}
+        registry={{
+          prism_path: StubRenderer as unknown as RendererRegistry['prism_path'],
+        }}
+        getCardById={() => prismCard}
+        scoreStore={null}
+      />,
+    );
+
+    expect(
+      screen.getAllByLabelText(
+        /Prism path\. Rotate mirrors to guide a beam from IN to the star/,
+      ).length,
+    ).toBeGreaterThan(0);
   });
 
   it('windows the mount: off-window slides render the placeholder, not the stub', () => {
@@ -479,7 +572,12 @@ describe('FeedScreen (native)', () => {
     // The real renderer is mounted (its grid cell, not the stub affordances).
     // Scope to the active slide — windowed neighbours mount their own grids too.
     const activeGame = within(screen.getByTestId('feed-game-0'));
-    expect(activeGame.getByTestId('spot-cell-0-0')).toBeOnTheScreen();
+    const spotCell = activeGame.getByTestId('spot-cell-0-0');
+    expect(spotCell).toBeOnTheScreen();
+    expect(spotCell).toHaveStyle({
+      backgroundColor: categoryAccents.visual_attention.surfaceRaised,
+      borderColor: categoryAccents.visual_attention.border,
+    });
     expect(screen.queryByTestId('engage-b0-0')).toBeNull();
 
     // Tapping the anomaly engages (first interaction) AND resolves the game.

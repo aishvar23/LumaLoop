@@ -25,7 +25,13 @@ const fakeSource: FeedBatchSource = (seed) => {
   return [`b${n}-0`, `b${n}-1`, `b${n}-2`];
 };
 
-const DIFFICULTY_RANK: Record<Difficulty, number> = { easy: 0, medium: 1, hard: 2 };
+const DIFFICULTY_RANK: Record<Difficulty, number> = {
+  extremely_easy: 0,
+  easy: 1,
+  medium: 2,
+  hard: 3,
+  extremely_hard: 4,
+};
 const cardById = new Map(catalog.map((c) => [c.cardId, c]));
 const meanRank = (ids: readonly string[]): number => {
   const ranks = ids.map((id) => DIFFICULTY_RANK[cardById.get(id)!.difficulty]);

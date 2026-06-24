@@ -42,7 +42,10 @@ import {
 import { getCardById as getCatalogCardById } from '../cards/catalog';
 import type { LiquidCard } from '../cards/types';
 import { resolveRenderer } from '../session/rendererRegistry';
-import type { RendererRegistry, TemplateRenderer } from '../session/rendererRegistry';
+import type {
+  RendererRegistry,
+  TemplateRenderer,
+} from '../session/rendererRegistry';
 import type { CardResolution, CardStartContext } from '../templates/contract';
 import { getAnonymousUserId } from '../telemetry/anonymousUser';
 import { resolveCategoryTheme } from '../ui/categoryTheme';
@@ -144,7 +147,7 @@ export type FeedScreenProps = {
  * timer arms a fresh, full-duration countdown from the engage instant.
  *
  * This is template-AGNOSTIC: `timeLimitMs` is the one timing primitive common to
- * every {@link LiquidCard} config, so a single override works for all four
+ * every {@link LiquidCard} config, so a single override works for all
  * renderers with NO switch on `templateType`. The cast mirrors the one localized,
  * sound escape hatch documented in `rendererRegistry.ts`: the override preserves
  * the card's discriminant and every other field, so the result is the same card
@@ -165,29 +168,6 @@ function timerGatedCard(card: LiquidCard, engaged: boolean): LiquidCard {
     ...card,
     config: { ...card.config, timeLimitMs: Number.POSITIVE_INFINITY },
   } as LiquidCard;
-}
-
-/** True when motion should be reduced; safe in non-DOM/test environments. */
-function prefersReducedMotion(): boolean {
-  try {
-    return (
-      globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
-    );
-  } catch {
-    return false;
-  }
-}
-
-/** Best-effort `scrollIntoView` — jsdom/older engines may lack it; never throws. */
-function scrollSlideIntoView(el: HTMLElement, reduceMotion: boolean): void {
-  try {
-    el.scrollIntoView?.({
-      behavior: reduceMotion ? 'auto' : 'smooth',
-      block: 'start',
-    });
-  } catch {
-    // Best-effort only — navigation already updated the controller's active index.
-  }
 }
 
 export default function FeedScreen({
@@ -290,9 +270,8 @@ export default function FeedScreen({
   }, [cards.length]);
 
   // Keyboard / non-touch navigation: ArrowDown/Space → next, ArrowUp → prev.
-  // After the controller advances we scroll the target slide into view so the
-  // visual position matches the active card (respecting reduced-motion).
-  const pendingScrollRef = useRef<number | null>(null);
+  // Scroll the already-prefetched target inside the feed container itself so
+  // the document never moves and CSS snap owns the final resting position.
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
       if (
@@ -301,24 +280,20 @@ export default function FeedScreen({
         event.key === 'Spacebar'
       ) {
         event.preventDefault();
-        pendingScrollRef.current = activeIndex + 1;
+        const target = activeIndex + 1;
+        event.currentTarget.scrollTop =
+          target * event.currentTarget.clientHeight;
         next();
       } else if (event.key === 'ArrowUp') {
         event.preventDefault();
-        pendingScrollRef.current = Math.max(0, activeIndex - 1);
+        const target = Math.max(0, activeIndex - 1);
+        event.currentTarget.scrollTop =
+          target * event.currentTarget.clientHeight;
         prev();
       }
     },
     [activeIndex, next, prev],
   );
-
-  useEffect(() => {
-    const target = pendingScrollRef.current;
-    if (target === null) return;
-    pendingScrollRef.current = null;
-    const el = slideEls.current.get(target);
-    if (el) scrollSlideIntoView(el, prefersReducedMotion());
-  }, [activeIndex]);
 
   // Per-game lifecycle (#106), tracked in refs so it never triggers a render and
   // each transition latches exactly once per game instance:
@@ -584,10 +559,21 @@ const FeedSlide = memo(function FeedSlide({
         style={slideAccentStyle(card.category)}
         ref={registerSlide}
       >
-        <SlideTopChrome category={card.category} />
+        <div className="feed-slide__ambient" aria-hidden="true">
+          <span className="feed-slide__orb feed-slide__orb--one" />
+          <span className="feed-slide__orb feed-slide__orb--two" />
+          <span className="feed-slide__grid-texture" />
+        </div>
+        <SlideTopChrome
+          category={card.category}
+          difficulty={card.difficulty}
+          estimatedSeconds={card.estimatedSeconds}
+        />
         <div
           className="feed-slide__game"
           data-testid={`feed-game-${index}`}
+          data-template={card.templateType}
+          data-difficulty={card.difficulty}
           // Phase 5: drive the activation-gated entrance animation. Only the
           // focused slide carries `data-active="true"`, so a pre-mounted
           // neighbour stays still until it actually snaps into view (motion is
@@ -595,20 +581,32 @@ const FeedSlide = memo(function FeedSlide({
           // it never feeds back into timing/`isActive` game logic.
           data-active={active ? 'true' : 'false'}
         >
-          {createElement(Renderer as TemplateRenderer<LiquidCard>, {
-            key: `${feedId}:${index}`,
-            // #106: until engaged, the renderer's timer stays disarmed.
-            card: timerGatedCard(card, engaged),
-            context,
-            // Activation signal (#137 review fix): only the focused slide is
-            // active. Renderers with a timed PRE-phase (memory_sequence's watch,
-            // what_changed's preview) hold until this is true, so a pre-mounted
-            // slide's pre-phase cannot elapse off-screen. Template-agnostic; most
-            // renderers ignore it.
-            isActive: active,
-            onAttempt: handleAttempt,
-            onResolve: (resolution: CardResolution) => onResolve(index, resolution),
-          })}
+          <div className="feed-slide__game-light" aria-hidden="true">
+            <span className="feed-slide__game-orbit" />
+            <span className="feed-slide__game-sweep" />
+          </div>
+          <GamePostChrome
+            templateType={card.templateType}
+            mechanic={card.puzzleDna.mechanic}
+            difficulty={card.difficulty}
+          />
+          <div className="feed-slide__game-content">
+            {createElement(Renderer as TemplateRenderer<LiquidCard>, {
+              key: `${feedId}:${index}`,
+              // #106: until engaged, the renderer's timer stays disarmed.
+              card: timerGatedCard(card, engaged),
+              context,
+              // Activation signal (#137 review fix): only the focused slide is
+              // active. Renderers with a timed PRE-phase (memory_sequence's watch,
+              // what_changed's preview) hold until this is true, so a pre-mounted
+              // slide's pre-phase cannot elapse off-screen. Template-agnostic; most
+              // renderers ignore it.
+              isActive: active,
+              onAttempt: handleAttempt,
+              onResolve: (resolution: CardResolution) =>
+                onResolve(index, resolution),
+            })}
+          </div>
         </div>
         {/* Per-card social surface (likes + comments) — a FEED-LAYER concern
             keyed by cardId, NOT per-template (no switch on templateType, never
@@ -624,7 +622,12 @@ const FeedSlide = memo(function FeedSlide({
   }
 
   return (
-    <div className="feed-slide" data-index={index} data-testid="feed-slide" ref={registerSlide}>
+    <div
+      className="feed-slide"
+      data-index={index}
+      data-testid="feed-slide"
+      ref={registerSlide}
+    >
       <div
         className="feed-slide__placeholder"
         data-testid={`feed-placeholder-${index}`}
@@ -657,6 +660,109 @@ function categoryLabel(category: string): string {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
+/** Generic human-readable label for a template id ("spot_it" → "Spot it"). */
+function templateLabel(templateType: string): string {
+  return categoryLabel(templateType);
+}
+
+function templateDescription(templateType: string): string | null {
+  if (templateType === 'prism_path') {
+    return 'Rotate mirrors to guide a beam from IN to the star while avoiding blockers. Tap mirrors to flip / and \\, then fire when the preview reaches the target.';
+  }
+  return null;
+}
+
+function difficultyLevel(difficulty: string): number {
+  if (difficulty === 'extremely_hard') return 5;
+  if (difficulty === 'hard') return 4;
+  if (difficulty === 'medium') return 3;
+  if (difficulty === 'easy') return 2;
+  return 1;
+}
+
+function templateMonogram(templateType: string): string {
+  return templateType
+    .split('_')
+    .map((part) => part[0] ?? '')
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+/** Stable nine-cell fingerprint derived from the template id; no template switch. */
+function templateFingerprint(templateType: string): readonly boolean[] {
+  let hash = 2166136261;
+  for (const char of templateType) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return Array.from({ length: 9 }, (_, index) => {
+    const bit = (hash >>> (index % 24)) & 1;
+    return bit === 1 || index === 4;
+  });
+}
+
+/**
+ * Identity strip for the game object. The template name and authored mechanic
+ * replace the redundant "Playable" badge; the deterministic fingerprint gives
+ * every template a recognizable visual signature without branching in the feed.
+ */
+function GamePostChrome({
+  templateType,
+  mechanic,
+  difficulty,
+}: {
+  templateType: string;
+  mechanic: string;
+  difficulty: string;
+}) {
+  const level = difficultyLevel(difficulty);
+  const fingerprint = templateFingerprint(templateType);
+  const label = templateLabel(templateType);
+  const description = templateDescription(templateType);
+  return (
+    <div className="feed-slide__game-kicker">
+      <span className="feed-slide__template-mark" aria-hidden="true">
+        <span className="feed-slide__template-monogram">
+          {templateMonogram(templateType)}
+        </span>
+        <span className="feed-slide__fingerprint">
+          {fingerprint.map((filled, index) => (
+            <span key={index} data-filled={filled ? 'true' : 'false'} />
+          ))}
+        </span>
+      </span>
+      <span className="feed-slide__template-copy">
+        <span
+          className="feed-slide__template-label"
+          data-description={description ?? undefined}
+          data-has-description={description ? 'true' : 'false'}
+          title={description ?? undefined}
+          tabIndex={description ? 0 : undefined}
+          aria-label={description ? `${label}. ${description}` : undefined}
+        >
+          {label}
+        </span>
+        <span className="feed-slide__mechanic-label">
+          {categoryLabel(mechanic.replace(/-/g, '_'))}
+        </span>
+      </span>
+      <span
+        className="feed-slide__level"
+        aria-label={`${categoryLabel(difficulty)} difficulty`}
+      >
+        {[1, 2, 3, 4, 5].map((step) => (
+          <span
+            key={step}
+            aria-hidden="true"
+            data-filled={step <= level ? 'true' : 'false'}
+          />
+        ))}
+      </span>
+    </div>
+  );
+}
+
 /**
  * Top-of-slide chrome (Phase 3): a small category CHIP, accent-tinted from the
  * slide's `--accent`. It names the performance category in modest, guardrail-safe
@@ -664,10 +770,31 @@ function categoryLabel(category: string): string {
  * signal (the chip text carries the meaning). Decorative to assistive tech beyond
  * its text label.
  */
-function SlideTopChrome({ category }: { category: string }) {
+function SlideTopChrome({
+  category,
+  difficulty,
+  estimatedSeconds,
+}: {
+  category: string;
+  difficulty: string;
+  estimatedSeconds: number;
+}) {
   return (
     <div className="feed-slide__top">
-      <span className="feed-slide__chip">{categoryLabel(category)}</span>
+      <span className="feed-slide__brand">
+        <span className="feed-slide__brand-mark" aria-hidden="true">
+          L
+        </span>
+        <span className="feed-slide__brand-name">LumaLoop</span>
+        <span className="feed-slide__brand-mode">Discover</span>
+      </span>
+      <span className="feed-slide__meta">
+        <span className="feed-slide__chip">{categoryLabel(category)}</span>
+        <span className="feed-slide__meta-pill">
+          {categoryLabel(difficulty)}
+        </span>
+        <span className="feed-slide__meta-pill">~{estimatedSeconds}s</span>
+      </span>
     </div>
   );
 }
@@ -697,8 +824,16 @@ function SlideBottomChrome({
           {monogram}
         </span>
         {/* creatorHandle already carries the leading `@` (catalog convention). */}
-        <span className="feed-slide__byline" data-testid={`feed-byline-${index}`}>
-          {creatorHandle}
+        <span className="feed-slide__author-copy">
+          <span
+            className="feed-slide__byline"
+            data-testid={`feed-byline-${index}`}
+          >
+            {creatorHandle}
+          </span>
+          <span className="feed-slide__creator-caption">
+            Original playable challenge
+          </span>
         </span>
       </span>
       <span className="feed-slide__swipe" aria-hidden="true">

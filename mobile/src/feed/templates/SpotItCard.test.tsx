@@ -9,11 +9,15 @@ import { fireEvent, render, screen, act } from '@testing-library/react-native';
 
 import type { SpotItCard as SpotItCardType } from '../../core/cards/types';
 import type { CardResolution, CardStartContext } from '../../core/templates/contract';
+import { GameThemeProvider } from './GameTheme';
 import SpotItCard from './SpotItCard';
+import { categoryAccents, fontSize, space } from './tokens';
 
 const ACTIVE_AT = 1000;
 
-function makeCard(): SpotItCardType {
+function makeCard(
+  overrides: Partial<SpotItCardType['config']> = {},
+): SpotItCardType {
   return {
     cardId: 'spot-1',
     creatorHandle: '@gridwise',
@@ -34,9 +38,81 @@ function makeCard(): SpotItCardType {
       anomalyRow: 1,
       anomalyColumn: 0,
       timeLimitMs: 1000,
+      ...overrides,
     },
   };
 }
+
+it('uses a compact column gap for six-column boards', () => {
+  render(
+    <SpotItCard
+      card={makeCard({ columns: 6, anomalyColumn: 5 })}
+      context={context()}
+      onAttempt={jest.fn()}
+      onResolve={jest.fn()}
+    />,
+  );
+
+  expect(screen.getByTestId('spot-row-0')).toHaveStyle({
+    width: '100%',
+    gap: space.xs,
+  });
+  expect(screen.getByTestId('spot-cell-0-5')).toBeOnTheScreen();
+});
+
+it('shrinks two-character code glyphs below the single-glyph size', () => {
+  render(
+    <SpotItCard
+      card={makeCard({
+        rows: 1,
+        columns: 2,
+        baseElement: 'M7',
+        anomalyElement: 'MN',
+        anomalyRow: 0,
+        anomalyColumn: 1,
+      })}
+      context={context()}
+      onAttempt={jest.fn()}
+      onResolve={jest.fn()}
+    />,
+  );
+
+  expect(screen.getByText('M7')).toHaveStyle({
+    fontSize: fontSize.md,
+    letterSpacing: -0.25,
+  });
+  expect(screen.getByText('MN')).toHaveStyle({
+    fontSize: fontSize.md,
+    letterSpacing: -0.25,
+  });
+});
+
+it('shrinks three-character code glyphs aggressively so they fit inside each tile', () => {
+  render(
+    <SpotItCard
+      card={makeCard({
+        rows: 1,
+        columns: 2,
+        baseElement: 'M7N',
+        anomalyElement: 'MN7',
+        anomalyRow: 0,
+        anomalyColumn: 1,
+      })}
+      context={context()}
+      onAttempt={jest.fn()}
+      onResolve={jest.fn()}
+    />,
+  );
+
+  expect(screen.getByText('M7N')).toHaveStyle({
+    fontSize: fontSize.sm,
+    letterSpacing: -0.5,
+  });
+  expect(screen.getByText('MN7')).toHaveStyle({
+    fontSize: fontSize.sm,
+    letterSpacing: -0.5,
+  });
+});
 
 function context(): CardStartContext {
   return {
@@ -46,6 +122,30 @@ function context(): CardStartContext {
     interactionEnabledAtMs: ACTIVE_AT,
   };
 }
+
+it('uses the feed category palette for the board, cells, and glyphs', () => {
+  render(
+    <GameThemeProvider category="visual_attention">
+      <SpotItCard
+        card={makeCard()}
+        context={context()}
+        onAttempt={jest.fn()}
+        onResolve={jest.fn()}
+      />
+    </GameThemeProvider>,
+  );
+
+  const palette = categoryAccents.visual_attention;
+  expect(screen.getByTestId('spot-grid')).toHaveStyle({
+    backgroundColor: palette.surface,
+    borderColor: palette.border,
+  });
+  expect(screen.getByTestId('spot-cell-0-0')).toHaveStyle({
+    backgroundColor: palette.surfaceRaised,
+    borderColor: palette.border,
+  });
+  expect(screen.getAllByText('O')[0]).toHaveStyle({ color: palette.accent });
+});
 
 it('resolves CORRECT when the anomaly cell is tapped, routing through the evaluator', () => {
   const onAttempt = jest.fn();

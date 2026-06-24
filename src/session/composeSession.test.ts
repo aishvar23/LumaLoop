@@ -19,9 +19,11 @@ import { MODE_DEFAULTS, type SessionMode } from './sessionTypes';
 const MODES: readonly SessionMode[] = ['one_minute_rescue', 'three_minute_reset'];
 
 const DIFFICULTY_RANK: Record<Difficulty, number> = {
-  easy: 0,
-  medium: 1,
-  hard: 2,
+  extremely_easy: 0,
+  easy: 1,
+  medium: 2,
+  hard: 3,
+  extremely_hard: 4,
 };
 
 const cardById = new Map<string, LiquidCard>(
@@ -192,7 +194,7 @@ describe('composeSession — ordering constraints', () => {
     }
   });
 
-  it('ramps difficulty non-decreasingly (easy before medium)', () => {
+  it('ramps difficulty non-decreasingly (extremely easy before easy and medium)', () => {
     for (const mode of MODES) {
       for (const seed of seeds) {
         const ranks = cardsFor(composeSession({ mode, ...seed })).map(
@@ -286,7 +288,7 @@ describe('composeSession — progressive difficulty bias', () => {
     expect(means[means.length - 1]).toBeGreaterThan(means[0]);
   });
 
-  it('reaches hard cards only at a positive bias (bias 0 stays easy->medium)', () => {
+  it('reaches hard cards only at a positive bias (bias 0 stays introductory->medium)', () => {
     const atZero = cardsFor(
       composeSession({ mode: 'three_minute_reset', anonymousUserId: 'u', day: '2026-06-16', difficultyBias: 0 }),
     ).map((c) => c.difficulty);
@@ -416,9 +418,10 @@ describe('composeSession — forced fallback paths (synthetic catalogs)', () => 
     expect(hasThreeInARow).toBe(true);
   });
 
-  it('spills easy->medium to keep the non-decreasing ramp when easy is exhausted', () => {
-    // one_minute_rescue wants [easy, easy, medium] but only ONE easy card exists,
-    // so slot 1 must spill into the harder (medium) tier; the ramp must stay
+  it('spills introductory tiers upward to keep the ramp non-decreasing', () => {
+    // one_minute_rescue wants [extremely easy, extremely easy, medium], but this
+    // synthetic pool starts at easy. The first slots spill upward without ever
+    // moving back down, and then continue into medium; the ramp must stay
     // non-decreasing and never spill DOWN.
     const pool: readonly LiquidCard[] = [
       variant(spotItBase, 'only-easy', 'easy', 'visual_attention', 10),
