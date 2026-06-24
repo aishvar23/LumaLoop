@@ -121,8 +121,11 @@ export default function ProfilePage({
       contentContainerStyle={[
         styles.content,
         // Clear the status bar / Dynamic Island so the back button is visible
-        // and tappable (the page has no router; this is the only way back).
-        { paddingTop: insets.top + space.lg },
+        // and tappable (the page has no router; this is the only way back). Use a
+        // hard minimum so it's safe even if the safe-area inset reports 0 (e.g.
+        // before the provider measures) — otherwise the button overlaps the
+        // status bar and can't be tapped.
+        { paddingTop: Math.max(insets.top, 48) + space.md },
       ]}
     >
       {onBack && (
@@ -248,6 +251,11 @@ const styles = StyleSheet.create({
   },
   back: {
     alignSelf: 'flex-start',
+    paddingVertical: space.sm,
+    paddingHorizontal: space.md,
+    marginLeft: -space.sm,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
   },
   backText: {
     color: colors.accent,
