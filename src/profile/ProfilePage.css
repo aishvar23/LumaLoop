@@ -59,6 +59,9 @@
 }
 
 .profile-stat {
+  --stat-accent: var(--color-accent);
+  position: relative;
+  overflow: hidden;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md, 12px);
@@ -66,6 +69,21 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+/* A slim accent stripe down the left edge tints each headline stat by category. */
+.profile-stat::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--stat-accent);
+  opacity: 0.9;
+}
+
+.profile-stat__icon {
+  font-size: 1.1rem;
+  line-height: 1;
 }
 
 .profile-stat__value {
@@ -76,6 +94,100 @@
 .profile-stat__label {
   font-size: 0.8rem;
   color: var(--color-text-muted);
+}
+
+/* Per-category accuracy bar chart. */
+.profile-chart {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.profile-bar__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin-bottom: 4px;
+}
+
+.profile-bar__name {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.profile-bar__value {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.profile-bar__track {
+  height: 10px;
+  border-radius: var(--radius-pill, 999px);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+}
+
+.profile-bar__fill {
+  height: 100%;
+  min-width: 2px;
+  border-radius: inherit;
+  transition: width var(--motion-base, 220ms) var(--ease-out, ease-out);
+}
+
+/* Points-share segmented distribution bar + legend. */
+.profile-distribution {
+  display: flex;
+  height: 14px;
+  border-radius: var(--radius-pill, 999px);
+  overflow: hidden;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+.profile-distribution__seg {
+  height: 100%;
+  min-width: 3px;
+}
+
+.profile-legend {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+}
+
+.profile-legend__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+}
+
+.profile-legend__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.profile-legend__label {
+  color: var(--color-text);
+}
+
+.profile-legend__value {
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-bar__fill {
+    transition: none;
+  }
 }
 
 .profile-section-title {
@@ -114,6 +226,13 @@
   padding: var(--space-2) 0;
   border-bottom: 1px solid var(--color-border);
   gap: var(--space-2);
+}
+
+.profile-game-accent {
+  width: 4px;
+  align-self: stretch;
+  border-radius: var(--radius-pill, 999px);
+  flex-shrink: 0;
 }
 
 .profile-game-main {

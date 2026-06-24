@@ -31,12 +31,19 @@ import {
   type ProfileStats,
 } from '../core/profile/computeStats';
 import {
+  buildCategoryBars,
+  buildPointsDistribution,
+  type CategoryBar,
+  type DistributionSegment,
+} from '../core/profile/profileCharts';
+import {
   buildYourGames,
   type YourGameRow,
 } from '../core/profile/yourGames';
 import { fetchGameScores } from './gameScoresApi';
 import { authStyles as a } from '../auth/authStyles';
 import {
+  categoryAccent,
   colors,
   fontSize,
   fontWeight,
@@ -165,25 +172,35 @@ export default function ProfilePage({
           <Text style={a.note}>Loading your stats…</Text>
         ) : (
           <View style={styles.statsGrid}>
-            <Stat value={String(stats.gamesPlayed)} label="Games played" />
-            <Stat value={formatAccuracy(stats.accuracy)} label="Accuracy" />
-            <Stat value={String(stats.bestStreak)} label="Best streak" />
-            <Stat value={String(stats.totalPoints)} label="Total points" />
+            <Stat icon="🎮" value={String(stats.gamesPlayed)} label="Games played" tone="visual_attention" />
+            <Stat icon="🎯" value={formatAccuracy(stats.accuracy)} label="Accuracy" tone="logical_reasoning" />
+            <Stat icon="🔥" value={String(stats.bestStreak)} label="Best streak" tone="cognitive_flexibility" />
+            <Stat icon="⭐" value={String(stats.totalPoints)} label="Total points" tone="processing_speed" />
           </View>
         )}
       </View>
 
-      {!loading && stats.categories.length > 0 && (
-        <View accessibilityLabel="Per-category breakdown" style={styles.categories}>
-          <Text style={styles.sectionTitle}>By performance category</Text>
-          {stats.categories.map((c) => (
-            <View key={c.category} style={styles.categoryRow}>
-              <Text style={styles.categoryName}>{categoryLabel(c.category)}</Text>
-              <Text style={styles.categoryMeta}>
-                {c.played} played · {formatAccuracy(c.accuracy)} · {c.points} pts
-              </Text>
-            </View>
-          ))}
+      {!loading && (
+        <View accessibilityLabel="Accuracy by performance category" style={styles.categories}>
+          <Text style={styles.sectionTitle}>Accuracy by performance category</Text>
+          {stats.categories.length > 0 ? (
+            buildCategoryBars(stats.categories, 'accuracy').map((bar) => (
+              <CategoryBarRow key={bar.category} bar={bar} />
+            ))
+          ) : (
+            <Text style={a.note}>
+              Play a few games and your category accuracy will chart here.
+            </Text>
+          )}
+        </View>
+      )}
+
+      {!loading && stats.categories.length > 0 && stats.totalPoints > 0 && (
+        <View accessibilityLabel="Points share by category" style={styles.categories}>
+          <Text style={styles.sectionTitle}>Where your points come from</Text>
+          <PointsDistribution
+            segments={buildPointsDistribution(stats.categories)}
+          />
         </View>
       )}
 
@@ -192,11 +209,24 @@ export default function ProfilePage({
           <Text style={styles.sectionTitle}>Your games</Text>
           {games.map((g) => (
             <View key={g.cardId} style={styles.gameRow}>
+              <View
+                style={[
+                  styles.gameAccent,
+                  { backgroundColor: categoryAccent(g.category).accent },
+                ]}
+              />
               <View style={styles.gameMain}>
                 <Text style={styles.gameTitle} numberOfLines={1}>
                   {g.title}
                 </Text>
-                <Text style={styles.gameCategory}>{g.categoryLabel}</Text>
+                <Text
+                  style={[
+                    styles.gameCategory,
+                    { color: categoryAccent(g.category).accent },
+                  ]}
+                >
+                  {g.categoryLabel}
+                </Text>
               </View>
               <Text style={styles.gameScores}>
                 <Text style={styles.gameBest}>Best {g.bestPoints}</Text>
@@ -231,11 +261,92 @@ export default function ProfilePage({
   );
 }
 
-function Stat({ value, label }: { value: string; label: string }) {
+function Stat({
+  icon,
+  value,
+  label,
+  tone,
+}: {
+  icon: string;
+  value: string;
+  label: string;
+  /** Category id whose accent tints the card stripe; cosmetic only. */
+  tone: string;
+}) {
+  const accent = categoryAccent(tone).accent;
   return (
     <View style={styles.stat}>
+      <View style={[styles.statStripe, { backgroundColor: accent }]} />
+      <Text style={styles.statIcon}>{icon}</Text>
       <Text style={styles.statValue}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
+/** One labelled, accent-tinted horizontal accuracy bar (color is not the only cue). */
+function CategoryBarRow({ bar }: { bar: CategoryBar }) {
+  const accent = categoryAccent(bar.category).accent;
+  return (
+    <View
+      style={styles.bar}
+      accessibilityLabel={`${categoryLabel(bar.category)}: ${bar.valueLabel}`}
+    >
+      <View style={styles.barHead}>
+        <Text style={styles.barName}>{categoryLabel(bar.category)}</Text>
+        <Text style={styles.barValue}>{bar.valueLabel}</Text>
+      </View>
+      <View style={styles.barTrack}>
+        <View
+          style={[
+            styles.barFill,
+            // Width as a percentage string; clamp the floor so a tiny non-zero
+            // value still shows a sliver, and a 0 stays empty.
+            {
+              width: `${Math.round(bar.fill * 100)}%`,
+              backgroundColor: accent,
+            },
+          ]}
+        />
+      </View>
+    </View>
+  );
+}
+
+/** A segmented bar of each category's share of total points, plus a legend. */
+function PointsDistribution({ segments }: { segments: DistributionSegment[] }) {
+  const visible = segments.filter((s) => s.value > 0);
+  return (
+    <View>
+      <View
+        style={styles.distribution}
+        accessibilityRole="image"
+        accessibilityLabel="Points share by category"
+      >
+        {visible.map((s) => (
+          <View
+            key={s.category}
+            style={{
+              width: `${s.share * 100}%`,
+              backgroundColor: categoryAccent(s.category).accent,
+            }}
+          />
+        ))}
+      </View>
+      <View style={styles.legend}>
+        {visible.map((s) => (
+          <View key={s.category} style={styles.legendItem}>
+            <View
+              style={[
+                styles.legendDot,
+                { backgroundColor: categoryAccent(s.category).accent },
+              ]}
+            />
+            <Text style={styles.legendLabel}>{categoryLabel(s.category)}</Text>
+            <Text style={styles.legendValue}>{s.sharePercent}</Text>
+          </View>
+        ))}
+      </View>
     </View>
   );
 }
@@ -298,6 +409,8 @@ const styles = StyleSheet.create({
     gap: space.md,
   },
   stat: {
+    position: 'relative',
+    overflow: 'hidden',
     flexGrow: 1,
     flexBasis: '45%',
     backgroundColor: colors.surface,
@@ -308,6 +421,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.lg,
     alignItems: 'center',
   },
+  statStripe: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+    opacity: 0.9,
+  },
+  statIcon: {
+    fontSize: fontSize.md,
+    marginBottom: space.xs,
+  },
   statValue: {
     color: colors.text,
     fontSize: fontSize.xl,
@@ -317,6 +442,72 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: fontSize.sm,
     marginTop: space.xs,
+  },
+  bar: {
+    marginBottom: space.md,
+  },
+  barHead: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    marginBottom: space.xs,
+  },
+  barName: {
+    color: colors.text,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.semibold,
+  },
+  barValue: {
+    color: colors.textMuted,
+    fontSize: fontSize.sm,
+  },
+  barTrack: {
+    height: 10,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  barFill: {
+    height: '100%',
+    minWidth: 2,
+    borderRadius: radius.pill,
+  },
+  distribution: {
+    flexDirection: 'row',
+    height: 14,
+    borderRadius: radius.pill,
+    overflow: 'hidden',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  legend: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: space.sm,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: space.md,
+    marginBottom: space.xs,
+  },
+  legendDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 6,
+  },
+  legendLabel: {
+    color: colors.text,
+    fontSize: fontSize.sm,
+    marginRight: 4,
+  },
+  legendValue: {
+    color: colors.textMuted,
+    fontSize: fontSize.sm,
   },
   categories: {
     gap: space.sm,
@@ -352,6 +543,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
     gap: space.md,
+  },
+  gameAccent: {
+    width: 4,
+    alignSelf: 'stretch',
+    borderRadius: radius.pill,
   },
   gameMain: {
     flexShrink: 1,

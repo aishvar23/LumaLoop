@@ -26,6 +26,11 @@ export interface YourGameRow {
   cardId: string;
   /** Friendly game title (catalog `explanation.title`, falling back to prompt). */
   title: string;
+  /**
+   * Raw performance-category id (e.g. "visual_attention") — the colour key for the
+   * row's accent. Prefers the live catalog category, falling back to the view row.
+   */
+  category: string;
   /** Human label for the performance category (e.g. "Visual attention"). */
   categoryLabel: string;
   bestPoints: number;
@@ -75,12 +80,14 @@ export function buildYourGames(
 ): YourGameRow[] {
   const rows: YourGameRow[] = scores.map((s) => {
     const card = getCardById(s.card_id);
+    // Prefer the live catalog category (kept current), falling back to the value
+    // stored on the view row.
+    const category = card?.category ?? s.category;
     return {
       cardId: s.card_id,
       title: gameTitle(card, s.card_id),
-      // Prefer the live catalog category (kept current), falling back to the
-      // value stored on the view row.
-      categoryLabel: categoryLabel(card?.category ?? s.category),
+      category,
+      categoryLabel: categoryLabel(category),
       bestPoints: s.best_points,
       lastPoints: s.last_points,
       timesPlayed: s.times_played,

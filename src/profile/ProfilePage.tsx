@@ -20,6 +20,7 @@ import { supabase } from '../auth/supabaseClient';
 import type { GamePlay } from '../auth/types';
 import { getCardById as defaultGetCardById } from '../cards/catalog';
 import type { LiquidCard } from '../cards/types';
+import { resolveCategoryTheme } from '../ui/categoryTheme';
 import {
   computeStats,
   EMPTY_PROFILE_STATS,
@@ -27,6 +28,12 @@ import {
   type ProfileStats,
 } from './computeStats';
 import { fetchGameScores } from './gameScoresApi';
+import {
+  buildCategoryBars,
+  buildPointsDistribution,
+  type CategoryBar,
+  type DistributionSegment,
+} from './profileCharts';
 import { buildYourGames, type YourGameRow } from './yourGames';
 import '../auth/AuthScreens.css';
 import './ProfilePage.css';
@@ -122,27 +129,37 @@ export default function ProfilePage({
           <p className="profile-empty">Loading your stats…</p>
         ) : (
           <div className="profile-stats-grid">
-            <Stat value={String(stats.gamesPlayed)} label="Games played" />
-            <Stat value={formatAccuracy(stats.accuracy)} label="Accuracy" />
-            <Stat value={String(stats.bestStreak)} label="Best streak" />
-            <Stat value={String(stats.totalPoints)} label="Total points" />
+            <Stat icon="🎮" value={String(stats.gamesPlayed)} label="Games played" tone="visual_attention" />
+            <Stat icon="🎯" value={formatAccuracy(stats.accuracy)} label="Accuracy" tone="logical_reasoning" />
+            <Stat icon="🔥" value={String(stats.bestStreak)} label="Best streak" tone="cognitive_flexibility" />
+            <Stat icon="⭐" value={String(stats.totalPoints)} label="Total points" tone="processing_speed" />
           </div>
         )}
       </section>
 
-      {!loading && stats.categories.length > 0 && (
-        <section aria-label="Per-category breakdown">
-          <h2 className="profile-section-title">By performance category</h2>
-          {stats.categories.map((c) => (
-            <div key={c.category} className="profile-category-row">
-              <span className="profile-category-name">
-                {categoryLabel(c.category)}
-              </span>
-              <span className="profile-category-meta">
-                {c.played} played · {formatAccuracy(c.accuracy)} · {c.points} pts
-              </span>
+      {!loading && (
+        <section aria-label="Accuracy by performance category">
+          <h2 className="profile-section-title">Accuracy by performance category</h2>
+          {stats.categories.length > 0 ? (
+            <div className="profile-chart" role="list">
+              {buildCategoryBars(stats.categories, 'accuracy').map((bar) => (
+                <CategoryBarRow key={bar.category} bar={bar} />
+              ))}
             </div>
-          ))}
+          ) : (
+            <p className="profile-empty">
+              Play a few games and your category accuracy will chart here.
+            </p>
+          )}
+        </section>
+      )}
+
+      {!loading && stats.categories.length > 0 && stats.totalPoints > 0 && (
+        <section aria-label="Points share by category">
+          <h2 className="profile-section-title">Where your points come from</h2>
+          <PointsDistribution
+            segments={buildPointsDistribution(stats.categories)}
+          />
         </section>
       )}
 
@@ -151,9 +168,19 @@ export default function ProfilePage({
           <h2 className="profile-section-title">Your games</h2>
           {games.map((g) => (
             <div key={g.cardId} className="profile-game-row">
+              <span
+                className="profile-game-accent"
+                aria-hidden="true"
+                style={{ background: resolveCategoryTheme(g.category).accent }}
+              />
               <span className="profile-game-main">
                 <span className="profile-game-title">{g.title}</span>
-                <span className="profile-game-category">{g.categoryLabel}</span>
+                <span
+                  className="profile-game-category"
+                  style={{ color: resolveCategoryTheme(g.category).accent }}
+                >
+                  {g.categoryLabel}
+                </span>
               </span>
               <span className="profile-game-scores">
                 <span className="profile-game-best">Best {g.bestPoints}</span>
@@ -185,11 +212,99 @@ export default function ProfilePage({
   );
 }
 
-function Stat({ value, label }: { value: string; label: string }) {
+function Stat({
+  icon,
+  value,
+  label,
+  tone,
+}: {
+  icon: string;
+  value: string;
+  label: string;
+  /** Category id whose accent tints the card; cosmetic only. */
+  tone: string;
+}) {
+  const accent = resolveCategoryTheme(tone).accent;
   return (
-    <div className="profile-stat">
+    <div
+      className="profile-stat"
+      style={{ ['--stat-accent' as string]: accent }}
+    >
+      <span className="profile-stat__icon" aria-hidden="true">
+        {icon}
+      </span>
       <span className="profile-stat__value">{value}</span>
       <span className="profile-stat__label">{label}</span>
     </div>
+  );
+}
+
+/** One labelled, accent-tinted horizontal accuracy bar (color is not the only cue). */
+function CategoryBarRow({ bar }: { bar: CategoryBar }) {
+  const accent = resolveCategoryTheme(bar.category).accent;
+  return (
+    <div
+      className="profile-bar"
+      role="listitem"
+      aria-label={`${categoryLabel(bar.category)}: ${bar.valueLabel}`}
+    >
+      <div className="profile-bar__head">
+        <span className="profile-bar__name">{categoryLabel(bar.category)}</span>
+        <span className="profile-bar__value">{bar.valueLabel}</span>
+      </div>
+      <div className="profile-bar__track">
+        <div
+          className="profile-bar__fill"
+          style={{
+            width: `${Math.round(bar.fill * 100)}%`,
+            background: accent,
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/** A single segmented bar of each category's share of total points, plus a legend. */
+function PointsDistribution({
+  segments,
+}: {
+  segments: DistributionSegment[];
+}) {
+  return (
+    <>
+      <div className="profile-distribution" role="img" aria-label="Points share by category">
+        {segments
+          .filter((s) => s.share > 0)
+          .map((s) => (
+            <span
+              key={s.category}
+              className="profile-distribution__seg"
+              style={{
+                width: `${s.share * 100}%`,
+                background: resolveCategoryTheme(s.category).accent,
+              }}
+              title={`${categoryLabel(s.category)} ${s.sharePercent}`}
+            />
+          ))}
+      </div>
+      <ul className="profile-legend">
+        {segments
+          .filter((s) => s.value > 0)
+          .map((s) => (
+            <li key={s.category} className="profile-legend__item">
+              <span
+                className="profile-legend__dot"
+                aria-hidden="true"
+                style={{ background: resolveCategoryTheme(s.category).accent }}
+              />
+              <span className="profile-legend__label">
+                {categoryLabel(s.category)}
+              </span>
+              <span className="profile-legend__value">{s.sharePercent}</span>
+            </li>
+          ))}
+      </ul>
+    </>
   );
 }
