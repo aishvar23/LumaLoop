@@ -6,8 +6,8 @@
  * from the shared pure evaluator.
  */
 
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type {
   GridCoordinate,
@@ -23,7 +23,6 @@ import {
   type PrismPathOrientationMap,
 } from '../../core/templates/prismPath/prismPathEvaluator';
 import {
-  categoryAccent,
   colors,
   elevation,
   fontSize,
@@ -33,6 +32,7 @@ import {
   space,
   TAP_TARGET_MIN,
 } from './tokens';
+import { useGameTheme } from './GameTheme';
 
 export type PrismPathCardProps = TemplateProps<PrismPathCardType> & {
   now?: () => number;
@@ -52,6 +52,44 @@ function mirrorGlyph(orientation: PrismMirrorOrientation): string {
   return orientation === 'slash' ? '/' : '\\';
 }
 
+const PRISM_PATH_DESCRIPTION =
+  'Rotate mirrors to bend the beam from IN to the star while avoiding blocker squares. Use the live preview, then fire only when the route reaches the target.';
+const DEMO_TIME_HINT =
+  'Watching the demo adds about 5 seconds to your overall solve time.';
+const DEMO_CONNECT_MS = 1300;
+const DEMO_TARGET_MS = 2600;
+const DEMO_CLOSE_MS = 4200;
+
+type DemoStep = 0 | 1 | 2;
+
+const DEMO_CONFIG: PrismPathCardType['config'] = {
+  rows: 3,
+  columns: 4,
+  entry: { row: 2, column: 0 },
+  entryDirection: 'right',
+  target: { row: 0, column: 3 },
+  mirrors: [
+    { id: 'demo-a', row: 2, column: 1, initialOrientation: 'backslash' },
+    { id: 'demo-b', row: 0, column: 1, initialOrientation: 'backslash' },
+  ],
+  blockers: [{ row: 0, column: 0 }],
+  solution: [
+    { mirrorId: 'demo-a', orientation: 'slash' },
+    { mirrorId: 'demo-b', orientation: 'slash' },
+  ],
+  timeLimitMs: 0,
+};
+
+function demoOrientationsForStep(step: DemoStep): PrismPathOrientationMap {
+  if (step === 0) {
+    return { 'demo-a': 'backslash', 'demo-b': 'backslash' };
+  }
+  if (step === 1) {
+    return { 'demo-a': 'slash', 'demo-b': 'backslash' };
+  }
+  return { 'demo-a': 'slash', 'demo-b': 'slash' };
+}
+
 export default function PrismPathCard({
   card,
   context,
@@ -61,7 +99,8 @@ export default function PrismPathCard({
   now = Date.now,
 }: PrismPathCardProps) {
   const { config } = card;
-  const accent = categoryAccent(card.category).accent;
+  const theme = useGameTheme();
+  const { accent } = theme;
   const [orientations, setOrientations] = useState<PrismPathOrientationMap>(() =>
     initialOrientationMap(config.mirrors),
   );
@@ -69,6 +108,39 @@ export default function PrismPathCard({
   const firstInputElapsedRef = useRef<number | null>(null);
   const attemptCountRef = useRef(0);
   const resolvedRef = useRef(false);
+  const [demoOpen, setDemoOpen] = useState(false);
+  const [demoStep, setDemoStep] = useState<DemoStep>(0);
+  const [showYourTurn, setShowYourTurn] = useState(false);
+  const [hasInteracted, setHasInteracted] = useState(false);
+
+  const finishDemo = useCallback(() => {
+    setDemoOpen(false);
+    setDemoStep(0);
+    setShowYourTurn(true);
+  }, []);
+
+  useEffect(() => {
+    if (!demoOpen) return undefined;
+    setDemoStep(0);
+    const connectTimer = setTimeout(
+      () => setDemoStep(1),
+      DEMO_CONNECT_MS,
+    );
+    const targetTimer = setTimeout(() => setDemoStep(2), DEMO_TARGET_MS);
+    const closeTimer = setTimeout(finishDemo, DEMO_CLOSE_MS);
+    return () => {
+      clearTimeout(connectTimer);
+      clearTimeout(targetTimer);
+      clearTimeout(closeTimer);
+    };
+  }, [demoOpen, finishDemo]);
+
+  const openDemo = useCallback(() => {
+    if (resolvedRef.current || hasInteracted) return;
+    setShowYourTurn(false);
+    setDemoStep(0);
+    setDemoOpen(true);
+  }, [hasInteracted]);
 
   const handleResolve = useCallback(
     (resolution: CardResolution) => {
@@ -100,6 +172,8 @@ export default function PrismPathCard({
 
   const markFirstInput = useCallback(() => {
     if (firstInputElapsedRef.current !== null) return;
+    setHasInteracted(true);
+    setShowYourTurn(false);
     const tti = now() - context.interactionEnabledAtMs;
     firstInputElapsedRef.current = tti;
     onAttempt({ time_to_interaction: tti });
@@ -176,15 +250,58 @@ export default function PrismPathCard({
   );
 
   return (
-    <View style={styles.section} accessibilityLabel="Prism path">
+    <View
+      style={styles.section}
+      accessibilityLabel="Prism path"
+      accessibilityHint={PRISM_PATH_DESCRIPTION}
+    >
+      <View style={styles.demoLaunchRow}>
+        <Text
+          testID="pp-description-trigger"
+          accessibilityHint={PRISM_PATH_DESCRIPTION}
+          style={[styles.eyebrow, { color: accent }]}
+        >
+          PRISM PATH · MIRROR ROUTING
+        </Text>
+        {!hasInteracted ? (
+          <Pressable
+            testID="pp-demo-button"
+            accessibilityRole="button"
+            accessibilityLabel="Watch Prism Path demo"
+            accessibilityHint={DEMO_TIME_HINT}
+            onPress={openDemo}
+            style={({ pressed }) => [
+              styles.demoButton,
+              { borderColor: theme.border },
+              pressed && { backgroundColor: theme.surfaceStrong },
+            ]}
+          >
+            <Text style={[styles.demoButtonText, { color: accent }]}>
+              Watch demo
+            </Text>
+          </Pressable>
+        ) : null}
+      </View>
       <Text testID="pp-prompt" style={styles.prompt}>
         {card.prompt}
       </Text>
+      {showYourTurn && !hasInteracted ? (
+        <Text
+          testID="pp-your-turn"
+          accessibilityLiveRegion="polite"
+          style={[styles.yourTurn, { borderColor: accent, color: accent }]}
+        >
+          Your turn — rotate mirrors until the preview reaches the star.
+        </Text>
+      ) : null}
 
       <View
         testID="pp-board"
         accessibilityLabel="Mirror beam grid"
-        style={[styles.board, { borderColor: accent }]}
+        style={[
+          styles.board,
+          { backgroundColor: theme.surface, borderColor: theme.border },
+        ]}
       >
         {rows.map((row, rowIndex) => (
           <View key={rowIndex} style={styles.row}>
@@ -201,7 +318,14 @@ export default function PrismPathCard({
               const isBeam = pathSet.has(key);
               const baseStyles = [
                 styles.cell,
-                isBeam && styles.beamCell,
+                {
+                  backgroundColor: theme.surfaceRaised,
+                  borderColor: theme.border,
+                },
+                isBeam && {
+                  backgroundColor: theme.surfaceStrong,
+                  borderColor: accent,
+                },
                 isEntry && { borderColor: accent },
                 isTarget && { borderColor: accent },
                 isBlocker && styles.blockerCell,
@@ -219,7 +343,11 @@ export default function PrismPathCard({
                     style={({ pressed }) => [
                       ...baseStyles,
                       styles.mirrorCell,
-                      pressed && styles.mirrorPressed,
+                      { backgroundColor: theme.surfaceRaised },
+                      pressed && {
+                        backgroundColor: theme.surfaceStrong,
+                        borderColor: accent,
+                      },
                     ]}
                   >
                     <Text style={[styles.mirrorGlyph, { color: accent }]}>
@@ -256,7 +384,7 @@ export default function PrismPathCard({
         style={({ pressed }) => [
           styles.submit,
           { backgroundColor: accent },
-          pressed && styles.submitPressed,
+          pressed && { backgroundColor: theme.deep },
         ]}
       >
         <Text style={styles.submitText}>Fire beam</Text>
@@ -271,21 +399,216 @@ export default function PrismPathCard({
           ? 'Beam preview reaches the star.'
           : `Beam currently ${trace.exitReason.replace('_', ' ')}.`}
       </Text>
+      <PrismDemo
+        visible={demoOpen}
+        step={demoStep}
+        accent={accent}
+        surface={theme.surface}
+        surfaceRaised={theme.surfaceRaised}
+        border={theme.border}
+        onClose={finishDemo}
+      />
     </View>
   );
 }
 
 PrismPathCard.displayName = 'PrismPathCard';
 
+function PrismDemo({
+  visible,
+  step,
+  accent,
+  surface,
+  surfaceRaised,
+  border,
+  onClose,
+}: {
+  visible: boolean;
+  step: DemoStep;
+  accent: string;
+  surface: string;
+  surfaceRaised: string;
+  border: string;
+  onClose: () => void;
+}) {
+  const orientations = demoOrientationsForStep(step);
+  const trace = tracePrismPath(DEMO_CONFIG, orientations);
+  const pathSet = new Set(trace.cells.map(coordKey));
+  const blockerSet = new Set(DEMO_CONFIG.blockers.map(coordKey));
+  const mirrorByCoord = new Map<string, (typeof DEMO_CONFIG.mirrors)[number]>();
+  for (const mirror of DEMO_CONFIG.mirrors) {
+    mirrorByCoord.set(coordKey(mirror), mirror);
+  }
+  const instruction =
+    step === 0
+      ? 'The beam starts at IN and follows the current mirror angle.'
+      : step === 1
+        ? 'One mirror turns the beam upward, but the next angle still hits a block.'
+        : 'Rotate the second mirror and the beam reaches the star.';
+  const rows = Array.from({ length: DEMO_CONFIG.rows }, (_, row) =>
+    Array.from({ length: DEMO_CONFIG.columns }, (_, column) => ({
+      row,
+      column,
+    })),
+  );
+
+  return (
+    <Modal
+      transparent
+      visible={visible}
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <View
+        style={styles.demoBackdrop}
+        accessibilityViewIsModal
+        accessibilityLabel="Prism Path demonstration"
+      >
+        <View style={styles.demoPanel}>
+          <Text style={styles.demoTitle}>How Prism Path works</Text>
+          <Text
+            testID="pp-demo-instruction"
+            accessibilityLiveRegion="polite"
+            style={styles.demoInstruction}
+          >
+            {instruction}
+          </Text>
+          <View
+            testID="pp-demo-board"
+            accessibilityLabel="Separate Prism Path demo board"
+            style={[
+              styles.demoBoard,
+              { backgroundColor: surface, borderColor: border },
+            ]}
+          >
+            {rows.map((row, rowIndex) => (
+              <View key={rowIndex} style={styles.row}>
+                {row.map((coord) => {
+                  const key = coordKey(coord);
+                  const mirror = mirrorByCoord.get(key);
+                  const isEntry =
+                    coord.row === DEMO_CONFIG.entry.row &&
+                    coord.column === DEMO_CONFIG.entry.column;
+                  const isTarget =
+                    coord.row === DEMO_CONFIG.target.row &&
+                    coord.column === DEMO_CONFIG.target.column;
+                  const isBlocker = blockerSet.has(key);
+                  const isBeam = pathSet.has(key);
+
+                  return (
+                    <View
+                      key={key}
+                      testID={`pp-demo-cell-${key}`}
+                      style={[
+                        styles.demoCell,
+                        { backgroundColor: surfaceRaised, borderColor: border },
+                        isBeam && {
+                          backgroundColor: 'rgba(91, 140, 255, 0.22)',
+                          borderColor: accent,
+                        },
+                        isEntry && { borderColor: accent },
+                        isTarget && { borderColor: accent },
+                        isBlocker && styles.blockerCell,
+                      ]}
+                    >
+                      {mirror ? (
+                        <Text style={[styles.demoMirrorGlyph, { color: accent }]}>
+                          {mirrorGlyph(orientations[mirror.id] ?? 'slash')}
+                        </Text>
+                      ) : isEntry ? (
+                        <Text style={[styles.entryText, { color: accent }]}>
+                          IN
+                        </Text>
+                      ) : isTarget ? (
+                        <Text
+                          accessibilityLabel="target"
+                          style={[styles.targetText, { color: accent }]}
+                        >
+                          ★
+                        </Text>
+                      ) : isBlocker ? (
+                        <Text
+                          accessibilityLabel="blocker"
+                          style={styles.blockerText}
+                        >
+                          ×
+                        </Text>
+                      ) : null}
+                    </View>
+                  );
+                })}
+              </View>
+            ))}
+          </View>
+          <Text style={styles.demoCaption}>
+            Demo uses a separate mini board, not this puzzle’s answer.
+          </Text>
+          <View style={styles.demoProgress} accessibilityElementsHidden>
+            {[0, 1, 2].map((item) => (
+              <View
+                key={item}
+                style={[
+                  styles.demoDot,
+                  { backgroundColor: item <= step ? accent : colors.border },
+                ]}
+              />
+            ))}
+          </View>
+          <Pressable
+            testID="pp-demo-skip"
+            accessibilityRole="button"
+            onPress={onClose}
+            style={styles.demoSkip}
+          >
+            <Text style={styles.demoSkipText}>Skip demo</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 const styles = StyleSheet.create({
   section: {
     gap: space.md,
+  },
+  demoLaunchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: space.sm,
+  },
+  eyebrow: {
+    flexShrink: 1,
+    fontSize: 11,
+    fontWeight: fontWeight.heavy,
+    letterSpacing: 2,
+  },
+  demoButton: {
+    minHeight: TAP_TARGET_MIN,
+    paddingHorizontal: space.md,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  demoButtonText: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold,
   },
   prompt: {
     color: colors.text,
     fontSize: fontSize.hero,
     fontWeight: fontWeight.heavy,
     lineHeight: fontSize.hero * lineHeight.tight,
+  },
+  yourTurn: {
+    padding: space.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.semibold,
   },
   board: {
     gap: space.xs,
@@ -362,5 +685,80 @@ const styles = StyleSheet.create({
     minHeight: fontSize.md,
     color: colors.textMuted,
     fontSize: fontSize.sm,
+  },
+  demoBackdrop: {
+    flex: 1,
+    padding: space.xl,
+    backgroundColor: 'rgba(4,6,12,0.88)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  demoPanel: {
+    width: '100%',
+    maxWidth: 390,
+    gap: space.lg,
+    padding: space.xl,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: '#151923',
+    ...elevation.card,
+  },
+  demoTitle: {
+    color: colors.text,
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.heavy,
+    textAlign: 'center',
+  },
+  demoInstruction: {
+    minHeight: 52,
+    color: colors.textMuted,
+    fontSize: fontSize.md,
+    textAlign: 'center',
+  },
+  demoBoard: {
+    gap: space.xs,
+    padding: space.sm,
+    borderWidth: 1,
+    borderRadius: radius.md,
+  },
+  demoCell: {
+    flex: 1,
+    aspectRatio: 1,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderRadius: radius.sm,
+  },
+  demoMirrorGlyph: {
+    fontSize: 24,
+    fontWeight: fontWeight.heavy,
+    lineHeight: 26,
+  },
+  demoCaption: {
+    color: colors.textMuted,
+    fontSize: fontSize.xs,
+    textAlign: 'center',
+  },
+  demoProgress: {
+    flexDirection: 'row',
+    alignSelf: 'center',
+    gap: space.sm,
+  },
+  demoDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  demoSkip: {
+    minHeight: TAP_TARGET_MIN,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  demoSkipText: {
+    color: colors.textMuted,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.semibold,
   },
 });

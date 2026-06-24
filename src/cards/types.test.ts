@@ -18,6 +18,8 @@ const ALL_TEMPLATE_TYPES: TemplateType[] = [
   'step_logic',
   'code_break',
   'prism_path',
+  'signal_set',
+  'circuit_flow',
 ];
 
 const ALL_CATEGORIES: ChallengeCategory[] = [
@@ -69,7 +71,9 @@ describe('templateCategoryMap', () => {
     // The array is frozen, so a push must throw in strict mode (the test file
     // is an ES module and therefore strict).
     expect(() => {
-      (templateCategoryMap.spot_it as ChallengeCategory[]).push('working_memory');
+      (templateCategoryMap.spot_it as ChallengeCategory[]).push(
+        'working_memory',
+      );
     }).toThrow();
     expect(templateCategoryMap.spot_it).toEqual([
       'visual_attention',
@@ -87,7 +91,13 @@ describe('templateCategoryMap', () => {
       pattern_chain: ['pattern_recognition'],
       step_logic: ['logical_reasoning'],
       code_break: ['logical_reasoning'],
-      prism_path: ['logical_reasoning', 'pattern_recognition', 'working_memory'],
+      prism_path: [
+        'logical_reasoning',
+        'pattern_recognition',
+        'working_memory',
+      ],
+      signal_set: ['pattern_recognition', 'logical_reasoning'],
+      circuit_flow: ['logical_reasoning', 'pattern_recognition'],
     });
   });
 });
@@ -127,6 +137,12 @@ function categoriesForCard(card: LiquidCard): ChallengeCategory {
       return 'logical_reasoning';
     case 'prism_path':
       void card.config.mirrors;
+      return 'logical_reasoning';
+    case 'signal_set':
+      void card.config.solutionIds;
+      return 'pattern_recognition';
+    case 'circuit_flow':
+      void card.config.sourceTileId;
       return 'logical_reasoning';
     default: {
       // If a new TemplateType is added without a case above, `card` is no

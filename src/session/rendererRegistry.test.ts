@@ -22,10 +22,12 @@ import type {
   WhatChangedCard,
 } from '../cards/types';
 import CodeBreakCardRenderer from '../templates/codeBreak/CodeBreakCard';
+import CircuitFlowCardRenderer from '../templates/circuitFlow/CircuitFlowCard';
 import MemorySequenceCardRenderer from '../templates/memorySequence/MemorySequenceCard';
 import PatternChainCardRenderer from '../templates/patternChain/PatternChainCard';
 import PrismPathCardRenderer from '../templates/prismPath/PrismPathCard';
 import RuleFlipCardRenderer from '../templates/ruleFlip/RuleFlipCard';
+import SignalSetCardRenderer from '../templates/signalSet/SignalSetCard';
 import SpotItCardRenderer from '../templates/spotIt/SpotItCard';
 import StepLogicCardRenderer from '../templates/stepLogic/StepLogicCard';
 import TinyLogicCardRenderer from '../templates/tinyLogic/TinyLogicCard';
@@ -335,6 +337,11 @@ describe('defaultRendererRegistry', () => {
 
   it('wires the prism_path renderer', () => {
     expect(defaultRendererRegistry.prism_path).toBe(PrismPathCardRenderer);
+  });
+
+  it('wires the signal_set and circuit_flow renderers', () => {
+    expect(defaultRendererRegistry.signal_set).toBe(SignalSetCardRenderer);
+    expect(defaultRendererRegistry.circuit_flow).toBe(CircuitFlowCardRenderer);
   });
 
   it('resolves the spot_it card to its renderer', () => {

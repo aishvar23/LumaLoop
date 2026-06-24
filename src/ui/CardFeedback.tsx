@@ -80,6 +80,11 @@ export default function CardFeedback({
   const detail = OUTCOME_DETAIL[resolutionType];
   const glyph = OUTCOME_GLYPH[resolutionType];
   const positive = resolutionType === 'correct';
+  const failureReason =
+    typeof resolution.signals.failure_reason === 'string' &&
+    resolution.signals.failure_reason.trim().length > 0
+      ? resolution.signals.failure_reason
+      : null;
 
   // Outcome-tinted RESULT card (Phase 3, mirroring mobile): a success hue
   // reinforces "Correct"; the softer error hue reinforces "Not quite"/"Time's up".
@@ -145,6 +150,19 @@ export default function CardFeedback({
 
         {/* Explanation state — headed copy, not a second live region, so the
             outcome above is not double-announced. */}
+        {failureReason ? (
+          <section
+            aria-labelledby="card-failure-title"
+            data-testid="card-failure-reason"
+            style={failureReasonStyle}
+          >
+            <p id="card-failure-title" style={failureReasonTitleStyle}>
+              What went wrong
+            </p>
+            <p style={failureReasonBodyStyle}>{failureReason}</p>
+          </section>
+        ) : null}
+
         <section aria-labelledby="card-explanation-title" style={explanationStyle}>
           <p id="card-explanation-title" style={explanationTitleStyle}>
             {explanation.title}
@@ -306,6 +324,30 @@ const explanationStyle = {
   borderRadius: 'var(--radius-md)',
   border: '1px solid var(--color-border)',
   background: 'var(--color-surface-raised)',
+} as const;
+
+const failureReasonStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 'var(--space-1)',
+  padding: 'var(--space-3)',
+  borderRadius: 'var(--radius-md)',
+  border: '1px solid var(--color-error-border)',
+  background: 'var(--color-error-surface)',
+} as const;
+
+const failureReasonTitleStyle = {
+  margin: 0,
+  fontSize: 'var(--font-size-sm)',
+  fontWeight: 'var(--font-weight-bold)',
+  color: 'var(--color-error-bright)',
+} as const;
+
+const failureReasonBodyStyle = {
+  margin: 0,
+  fontSize: 'var(--font-size-sm)',
+  lineHeight: 'var(--line-height-normal)',
+  color: 'var(--color-text)',
 } as const;
 
 const explanationTitleStyle = {

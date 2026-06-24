@@ -55,6 +55,7 @@ import {
   space,
   TAP_TARGET_MIN,
 } from './tokens';
+import { useGameTheme } from './GameTheme';
 
 /**
  * The renderer accepts the shared {@link TemplateProps} plus an optional
@@ -156,6 +157,7 @@ function WhatChangedAnswer({
   now,
 }: WhatChangedAnswerProps) {
   const { config } = card;
+  const theme = useGameTheme();
 
   // Interaction bookkeeping lives in refs so selections don't depend on render
   // timing. `selectedId` is mirrored into state purely to drive the pressed
@@ -249,6 +251,7 @@ function WhatChangedAnswer({
         testIdPrefix="wc-after"
       />
       <View
+        testID="wc-options"
         accessibilityRole="radiogroup"
         accessibilityLabel="What changed? Pick one"
         style={styles.options}
@@ -265,13 +268,24 @@ function WhatChangedAnswer({
               onPress={() => handleSelect(option.id)}
               style={({ pressed }) => [
                 styles.option,
-                pressed && styles.optionPressed,
-                isSelected && styles.optionSelected,
+                {
+                  backgroundColor: theme.surfaceRaised,
+                  borderColor: theme.border,
+                },
+                pressed && { backgroundColor: theme.surfaceStrong },
+                isSelected && {
+                  backgroundColor: theme.surfaceStrong,
+                  borderColor: theme.accent,
+                },
               ]}
             >
               {/* Non-colour selected cue: an explicit ▸ marker, not hue alone. */}
               <Text
-                style={[styles.optionText, isSelected && styles.optionTextSelected]}
+                style={[
+                  styles.optionText,
+                  isSelected && styles.optionTextSelected,
+                  isSelected && { color: theme.accent },
+                ]}
               >
                 {isSelected ? '▸ ' : ''}
                 {option.label}
@@ -301,16 +315,29 @@ function PatternStrip({
   pattern: string[];
   testIdPrefix: string;
 }) {
+  const theme = useGameTheme();
   return (
-    <View accessibilityLabel={label} style={styles.pattern}>
+    <View
+      accessibilityLabel={label}
+      style={[
+        styles.pattern,
+        { backgroundColor: theme.surface, borderColor: theme.border },
+      ]}
+    >
       {pattern.map((cell, index) => (
         <View
           key={`${testIdPrefix}-${index}`}
           testID={`${testIdPrefix}-${index}`}
           accessibilityLabel={`Position ${index + 1}: ${cell}`}
-          style={styles.tile}
+          style={[
+            styles.tile,
+            {
+              backgroundColor: theme.surfaceRaised,
+              borderColor: theme.border,
+            },
+          ]}
         >
-          <Text style={styles.tileText}>{cell}</Text>
+          <Text style={[styles.tileText, { color: theme.accent }]}>{cell}</Text>
         </View>
       ))}
     </View>
@@ -332,6 +359,9 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: space.sm,
     width: '100%',
+    padding: space.sm,
+    borderRadius: radius.lg,
+    borderWidth: 1,
   },
   tile: {
     minHeight: TAP_TARGET_MIN,
@@ -350,11 +380,15 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xl,
   },
   options: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: space.md,
     width: '100%',
   },
   // Options read as tappable chips/cards: elevated, rounded, generous targets.
   option: {
+    flexBasis: '46%',
+    flexGrow: 1,
     minHeight: TAP_TARGET_MIN + 4,
     alignItems: 'center',
     justifyContent: 'center',

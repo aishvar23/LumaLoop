@@ -87,6 +87,11 @@ export default function CardFeedback({
   const heading = OUTCOME_HEADING[resolutionType];
   const detail = OUTCOME_DETAIL[resolutionType];
   const positive = resolutionType === 'correct';
+  const failureReason =
+    typeof resolution.signals.failure_reason === 'string' &&
+    resolution.signals.failure_reason.trim().length > 0
+      ? resolution.signals.failure_reason
+      : null;
 
   // Outcome-tinted treatment: a success hue reinforces "Correct"; the softer
   // danger hue reinforces "Not quite"/"Time's up". Always paired with the word.
@@ -179,6 +184,13 @@ export default function CardFeedback({
           current streak/combo. Shown only when a score was supplied (feed runs);
           omitted in standalone renders. */}
       {cardScore ? <ScoreChip cardScore={cardScore} accent={accent} /> : null}
+
+      {failureReason ? (
+        <View testID="feedback-failure-reason" style={styles.failureReason}>
+          <Text style={styles.failureReasonTitle}>What went wrong</Text>
+          <Text style={styles.failureReasonBody}>{failureReason}</Text>
+        </View>
+      ) : null}
 
       {/* Explanation state — the card's authored copy, shown for every outcome. */}
       <View
@@ -295,6 +307,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
+  },
+  failureReason: {
+    gap: space.xs,
+    padding: space.lg,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.dangerBorder,
+    backgroundColor: colors.dangerSurface,
+  },
+  failureReasonTitle: {
+    color: colors.danger,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold,
+  },
+  failureReasonBody: {
+    color: colors.text,
+    fontSize: fontSize.sm,
+    lineHeight: fontSize.sm * lineHeight.normal,
   },
   explanationTitle: {
     color: colors.text,

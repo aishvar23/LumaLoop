@@ -60,9 +60,16 @@ export type TemplateType =
   | 'pattern_chain'
   | 'step_logic'
   | 'code_break'
-  | 'prism_path';
+  | 'prism_path'
+  | 'signal_set'
+  | 'circuit_flow';
 
-export type Difficulty = 'easy' | 'medium' | 'hard';
+export type Difficulty =
+  | 'extremely_easy'
+  | 'easy'
+  | 'medium'
+  | 'hard'
+  | 'extremely_hard';
 
 /**
  * Descriptive metadata about what a card measures and how it is played.
@@ -192,7 +199,7 @@ export type MemorySequenceCard = LiquidCardBase & {
     flashMs: number;
     /** Dark gap between consecutive flashes during the WATCH phase, in ms. */
     gapMs: number;
-    /** Countdown for the REPRODUCE phase only (5–30s; see validation). */
+    /** Countdown for the REPRODUCE phase only (5–120s; see validation). */
     timeLimitMs: number;
   };
 };
@@ -237,7 +244,7 @@ export type PatternChainCard = LiquidCardBase & {
      * step's `options`.
      */
     steps: ReadonlyArray<PatternChainStep>;
-    /** Countdown for the whole solve (5–30s; see validation). */
+    /** Countdown for the whole solve (5–120s; see validation). */
     timeLimitMs: number;
   };
 };
@@ -286,7 +293,7 @@ export type StepLogicCard = LiquidCardBase & {
      * validation); `correctOptionId` must be one of that step's `options`.
      */
     steps: ReadonlyArray<StepLogicStep>;
-    /** Countdown for the whole solve (5–30s; see validation). */
+    /** Countdown for the whole solve (5–120s; see validation). */
     timeLimitMs: number;
   };
 };
@@ -330,7 +337,7 @@ export type CodeBreakCard = LiquidCardBase & {
     secret: ReadonlyArray<string>;
     /** How many guesses the player gets (catalog validation bounds it 4–12). */
     maxGuesses: number;
-    /** Countdown for the whole solve (5–30s; see validation). */
+    /** Countdown for the whole solve (5–120s; see validation). */
     timeLimitMs: number;
   };
 };
@@ -384,7 +391,52 @@ export type PrismPathCard = LiquidCardBase & {
      * the target, so alternate valid paths are not unfairly rejected.
      */
     solution: ReadonlyArray<PrismPathSolution>;
-    /** Countdown for the whole solve (5-30s; see validation). */
+    /** Countdown for the whole solve (5-120s; see validation). */
+    timeLimitMs: number;
+  };
+};
+
+export type SignalShape = 'circle' | 'triangle' | 'diamond';
+export type SignalFill = 'solid' | 'striped' | 'outline';
+export type SignalCount = 1 | 2 | 3;
+
+export type SignalTile = {
+  id: string;
+  shape: SignalShape;
+  fill: SignalFill;
+  count: SignalCount;
+};
+
+export type SignalSetCard = LiquidCardBase & {
+  templateType: 'signal_set';
+  config: {
+    tiles: ReadonlyArray<SignalTile>;
+    solutionIds: readonly [string, string, string];
+    timeLimitMs: number;
+  };
+};
+
+export type CircuitRotation = 0 | 1 | 2 | 3;
+
+export type CircuitTile = GridCoordinate & {
+  id: string;
+  connections: ReadonlyArray<GridDirection>;
+  initialRotation: CircuitRotation;
+};
+
+export type CircuitSolution = {
+  tileId: string;
+  rotation: CircuitRotation;
+};
+
+export type CircuitFlowCard = LiquidCardBase & {
+  templateType: 'circuit_flow';
+  config: {
+    rows: number;
+    columns: number;
+    sourceTileId: string;
+    tiles: ReadonlyArray<CircuitTile>;
+    solution: ReadonlyArray<CircuitSolution>;
     timeLimitMs: number;
   };
 };
@@ -402,7 +454,9 @@ export type LiquidCard =
   | PatternChainCard
   | StepLogicCard
   | CodeBreakCard
-  | PrismPathCard;
+  | PrismPathCard
+  | SignalSetCard
+  | CircuitFlowCard;
 
 /**
  * The categories each template is allowed to map to (Technical Design §11).
@@ -421,8 +475,14 @@ export const templateCategoryMap: Readonly<
 > = Object.freeze({
   spot_it: Object.freeze(['visual_attention', 'processing_speed'] as const),
   what_changed: Object.freeze(['working_memory', 'visual_attention'] as const),
-  rule_flip: Object.freeze(['cognitive_flexibility', 'processing_speed'] as const),
-  tiny_logic: Object.freeze(['logical_reasoning', 'pattern_recognition'] as const),
+  rule_flip: Object.freeze([
+    'cognitive_flexibility',
+    'processing_speed',
+  ] as const),
+  tiny_logic: Object.freeze([
+    'logical_reasoning',
+    'pattern_recognition',
+  ] as const),
   memory_sequence: Object.freeze(['working_memory'] as const),
   pattern_chain: Object.freeze(['pattern_recognition'] as const),
   step_logic: Object.freeze(['logical_reasoning'] as const),
@@ -437,5 +497,13 @@ export const templateCategoryMap: Readonly<
     'logical_reasoning',
     'pattern_recognition',
     'working_memory',
+  ] as const),
+  signal_set: Object.freeze([
+    'pattern_recognition',
+    'logical_reasoning',
+  ] as const),
+  circuit_flow: Object.freeze([
+    'logical_reasoning',
+    'pattern_recognition',
   ] as const),
 }) satisfies Readonly<Record<TemplateType, readonly ChallengeCategory[]>>;

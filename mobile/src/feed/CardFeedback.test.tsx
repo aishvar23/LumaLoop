@@ -32,6 +32,28 @@ describe('CardFeedback score chip (RN)', () => {
     expect(screen.queryByTestId('card-score')).toBeNull();
   });
 
+  it('renders a renderer-supplied failure reason above the authored explanation', () => {
+    render(
+      <CardFeedback
+        resolution={{
+          ...makeResolution('incorrect'),
+          signals: {
+            failure_reason:
+              'Step 2 (B) was answered Match, but "Tap blue" expected No-match.',
+          },
+        }}
+        explanation={explanation}
+      />,
+    );
+
+    expect(screen.getByTestId('feedback-failure-reason')).toHaveTextContent(
+      /What went wrong/,
+    );
+    expect(screen.getByTestId('feedback-failure-reason')).toHaveTextContent(
+      /Step 2 \(B\)/,
+    );
+  });
+
   it('shows points + streak/combo on a correct resolution', () => {
     render(
       <CardFeedback
