@@ -15,6 +15,7 @@ import RequireAuth from './src/auth/RequireAuth';
 import ProfilePage from './src/profile/ProfilePage';
 import { useRecordGamePlay } from './src/feed/useRecordGamePlay';
 import { usePlayedCardIds } from './src/feed/usePlayedCardIds';
+import { SocialConfigProvider } from './src/social/SocialContext';
 import { supabase } from './src/auth/supabaseClient';
 import { getCardById as getCatalogCardById } from './src/core/cards/catalog';
 import { colors, fontSize, fontWeight } from './src/feed/templates/tokens';
@@ -187,19 +188,25 @@ function TelemetryFeed({ anonymousUserId }: { anonymousUserId: string }) {
   if (!played.ready) return null;
 
   return (
-    <FeedScreen
-      key={userId ?? 'anon'}
-      anonymousUserId={anonymousUserId}
-      excludeCardIds={played.cardIds}
-      feedId={feedId}
-      onCardActive={handlers.onCardActive}
-      onCardEngaged={handlers.onCardEngaged}
-      onCardResolved={handlers.onCardResolved}
-      onCardSkipped={handlers.onCardSkipped}
-      onCardAbandoned={handlers.onCardAbandoned}
-      onCardExplanationViewed={handlers.onCardExplanationViewed}
-      onCardScored={recordGamePlay}
-    />
+    // Supply the per-card social surface (likes + comments) with the SAME client
+    // the provider authenticated against + the signed-in user id. Feed-layer
+    // concern keyed by cardId — the feed/engine stays auth-free (the rail reads
+    // this context; no provider → it renders nothing).
+    <SocialConfigProvider value={{ client: effectiveClient, userId }}>
+      <FeedScreen
+        key={userId ?? 'anon'}
+        anonymousUserId={anonymousUserId}
+        excludeCardIds={played.cardIds}
+        feedId={feedId}
+        onCardActive={handlers.onCardActive}
+        onCardEngaged={handlers.onCardEngaged}
+        onCardResolved={handlers.onCardResolved}
+        onCardSkipped={handlers.onCardSkipped}
+        onCardAbandoned={handlers.onCardAbandoned}
+        onCardExplanationViewed={handlers.onCardExplanationViewed}
+        onCardScored={recordGamePlay}
+      />
+    </SocialConfigProvider>
   );
 }
 

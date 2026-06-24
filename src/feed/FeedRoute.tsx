@@ -39,6 +39,7 @@ import {
 import type { TelemetrySource } from '../telemetry/telemetryEvents';
 import { useFeedTelemetry } from '../telemetry/useFeedTelemetry';
 import { ExplanationViewedProvider } from '../ui/feedRegistry';
+import { SocialConfigProvider } from '../social/SocialContext';
 import { useOptionalAuth } from '../auth/AuthProvider';
 import { supabase } from '../auth/supabaseClient';
 import type { AuthClient } from '../auth/authClient';
@@ -167,8 +168,13 @@ export default function FeedRoute({
       {/* The gate fires Card_Explanation_Viewed through this seam (no telemetry
           coupling inside the gate/renderer — CLAUDE.md §4/§6). */}
       <ExplanationViewedProvider handler={telemetry.onExplanationViewed}>
-        {played.ready && (
-          <FeedScreen
+        {/* Supply the per-card social surface (likes + comments) with the SAME
+            client the provider authenticated against + the signed-in user id.
+            Feed-layer concern keyed by cardId — the feed/engine stays auth-free
+            (the rail reads this context; no provider → it renders nothing). */}
+        <SocialConfigProvider value={{ client: effectiveClient, userId }}>
+          {played.ready && (
+            <FeedScreen
             key={userId ?? 'anon'}
             registry={registry}
             source={feedSource}
@@ -184,7 +190,8 @@ export default function FeedRoute({
             onCardResolved={telemetry.onCardResolved}
             onCardScored={recordGamePlay}
           />
-        )}
+          )}
+        </SocialConfigProvider>
       </ExplanationViewedProvider>
       <FirstRunNotice />
     </>

@@ -164,6 +164,16 @@
   letter-spacing: 0.01em;
 }
 
+/* ── Per-card social surface (likes + comments) ─────────────────────────────
+ * Sits between the game and the bottom chrome, flex-none so it never steals the
+ * game's space; its own comments sheet is height-capped (CardSocialRail.css) so
+ * it can't overlap the game above. Feed-layer only — keyed by cardId, never
+ * per-template. */
+.feed-slide__social {
+  flex: 0 0 auto;
+  margin-top: var(--space-2);
+}
+
 /* ── Bottom chrome: creator byline + swipe-up cue ───────────────────────────
  * The social author row (avatar monogram + @handle) on the left and an animated
  * "Swipe up" affordance on the right, mirroring the mobile feed. */

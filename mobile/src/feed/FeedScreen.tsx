@@ -81,6 +81,7 @@ import FeedScoreHud from './FeedScoreHud';
 import type { ScoreStore } from './scoreStore';
 import { useFeedController } from './useFeedController';
 import { useFeedScore } from './useFeedScore';
+import CardSocialRail from '../social/CardSocialRail';
 
 /** Slides within this many of the active index mount their real renderer. */
 const WINDOW_RADIUS = 1;
@@ -612,6 +613,12 @@ const FeedSlide = memo(function FeedSlide({
             />
           </ActiveEntrance>
         </View>
+        {/* Per-card social surface (likes + comments) — a FEED-LAYER concern
+            keyed by cardId, NOT per-template (no switch on templateType, never
+            touches the renderer's logic). Activation-gated: it loads only when
+            this slide is the focused one (`active`). Renders nothing when there
+            is no social provider. */}
+        <CardSocialRail cardId={cardId} active={active} />
         {/* MP3 (#135): the social-feed author byline as a bottom-left overlay
             (avatar monogram + @handle) plus a subtle swipe-up affordance — so each
             slide reads like a Reels/TikTok card, not a plain page. Phase 3: the

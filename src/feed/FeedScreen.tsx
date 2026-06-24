@@ -47,6 +47,7 @@ import type { CardResolution, CardStartContext } from '../templates/contract';
 import { getAnonymousUserId } from '../telemetry/anonymousUser';
 import { resolveCategoryTheme } from '../ui/categoryTheme';
 import { feedRegistry } from '../ui/feedRegistry';
+import CardSocialRail from '../social/CardSocialRail';
 import { CardScoreProvider } from './cardScoreContext';
 import type { CardScore } from './scoring';
 import type { FeedBatchSource } from './feedDeck';
@@ -608,6 +609,14 @@ const FeedSlide = memo(function FeedSlide({
             onAttempt: handleAttempt,
             onResolve: (resolution: CardResolution) => onResolve(index, resolution),
           })}
+        </div>
+        {/* Per-card social surface (likes + comments) — a FEED-LAYER concern
+            keyed by cardId, NOT per-template (no switch on templateType, never
+            touches the renderer's logic). Activation-gated: it loads only when
+            this slide is the focused one (`active`), so pre-mounted neighbours
+            don't fetch. Renders nothing when there's no social provider. */}
+        <div className="feed-slide__social">
+          <CardSocialRail cardId={cardId} active={active} />
         </div>
         <SlideBottomChrome creatorHandle={card.creatorHandle} index={index} />
       </div>
