@@ -111,6 +111,13 @@ export type FeedScreenProps = {
   /** Test seam: deterministic feed batch source. Defaults to seeded catalog. */
   source?: FeedBatchSource;
   /**
+   * Already-played cardIds for the signed-in user, skipped in the endless feed
+   * (D2). Threaded into the controller's composition; ignored when an explicit
+   * `source` is supplied. Best-effort — an empty/omitted set means "skip
+   * nothing", and the composer's exhaustion fallback keeps the feed endless.
+   */
+  excludeCardIds?: ReadonlySet<string> | readonly string[];
+  /**
    * The anonymous id seeding deck composition. Defaults to a stable placeholder
    * (telemetry identity is M5).
    */
@@ -210,6 +217,7 @@ function makeFeedId(anonymousUserId: string, stamp: number): string {
 export default function FeedScreen({
   registry = feedRegistry,
   source,
+  excludeCardIds,
   anonymousUserId = DEFAULT_ANONYMOUS_USER_ID,
   getCardById = getCatalogCardById,
   now,
@@ -246,6 +254,7 @@ export default function FeedScreen({
   const { cards, activeIndex, setActiveIndex } = useFeedController({
     anonymousUserId,
     source,
+    excludeCardIds,
   });
 
   // Phase 4: the GAME-POINTS accumulator. It folds each resolution through the

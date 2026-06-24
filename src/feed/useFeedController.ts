@@ -15,6 +15,7 @@ import {
   FEED_PREFETCH_THRESHOLD,
   defaultFeedBatchSource,
   ensureDeckLength,
+  makeFeedBatchSource,
   type FeedBatchSource,
   type FeedDeckState,
 } from './feedDeck';
@@ -39,6 +40,15 @@ export interface FeedControllerOptions {
   anonymousUserId: string;
   /** Batch source — injected in tests; defaults to seeded catalog composition. */
   source?: FeedBatchSource;
+  /**
+   * Already-played cardIds to skip in the endless feed (D2). When provided (and
+   * no explicit `source` is given) the controller composes from a source that
+   * excludes these ids, with the composer's exhaustion fallback guaranteeing the
+   * feed never empties. Captured ONCE at mount alongside the source/seed (best-
+   * effort: the wiring layer waits for the played set, then mounts), so it does
+   * not re-seed an in-flight deck. Ignored when `source` is supplied (tests).
+   */
+  excludeCardIds?: ReadonlySet<string> | readonly string[];
   /** How many cards to materialise up front. */
   initialLength?: number;
 }
@@ -55,7 +65,13 @@ function grownFor(
 
 export function useFeedController(options: FeedControllerOptions): FeedController {
   const { anonymousUserId } = options;
-  const source = options.source ?? defaultFeedBatchSource;
+  // An explicit `source` (tests) wins; otherwise build the default catalog source,
+  // skipping already-played cards when an exclusion set was supplied (D2).
+  const source =
+    options.source ??
+    (options.excludeCardIds
+      ? makeFeedBatchSource(options.excludeCardIds)
+      : defaultFeedBatchSource);
   const initialLength = options.initialLength ?? 8;
 
   // Source + anon id are fixed for the controller's lifetime; capture via refs so

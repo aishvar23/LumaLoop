@@ -30,7 +30,7 @@ rely on the ported unit tests below to catch behavioural drift.
 | Composition | `session/composeSession.ts`, `feed/feedDeck.ts` | `useFeedController` (RN feed → M3) |
 | Scoring (Phase 4) | `feed/scoring.ts` (pure game-points + streak/combo core) | `useFeedScore` hook + `scoreStore` (RN, in `mobile/src/feed/`) |
 | Telemetry | `telemetry/telemetryEvents.ts` (names + payload types) | telemetry client, `anonymousUser` (RN client → M5) |
-| Accounts (pivot) | `auth/types.ts` (profiles/game_plays row models), `auth/gamePlayFromResolution.ts` (resolution→row mapper), `profile/computeStats.ts` (pure /you stats) | Supabase client, AuthProvider, screens, data helpers (RN, in `mobile/src/auth/` + `mobile/src/profile/`) |
+| Accounts (pivot) | `auth/types.ts` (profiles/game_plays/`user_game_scores` row models), `auth/gamePlayFromResolution.ts` (resolution→row mapper), `profile/computeStats.ts` (pure /you stats), `profile/yourGames.ts` (pure per-game "Your games" shaping, D3) | Supabase client, AuthProvider, screens, data helpers incl. `feed/playedCardsApi.ts`+`feed/usePlayedCardIds.ts` (D2 already-played skip) and `profile/gameScoresApi.ts` (D3) (RN, in `mobile/src/auth/`, `mobile/src/feed/`, `mobile/src/profile/`) |
 
 The layout mirrors the web `src/` so internal relative imports are unchanged.
 

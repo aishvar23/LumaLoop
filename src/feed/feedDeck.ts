@@ -92,6 +92,33 @@ export const defaultFeedBatchSource: FeedBatchSource = (seedUserId, batchIndex) 
   });
 
 /**
+ * Build a {@link FeedBatchSource} that skips already-played games (D2) — the
+ * default source plus an `excludeCardIds` set threaded into the pure composer.
+ *
+ * Composes cleanly with the difficulty ramp (the ramp is still
+ * `feedDifficultyBias(batchIndex)`) and stays template-agnostic — the exclusion
+ * is just an id set. The composer applies the ENDLESS-feed exhaustion fallback
+ * (if every eligible card is already played, it replays the full pool rather
+ * than empties), so this source is always non-empty when the catalog is. An
+ * empty/omitted set yields exactly {@link defaultFeedBatchSource} behaviour.
+ */
+export function makeFeedBatchSource(
+  excludeCardIds: ReadonlySet<string> | readonly string[] | undefined,
+): FeedBatchSource {
+  const exclude = excludeCardIds ?? EMPTY_EXCLUDE_IDS;
+  return (seedUserId, batchIndex) =>
+    composeSession({
+      mode: FEED_BATCH_MODE,
+      anonymousUserId: seedUserId,
+      difficultyBias: feedDifficultyBias(batchIndex),
+      excludeCardIds: exclude,
+    });
+}
+
+/** Shared empty exclusion — keeps {@link makeFeedBatchSource} allocation-free. */
+const EMPTY_EXCLUDE_IDS: ReadonlySet<string> = new Set<string>();
+
+/**
  * Append one more batch to the deck, avoiding an exact back-to-back repeat at
  * the seam (if the new batch's first card equals the deck's last card, rotate it
  * to the end). A source that yields no cards returns the deck unchanged — the

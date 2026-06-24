@@ -51,3 +51,25 @@ export type ProfileInsert = Pick<
   Profile,
   'id' | 'handle' | 'display_name' | 'avatar_url'
 >;
+
+/**
+ * A row of `public.user_game_scores` — the per-user, per-game score aggregate
+ * over `game_plays` (migration 0003). One row per (user_id, card_id) the user
+ * has played: best/last points, times played, ever/last correct. Read-only
+ * (a VIEW); `security_invoker` + game_plays RLS scope it to the caller.
+ *
+ * POSITIONING GUARDRAIL (Design §7 / §21.8): these are GAME scores — points,
+ * times played — NOT an ability / IQ / trait / clinical measure.
+ */
+export interface UserGameScore {
+  user_id: string;
+  card_id: string;
+  template_type: string;
+  category: string;
+  times_played: number;
+  best_points: number;
+  last_points: number;
+  ever_correct: boolean;
+  last_is_correct: boolean;
+  last_played_at: string;
+}

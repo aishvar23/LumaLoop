@@ -467,3 +467,125 @@ describe('composeSession — forced fallback paths (synthetic catalogs)', () => 
     expect(total).toBeGreaterThan(budgetSeconds); // not truncated to fit budget
   });
 });
+
+describe('composeSession — excludeCardIds (D2 already-played skip)', () => {
+  // Use the real catalog: exclusion should remove those ids from the result.
+  it('omits excluded cards while the surviving pool is non-empty', () => {
+    const full = composeSession({
+      mode: 'three_minute_reset',
+      anonymousUserId: 'excl-user',
+      day: '2026-06-21',
+    });
+    expect(full.length).toBeGreaterThan(2);
+    const exclude = new Set(full.slice(0, 2)); // pretend the first two were played
+    const filtered = composeSession({
+      mode: 'three_minute_reset',
+      anonymousUserId: 'excl-user',
+      day: '2026-06-21',
+      excludeCardIds: exclude,
+    });
+    for (const id of exclude) expect(filtered).not.toContain(id);
+    // No card is ever duplicated within a composition.
+    expect(new Set(filtered).size).toBe(filtered.length);
+  });
+
+  it('accepts an array as well as a Set', () => {
+    const full = composeSession({
+      mode: 'three_minute_reset',
+      anonymousUserId: 'excl-arr',
+      day: '2026-06-21',
+    });
+    const excludeArr = full.slice(0, 1);
+    const filtered = composeSession({
+      mode: 'three_minute_reset',
+      anonymousUserId: 'excl-arr',
+      day: '2026-06-21',
+      excludeCardIds: excludeArr,
+    });
+    expect(filtered).not.toContain(excludeArr[0]);
+  });
+
+  it('an empty exclusion is byte-identical to omitting it', () => {
+    const base = composeSession({
+      mode: 'three_minute_reset',
+      anonymousUserId: 'excl-empty',
+      day: '2026-06-21',
+    });
+    const withEmptySet = composeSession({
+      mode: 'three_minute_reset',
+      anonymousUserId: 'excl-empty',
+      day: '2026-06-21',
+      excludeCardIds: new Set<string>(),
+    });
+    const withEmptyArr = composeSession({
+      mode: 'three_minute_reset',
+      anonymousUserId: 'excl-empty',
+      day: '2026-06-21',
+      excludeCardIds: [],
+    });
+    expect(withEmptySet).toEqual(base);
+    expect(withEmptyArr).toEqual(base);
+  });
+
+  it('EXHAUSTION FALLBACK: excluding every eligible card replays the full pool (never empty)', () => {
+    const full = composeSession({
+      mode: 'three_minute_reset',
+      anonymousUserId: 'excl-all',
+      day: '2026-06-21',
+    });
+    // Exclude every cardId that could possibly appear (the whole catalog).
+    const excludeAll = new Set(catalog.map((c) => c.cardId));
+    const fallback = composeSession({
+      mode: 'three_minute_reset',
+      anonymousUserId: 'excl-all',
+      day: '2026-06-21',
+      excludeCardIds: excludeAll,
+    });
+    // Endless: the feed never empties — the fallback reproduces the full result.
+    expect(fallback.length).toBe(full.length);
+    expect(fallback).toEqual(full);
+  });
+
+  it('ignores ids that are not in the pool', () => {
+    const base = composeSession({
+      mode: 'three_minute_reset',
+      anonymousUserId: 'excl-noise',
+      day: '2026-06-21',
+    });
+    const withNoise = composeSession({
+      mode: 'three_minute_reset',
+      anonymousUserId: 'excl-noise',
+      day: '2026-06-21',
+      excludeCardIds: ['not-a-real-card', 'another-ghost'],
+    });
+    expect(withNoise).toEqual(base);
+  });
+
+  it('keeps the no-3-in-a-row + non-decreasing-difficulty rules under exclusion', () => {
+    const full = composeSession({
+      mode: 'three_minute_reset',
+      anonymousUserId: 'excl-rules',
+      day: '2026-06-21',
+    });
+    const filtered = composeSession({
+      mode: 'three_minute_reset',
+      anonymousUserId: 'excl-rules',
+      day: '2026-06-21',
+      excludeCardIds: new Set(full.slice(0, 3)),
+    });
+    const cards = cardsFor(filtered);
+    // No 3 identical templateTypes in a row.
+    for (let i = 2; i < cards.length; i += 1) {
+      const same =
+        cards[i].templateType === cards[i - 1].templateType &&
+        cards[i].templateType === cards[i - 2].templateType;
+      expect(same).toBe(false);
+    }
+    // Non-decreasing difficulty.
+    for (let i = 1; i < cards.length; i += 1) {
+      expect(DIFFICULTY_RANK[cards[i].difficulty]).toBeGreaterThanOrEqual(
+        DIFFICULTY_RANK[cards[i - 1].difficulty],
+      );
+    }
+  });
+});
