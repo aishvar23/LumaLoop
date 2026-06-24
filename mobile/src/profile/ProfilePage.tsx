@@ -15,6 +15,7 @@
  */
 import { useEffect, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '../auth/AuthProvider';
 import type { AuthClient } from '../auth/authClient';
@@ -75,6 +76,7 @@ export default function ProfilePage({
 }: ProfilePageProps) {
   const auth = useAuth();
   const { user, profile, signOut } = auth;
+  const insets = useSafeAreaInsets();
   const client = clientProp ?? auth.client ?? supabase;
   const [stats, setStats] = useState<ProfileStats>(EMPTY_PROFILE_STATS);
   const [games, setGames] = useState<YourGameRow[]>([]);
@@ -114,12 +116,21 @@ export default function ProfilePage({
   }
 
   return (
-    <ScrollView style={styles.page} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.page}
+      contentContainerStyle={[
+        styles.content,
+        // Clear the status bar / Dynamic Island so the back button is visible
+        // and tappable (the page has no router; this is the only way back).
+        { paddingTop: insets.top + space.lg },
+      ]}
+    >
       {onBack && (
         <Pressable
           accessibilityRole="button"
           testID="profile-back"
           onPress={onBack}
+          hitSlop={12}
           style={styles.back}
         >
           <Text style={styles.backText}>‹ Feed</Text>
