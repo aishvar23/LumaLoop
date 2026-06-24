@@ -14,6 +14,8 @@ import { AuthProvider, useAuth, useOptionalAuth } from './src/auth/AuthProvider'
 import RequireAuth from './src/auth/RequireAuth';
 import ProfilePage from './src/profile/ProfilePage';
 import { useRecordGamePlay } from './src/feed/useRecordGamePlay';
+import { usePlayedCardIds } from './src/feed/usePlayedCardIds';
+import { supabase } from './src/auth/supabaseClient';
 import { getCardById as getCatalogCardById } from './src/core/cards/catalog';
 import { colors, fontSize, fontWeight } from './src/feed/templates/tokens';
 
@@ -150,10 +152,22 @@ function TelemetryFeed({ anonymousUserId }: { anonymousUserId: string }) {
   // is gated by RequireAuth, so in production there is always a user; the recorder
   // no-ops when there isn't (defensive / tests).
   const auth = useOptionalAuth();
+  const userId = auth?.user?.id ?? null;
+  // Use the SAME client the provider authenticated against (the fake in tests),
+  // falling back to the real client when mounted standalone.
+  const effectiveClient = auth?.client ?? supabase;
   const recordGamePlay = useRecordGamePlay({
-    userId: auth?.user?.id ?? null,
+    userId,
     getCardById: getCatalogCardById,
+    client: effectiveClient,
   });
+
+  // D2: best-effort fetch of the signed-in user's already-played games so the
+  // feed skips them. The controller captures the exclusion set ONCE at mount, so
+  // we wait for `ready` before mounting the feed (the first batch already skips
+  // played cards). `ready` flips true on success OR error, so a failed/slow fetch
+  // never blocks gameplay; re-keyed by userId so a fresh sign-in re-reads.
+  const played = usePlayedCardIds(effectiveClient, userId);
 
   const handlers = useMemo(
     () => ({
@@ -167,9 +181,16 @@ function TelemetryFeed({ anonymousUserId }: { anonymousUserId: string }) {
     [telemetry],
   );
 
+  // Wait for the played set to settle before mounting the feed so the very first
+  // batch already skips already-played games (best-effort: `ready` flips true even
+  // on error, with an empty set).
+  if (!played.ready) return null;
+
   return (
     <FeedScreen
+      key={userId ?? 'anon'}
       anonymousUserId={anonymousUserId}
+      excludeCardIds={played.cardIds}
       feedId={feedId}
       onCardActive={handlers.onCardActive}
       onCardEngaged={handlers.onCardEngaged}

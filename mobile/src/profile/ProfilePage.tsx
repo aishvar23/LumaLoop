@@ -20,6 +20,8 @@ import { useAuth } from '../auth/AuthProvider';
 import type { AuthClient } from '../auth/authClient';
 import { fetchGamePlays } from '../auth/profileApi';
 import { supabase } from '../auth/supabaseClient';
+import { getCardById as defaultGetCardById } from '../core/cards/catalog';
+import type { LiquidCard } from '../core/cards/types';
 import type { GamePlay } from '../core/auth/types';
 import {
   computeStats,
@@ -27,6 +29,11 @@ import {
   formatAccuracy,
   type ProfileStats,
 } from '../core/profile/computeStats';
+import {
+  buildYourGames,
+  type YourGameRow,
+} from '../core/profile/yourGames';
+import { fetchGameScores } from './gameScoresApi';
 import { authStyles as a } from '../auth/authStyles';
 import {
   colors,
@@ -38,8 +45,13 @@ import {
 } from '../feed/templates/tokens';
 
 export interface ProfilePageProps {
-  /** Test seam: the Supabase client. Defaults to the real native client. */
+  /**
+   * Test seam: the Supabase client. Defaults to the auth provider's client (the
+   * injected fake in tests), falling back to the real native client.
+   */
   client?: AuthClient;
+  /** Test seam: cardId → card resolver for friendly game titles. */
+  getCardById?: (cardId: string) => LiquidCard | undefined;
   /** Optional back-to-feed affordance (no router on native). */
   onBack?: () => void;
 }
@@ -56,9 +68,16 @@ function monogram(displayName: string, handle: string): string {
   return (source[0] ?? '?').toUpperCase();
 }
 
-export default function ProfilePage({ client = supabase, onBack }: ProfilePageProps) {
-  const { user, profile, signOut } = useAuth();
+export default function ProfilePage({
+  client: clientProp,
+  getCardById = defaultGetCardById,
+  onBack,
+}: ProfilePageProps) {
+  const auth = useAuth();
+  const { user, profile, signOut } = auth;
+  const client = clientProp ?? auth.client ?? supabase;
   const [stats, setStats] = useState<ProfileStats>(EMPTY_PROFILE_STATS);
+  const [games, setGames] = useState<YourGameRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,16 +89,21 @@ export default function ProfilePage({ client = supabase, onBack }: ProfilePagePr
     }
     setLoading(true);
     void (async () => {
-      const { plays, error: err } = await fetchGamePlays(client, user.id);
+      // Aggregate stats + per-game scores in parallel; both best-effort.
+      const [playsRes, scoresRes] = await Promise.all([
+        fetchGamePlays(client, user.id),
+        fetchGameScores(client, user.id),
+      ]);
       if (!active) return;
-      if (err) setError(err);
-      setStats(computeStats(plays as GamePlay[]));
+      if (playsRes.error) setError(playsRes.error);
+      setStats(computeStats(playsRes.plays as GamePlay[]));
+      setGames(buildYourGames(scoresRes.scores, getCardById, 'recent'));
       setLoading(false);
     })();
     return () => {
       active = false;
     };
-  }, [client, user]);
+  }, [client, user, getCardById]);
 
   if (!profile) {
     return (
@@ -143,6 +167,28 @@ export default function ProfilePage({ client = supabase, onBack }: ProfilePagePr
               <Text style={styles.categoryName}>{categoryLabel(c.category)}</Text>
               <Text style={styles.categoryMeta}>
                 {c.played} played · {formatAccuracy(c.accuracy)} · {c.points} pts
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {!loading && games.length > 0 && (
+        <View accessibilityLabel="Your games" style={styles.categories}>
+          <Text style={styles.sectionTitle}>Your games</Text>
+          {games.map((g) => (
+            <View key={g.cardId} style={styles.gameRow}>
+              <View style={styles.gameMain}>
+                <Text style={styles.gameTitle} numberOfLines={1}>
+                  {g.title}
+                </Text>
+                <Text style={styles.gameCategory}>{g.categoryLabel}</Text>
+              </View>
+              <Text style={styles.gameScores}>
+                <Text style={styles.gameBest}>Best {g.bestPoints}</Text>
+                {`  ·  Last ${g.lastPoints}  ·  ${
+                  g.timesPlayed === 1 ? '1 play' : `${g.timesPlayed} plays`
+                }`}
               </Text>
             </View>
           ))}
@@ -278,6 +324,38 @@ const styles = StyleSheet.create({
   categoryMeta: {
     color: colors.textMuted,
     fontSize: fontSize.sm,
+  },
+  gameRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: space.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    gap: space.md,
+  },
+  gameMain: {
+    flexShrink: 1,
+    gap: 2,
+  },
+  gameTitle: {
+    color: colors.text,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.semibold,
+  },
+  gameCategory: {
+    color: colors.textMuted,
+    fontSize: fontSize.sm,
+  },
+  gameScores: {
+    color: colors.textMuted,
+    fontSize: fontSize.sm,
+    textAlign: 'right',
+    flexShrink: 0,
+  },
+  gameBest: {
+    color: colors.text,
+    fontWeight: fontWeight.bold,
   },
   signOut: {
     marginTop: space.md,

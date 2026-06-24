@@ -69,6 +69,13 @@ export type FeedScreenProps = {
   /** Test seam: deterministic feed batch source. Defaults to seeded catalog. */
   source?: FeedBatchSource;
   /**
+   * Already-played cardIds for the signed-in user, skipped in the endless feed
+   * (D2). Threaded into the controller's composition; ignored when an explicit
+   * `source` is supplied. Best-effort — an empty/omitted set means "skip
+   * nothing", and the composer's exhaustion fallback keeps the feed endless.
+   */
+  excludeCardIds?: ReadonlySet<string> | readonly string[];
+  /**
    * Test seam: a fixed anonymous id for deterministic composition. When omitted
    * (real usage) it resolves to the real persisted id (Technical Design §10).
    */
@@ -185,6 +192,7 @@ function scrollSlideIntoView(el: HTMLElement, reduceMotion: boolean): void {
 export default function FeedScreen({
   registry = feedRegistry,
   source,
+  excludeCardIds,
   anonymousUserId,
   getCardById = getCatalogCardById,
   now,
@@ -217,6 +225,7 @@ export default function FeedScreen({
   const { cards, activeIndex, setActiveIndex, next, prev } = useFeedController({
     anonymousUserId: resolvedAnonymousUserId,
     source,
+    excludeCardIds,
   });
 
   // Phase 4: the GAME-POINTS accumulator. It folds each resolution through the

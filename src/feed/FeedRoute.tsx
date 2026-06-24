@@ -40,10 +40,13 @@ import type { TelemetrySource } from '../telemetry/telemetryEvents';
 import { useFeedTelemetry } from '../telemetry/useFeedTelemetry';
 import { ExplanationViewedProvider } from '../ui/feedRegistry';
 import { useOptionalAuth } from '../auth/AuthProvider';
+import { supabase } from '../auth/supabaseClient';
+import type { AuthClient } from '../auth/authClient';
 import type { FeedBatchSource } from './feedDeck';
 import FeedScreen from './FeedScreen';
 import FirstRunNotice from './FirstRunNotice';
 import { useRecordGamePlay } from './useRecordGamePlay';
+import { usePlayedCardIds } from './usePlayedCardIds';
 
 export interface FeedRouteProps {
   /** Test seam: telemetry client. Defaults to the real `/api/event` client. */
@@ -65,6 +68,12 @@ export interface FeedRouteProps {
    * read the same card. Defaults to the authored catalog.
    */
   getCardById?: (cardId: string) => LiquidCard | undefined;
+  /**
+   * Test seam: the Supabase client used for the D2 already-played read and the
+   * `game_plays` write. Defaults to the auth provider's client (the injected fake
+   * in tests), falling back to the real browser client when mounted standalone.
+   */
+  authClient?: AuthClient;
 }
 
 /** Best-effort read of the current URL query string. Never throws (SSR/tests). */
@@ -85,6 +94,7 @@ export default function FeedRoute({
   feedSource,
   registry,
   getCardById = defaultGetCardById,
+  authClient,
 }: FeedRouteProps = {}) {
   // Resolve identity + attribution ONCE per mount (Technical Design §10): the
   // persisted anon id, the parsed `?source=` (headline return uses 'direct'),
@@ -132,30 +142,49 @@ export default function FeedRoute({
   // untouched. `RequireAuth` gates `/`, so in production there is always a user;
   // the recorder no-ops when there isn't (e.g. a directly-mounted test feed).
   const auth = useOptionalAuth();
+  const userId = auth?.user?.id ?? null;
+  // Use the SAME client the provider authenticated against (the fake in tests),
+  // overridable via the `authClient` prop, falling back to the real client when
+  // the feed is mounted standalone (no provider).
+  const effectiveClient = authClient ?? auth?.client ?? supabase;
   const recordGamePlay = useRecordGamePlay({
-    userId: auth?.user?.id ?? null,
+    userId,
     getCardById,
+    client: effectiveClient,
   });
+
+  // D2: best-effort fetch of the signed-in user's already-played games so the
+  // feed skips them. The controller captures the exclusion set ONCE at mount, so
+  // we wait for `ready` before mounting the feed — that way even the first batch
+  // skips played cards. `ready` flips true on success OR error (empty set), so a
+  // failed/slow fetch never blocks gameplay; an explicit `feedSource` (tests)
+  // bypasses the exclusion entirely. Re-runs (and remounts the feed) on user
+  // change so a fresh sign-in re-reads the played set.
+  const played = usePlayedCardIds(effectiveClient, userId);
 
   return (
     <>
       {/* The gate fires Card_Explanation_Viewed through this seam (no telemetry
           coupling inside the gate/renderer — CLAUDE.md §4/§6). */}
       <ExplanationViewedProvider handler={telemetry.onExplanationViewed}>
-        <FeedScreen
-          registry={registry}
-          source={feedSource}
-          anonymousUserId={resolvedAnonymousUserId}
-          getCardById={getCardById}
-          now={now}
-          feedId={feedId}
-          onCardActive={telemetry.onCardActive}
-          onCardEngaged={telemetry.onCardEngaged}
-          onCardSkipped={telemetry.onCardSkipped}
-          onCardAbandoned={telemetry.onCardAbandoned}
-          onCardResolved={telemetry.onCardResolved}
-          onCardScored={recordGamePlay}
-        />
+        {played.ready && (
+          <FeedScreen
+            key={userId ?? 'anon'}
+            registry={registry}
+            source={feedSource}
+            excludeCardIds={played.cardIds}
+            anonymousUserId={resolvedAnonymousUserId}
+            getCardById={getCardById}
+            now={now}
+            feedId={feedId}
+            onCardActive={telemetry.onCardActive}
+            onCardEngaged={telemetry.onCardEngaged}
+            onCardSkipped={telemetry.onCardSkipped}
+            onCardAbandoned={telemetry.onCardAbandoned}
+            onCardResolved={telemetry.onCardResolved}
+            onCardScored={recordGamePlay}
+          />
+        )}
       </ExplanationViewedProvider>
       <FirstRunNotice />
     </>

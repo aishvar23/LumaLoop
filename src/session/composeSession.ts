@@ -85,6 +85,22 @@ export type ComposeSessionParams = {
    * reads only `card.difficulty`. */
   difficultyBias?: number;
   /**
+   * Cards to keep OUT of the composition — used by the endless feed to skip
+   * games the signed-in user has already played (D2). Template-agnostic: this is
+   * a plain id set, never a `templateType` switch.
+   *
+   * EXHAUSTION FALLBACK (the feed is ENDLESS and must never empty): exclusion is
+   * applied ONLY while at least one eligible card survives it. If excluding the
+   * set would leave the eligible pool EMPTY, the exclusion is dropped for this
+   * composition and the full eligible pool is used (replays allowed) — a
+   * documented, deterministic, pure fallback. Excluding down to a *small* pool is
+   * fine and intentional (a short batch is still endless via re-composition).
+   *
+   * Accepts a `Set` or array; order/duplicates do not matter. Out-of-pool ids are
+   * ignored. When omitted/empty, behaviour is byte-identical to before.
+   */
+  excludeCardIds?: ReadonlySet<string> | readonly string[];
+  /**
    * UTC day key (`yyyy-mm-dd`). When provided this fully determines the "day"
    * dimension of the seed and `now` is ignored. Prefer passing this in tests.
    */
@@ -313,6 +329,34 @@ function spillOrder(start: Difficulty): readonly Difficulty[] {
   return DIFFICULTY_ORDER.slice(DIFFICULTY_RANK[start]);
 }
 
+/** Normalise the `excludeCardIds` input to a `Set` for O(1) membership. */
+function toExcludeSet(
+  exclude: ReadonlySet<string> | readonly string[] | undefined,
+): ReadonlySet<string> {
+  if (exclude == null) return EMPTY_EXCLUDE;
+  return exclude instanceof Set ? exclude : new Set(exclude);
+}
+
+/** Shared empty exclusion set — avoids per-call allocation in the common case. */
+const EMPTY_EXCLUDE: ReadonlySet<string> = new Set<string>();
+
+/**
+ * Apply the already-played exclusion to the eligible pool, honouring the
+ * endless-feed exhaustion fallback. Pure: returns `eligible` unchanged when the
+ * exclusion is empty or would empty the pool (replays allowed rather than an
+ * empty feed). See {@link ComposeSessionParams.excludeCardIds}.
+ */
+function applyExclusion(
+  eligible: readonly LiquidCard[],
+  exclude: ReadonlySet<string>,
+): readonly LiquidCard[] {
+  if (exclude.size === 0) return eligible;
+  const filtered = eligible.filter((card) => !exclude.has(card.cardId));
+  // Exhaustion fallback: never return an empty pool just because everything was
+  // played — fall back to the full eligible pool so the endless feed continues.
+  return filtered.length > 0 ? filtered : eligible;
+}
+
 /**
  * Composes a deterministic, ordered list of `cardId`s for one session.
  *
@@ -330,8 +374,13 @@ export function composeSession(params: ComposeSessionParams): readonly string[] 
   const { maxCards, maxDurationMs } = MODE_DEFAULTS[mode];
   const timeBudgetSeconds = maxDurationMs / 1000;
 
-  const eligible = sourceCatalog.filter(isEligible);
-  if (eligible.length === 0) return [];
+  const allEligible = sourceCatalog.filter(isEligible);
+  if (allEligible.length === 0) return [];
+  // D2: drop already-played cards, with the endless-feed exhaustion fallback
+  // (see applyExclusion / excludeCardIds). Done before the seeded shuffle so the
+  // surviving pool is what gets ordered; the ramp/no-repeat/category rules below
+  // are unchanged — they simply operate on a smaller, template-agnostic pool.
+  const eligible = applyExclusion(allEligible, toExcludeSet(params.excludeCardIds));
 
   // One seeded shuffle establishes the per-(user, day, mode) base order; every
   // downstream tiebreak is a stable index into this order, so the whole result

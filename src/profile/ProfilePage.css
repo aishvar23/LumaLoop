@@ -105,3 +105,44 @@
 .profile-empty {
   color: var(--color-text-muted);
 }
+
+/* "Your games" — per-game best/last score + times played. */
+.profile-game-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-border);
+  gap: var(--space-2);
+}
+
+.profile-game-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.profile-game-title {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-game-category {
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+}
+
+.profile-game-scores {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.profile-game-best {
+  color: var(--color-text);
+  font-weight: 700;
+}

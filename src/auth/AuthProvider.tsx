@@ -36,6 +36,13 @@ import { supabase } from './supabaseClient';
 import type { Profile } from './types';
 
 export interface AuthContextValue {
+  /**
+   * The Supabase client this provider was constructed with. Exposed so feature
+   * data layers (the feed's already-played read, the profile reads) use the SAME
+   * client the provider authenticated against — in tests that is the injected
+   * fake, so no feature reaches the real network behind a fake session.
+   */
+  client: AuthClient;
   /** The current Supabase session, or null when signed out. */
   session: Session | null;
   /** The signed-in user, or null. */
@@ -166,6 +173,7 @@ export function AuthProvider({ children, client = supabase }: AuthProviderProps)
 
   const value = useMemo<AuthContextValue>(
     () => ({
+      client,
       session,
       user,
       profile,
@@ -177,6 +185,7 @@ export function AuthProvider({ children, client = supabase }: AuthProviderProps)
       refreshProfile,
     }),
     [
+      client,
       session,
       user,
       profile,

@@ -15,6 +15,7 @@ import {
   ensureDeckLength,
   feedBatchSeedUserId,
   feedDifficultyBias,
+  makeFeedBatchSource,
   type FeedBatchSource,
 } from './feedDeck';
 
@@ -171,5 +172,42 @@ describe('defaultFeedBatchSource (real catalog composition)', () => {
     const a = ensureDeckLength(EMPTY_FEED_DECK, 50, 'anon-det');
     const b = ensureDeckLength(EMPTY_FEED_DECK, 50, 'anon-det');
     expect(a.cards).toEqual(b.cards);
+  });
+});
+
+describe('makeFeedBatchSource (D2 already-played skip)', () => {
+  it('with no/empty exclusion reproduces the default source exactly', () => {
+    const src = makeFeedBatchSource(undefined);
+    const srcEmpty = makeFeedBatchSource(new Set<string>());
+    for (const batchIndex of [0, 1, 5]) {
+      const seed = feedBatchSeedUserId('mk', batchIndex);
+      const def = defaultFeedBatchSource(seed, batchIndex);
+      expect(src(seed, batchIndex)).toEqual(def);
+      expect(srcEmpty(seed, batchIndex)).toEqual(def);
+    }
+  });
+
+  it('omits excluded cards from the materialised endless stream', () => {
+    // Find some cards the default stream actually serves, then exclude them.
+    const baseline = ensureDeckLength(EMPTY_FEED_DECK, 40, 'mk-skip');
+    const excluded = new Set(baseline.cards.slice(0, 3));
+    const grown = ensureDeckLength(
+      EMPTY_FEED_DECK,
+      40,
+      'mk-skip',
+      makeFeedBatchSource(excluded),
+    );
+    for (const id of excluded) expect(grown.cards).not.toContain(id);
+  });
+
+  it('stays endless: excluding the entire catalog still grows (exhaustion fallback)', () => {
+    const excludeAll = new Set(catalog.map((c) => c.cardId));
+    const grown = ensureDeckLength(
+      EMPTY_FEED_DECK,
+      40,
+      'mk-all',
+      makeFeedBatchSource(excludeAll),
+    );
+    expect(grown.cards.length).toBeGreaterThanOrEqual(40);
   });
 });

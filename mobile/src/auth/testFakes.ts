@@ -14,7 +14,7 @@
 import type { Session, User } from '@supabase/supabase-js';
 
 import type { AuthClient } from './authClient';
-import type { GamePlay, Profile } from '../core/auth/types';
+import type { GamePlay, Profile, UserGameScore } from '../core/auth/types';
 
 export interface FakeAuthOptions {
   /** The session returned by getSession() and pushed to subscribers. */
@@ -23,6 +23,8 @@ export interface FakeAuthOptions {
   profile?: Profile | null;
   /** The plays a `game_plays` select resolves to. */
   plays?: GamePlay[];
+  /** The rows a `user_game_scores` select resolves to (D2/D3). */
+  gameScores?: UserGameScore[];
   /** Force a profiles-select error message. */
   profileError?: string | null;
   /** The authorize URL `signInWithOAuth` returns. */
@@ -155,6 +157,23 @@ export function createFakeAuthClient(options: FakeAuthOptions = {}): FakeAuthCli
     return builder;
   }
 
+  // `user_game_scores` (a read-only VIEW): D2 reads it via `.select().eq()` and
+  // D3 via `.select().eq().order()`. Both terminal calls resolve to the scripted
+  // rows, so a single thenable-free builder serves both shapes.
+  function gameScoresBuilder() {
+    const result = { data: options.gameScores ?? [], error: null };
+    const builder = {
+      select: () => builder,
+      eq: () => ({
+        ...builder,
+        order: () => Promise.resolve(result),
+        then: (resolve: (v: unknown) => void) => resolve(result),
+      }),
+      order: () => Promise.resolve(result),
+    };
+    return builder;
+  }
+
   const client = {
     auth: {
       getSession: () =>
@@ -192,8 +211,11 @@ export function createFakeAuthClient(options: FakeAuthOptions = {}): FakeAuthCli
         return Promise.resolve({ data: {}, error: null });
       },
     },
-    from: (table: string) =>
-      table === 'game_plays' ? gamePlaysBuilder() : profilesBuilder(),
+    from: (table: string) => {
+      if (table === 'game_plays') return gamePlaysBuilder();
+      if (table === 'user_game_scores') return gameScoresBuilder();
+      return profilesBuilder();
+    },
   } as unknown as AuthClient;
 
   return {
