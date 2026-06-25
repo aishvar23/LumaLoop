@@ -37,6 +37,8 @@ import WordUnscrambleCard from '../templates/wordUnscramble/WordUnscrambleCard';
 import QuickMathCard from '../templates/quickMath/QuickMathCard';
 import ColorWordCard from '../templates/colorWord/ColorWordCard';
 import NBackCard from '../templates/nBack/NBackCard';
+import OddOneOutCard from '../templates/oddOneOut/OddOneOutCard';
+import SchulteOrderCard from '../templates/schulteOrder/SchulteOrderCard';
 
 /**
  * A template renderer: a component that accepts {@link TemplateProps} for its
@@ -113,4 +115,6 @@ export const defaultRendererRegistry: RendererRegistry = {
   quick_math: QuickMathCard,
   color_word: ColorWordCard,
   n_back: NBackCard,
+  odd_one_out: OddOneOutCard,
+  schulte_order: SchulteOrderCard,
 };

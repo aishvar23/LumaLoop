@@ -32,10 +32,12 @@ import type {
   LiquidCard,
   NBackCard,
   MemorySequenceCard,
+  OddOneOutCard,
   PatternChainCard,
   PrismPathCard,
   QuickMathCard,
   RuleFlipCard,
+  SchulteOrderCard,
   SignalSetCard,
   SpotItCard,
   StepLogicCard,
@@ -4927,6 +4929,430 @@ const nBackCards: NBackCard[] = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// odd_one_out — pick the ONE item that breaks a hidden rule the rest follow.
+// Categories allowed: pattern_recognition | logical_reasoning. CONCEPTUAL (not a
+// perceptual glyph scan like spot_it): every distractor genuinely belongs to the
+// rule, so the odd one is found by reasoning, not eyeballing. The explanation
+// states the shared rule. Rule types vary (category, parity, property, shape).
+// Meaning is carried by the LABEL, never colour/position. Copy stays playful.
+// ---------------------------------------------------------------------------
+
+const oddOneOutCards: OddOneOutCard[] = [
+  {
+    cardId: 'oddoneout-001',
+    creatorHandle: '@oddsandends',
+    templateType: 'odd_one_out',
+    category: 'pattern_recognition',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 12,
+    prompt: 'Three of these belong together. Tap the one that does not.',
+    puzzleDna: {
+      mechanic: 'odd-one-out',
+      inputMode: 'choice',
+      measuredSignals: ['accuracy', 'time_to_interaction', 'distractor_choice'],
+    },
+    explanation: {
+      title: 'They all fly — except one',
+      body: 'Eagle, sparrow and bat all fly; a penguin is the bird that cannot. The rule is "can fly", not "is a bird".',
+    },
+    shareText: 'Spotted the one that does not belong.',
+    config: {
+      items: [
+        { id: 'eagle', label: 'Eagle' },
+        { id: 'sparrow', label: 'Sparrow' },
+        { id: 'penguin', label: 'Penguin' },
+        { id: 'bat', label: 'Bat' },
+      ],
+      oddItemId: 'penguin',
+      timeLimitMs: 12000,
+    },
+  },
+  {
+    cardId: 'oddoneout-002',
+    creatorHandle: '@oddsandends',
+    templateType: 'odd_one_out',
+    category: 'pattern_recognition',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 12,
+    prompt: 'One number breaks the pattern. Tap it.',
+    puzzleDna: {
+      mechanic: 'odd-one-out',
+      inputMode: 'choice',
+      measuredSignals: ['accuracy', 'time_to_interaction', 'distractor_choice'],
+    },
+    explanation: {
+      title: 'Perfect squares',
+      body: '9, 16 and 25 are 3², 4² and 5². 20 is not a perfect square, so it is the odd one.',
+    },
+    config: {
+      items: [
+        { id: 'n9', label: '9' },
+        { id: 'n16', label: '16' },
+        { id: 'n20', label: '20' },
+        { id: 'n25', label: '25' },
+      ],
+      oddItemId: 'n20',
+      timeLimitMs: 13000,
+    },
+  },
+  {
+    cardId: 'oddoneout-003',
+    creatorHandle: '@categorycat',
+    templateType: 'odd_one_out',
+    category: 'logical_reasoning',
+    difficulty: 'hard',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 16,
+    prompt: 'Find the word that does not fit the hidden rule.',
+    puzzleDna: {
+      mechanic: 'odd-one-out',
+      inputMode: 'choice',
+      measuredSignals: ['accuracy', 'time_to_interaction', 'distractor_choice'],
+    },
+    explanation: {
+      title: 'Anagrams of body parts',
+      body: 'EAR→"are", ARM→"ram", HIP→"phi"… each is an anagram of a body part. "Listen" is not — it anagrams to "silent", not a body part.',
+    },
+    config: {
+      items: [
+        { id: 'are', label: 'ARE' },
+        { id: 'ram', label: 'RAM' },
+        { id: 'phi', label: 'PHI' },
+        { id: 'silent', label: 'SILENT' },
+      ],
+      oddItemId: 'silent',
+      timeLimitMs: 18000,
+    },
+  },
+  {
+    cardId: 'oddoneout-004',
+    creatorHandle: '@categorycat',
+    templateType: 'odd_one_out',
+    category: 'pattern_recognition',
+    difficulty: 'hard',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 16,
+    prompt: 'Four shapes, one rule. Tap the one that breaks it.',
+    puzzleDna: {
+      mechanic: 'odd-one-out',
+      inputMode: 'choice',
+      measuredSignals: ['accuracy', 'time_to_interaction', 'distractor_choice'],
+    },
+    explanation: {
+      title: 'Even number of sides',
+      body: 'Square (4), hexagon (6) and octagon (8) all have an even number of sides. A pentagon has 5 — the odd one out.',
+    },
+    config: {
+      items: [
+        { id: 'square', label: 'Square' },
+        { id: 'hexagon', label: 'Hexagon' },
+        { id: 'pentagon', label: 'Pentagon' },
+        { id: 'octagon', label: 'Octagon' },
+      ],
+      oddItemId: 'pentagon',
+      timeLimitMs: 17000,
+    },
+  },
+  {
+    cardId: 'oddoneout-005',
+    creatorHandle: '@ruleseeker',
+    templateType: 'odd_one_out',
+    category: 'logical_reasoning',
+    difficulty: 'extremely_hard',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 22,
+    prompt: 'A subtle rule links most of these. Tap the exception.',
+    puzzleDna: {
+      mechanic: 'odd-one-out',
+      inputMode: 'choice',
+      measuredSignals: ['accuracy', 'time_to_interaction', 'distractor_choice'],
+    },
+    explanation: {
+      title: 'Prime numbers',
+      body: '13, 17 and 31 are prime (divisible only by 1 and themselves). 51 = 3 × 17, so it is composite — the odd one out.',
+    },
+    config: {
+      items: [
+        { id: 'p13', label: '13' },
+        { id: 'p17', label: '17' },
+        { id: 'p51', label: '51' },
+        { id: 'p31', label: '31' },
+        { id: 'p41', label: '41' },
+      ],
+      oddItemId: 'p51',
+      timeLimitMs: 22000,
+    },
+  },
+  {
+    cardId: 'oddoneout-006',
+    creatorHandle: '@ruleseeker',
+    templateType: 'odd_one_out',
+    category: 'logical_reasoning',
+    difficulty: 'extremely_hard',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 22,
+    prompt: 'Most of these share a property. Tap the one that does not.',
+    puzzleDna: {
+      mechanic: 'odd-one-out',
+      inputMode: 'choice',
+      measuredSignals: ['accuracy', 'time_to_interaction', 'distractor_choice'],
+    },
+    explanation: {
+      title: 'Words containing the run "HEA"',
+      body: 'CHEAT, WHEAT, HEART and AHEAD each contain the consecutive letters "HEA". STONE does not — it is the odd one out.',
+    },
+    config: {
+      items: [
+        { id: 'cheat', label: 'CHEAT' },
+        { id: 'wheat', label: 'WHEAT' },
+        { id: 'heart', label: 'HEART' },
+        { id: 'stone', label: 'STONE' },
+        { id: 'ahead', label: 'AHEAD' },
+      ],
+      oddItemId: 'stone',
+      timeLimitMs: 24000,
+    },
+  },
+];
+
+// ---------------------------------------------------------------------------
+// schulte_order — tap scattered grid values in the correct ORDER, fast.
+// Categories allowed: processing_speed | visual_attention. Multi-tap + timed
+// (timeLimitMs in the tight [5s, 30s] scan band). The `targets` ARRAY ORDER is
+// the correct order (ascending numbers, or interleaved number/letter for harder
+// cards). Wrong/out-of-order taps are counted as NON-FATAL errors (the player
+// keeps hunting); the card resolves correct only once the full order is tapped,
+// timeout otherwise. Order is read from the LABEL/value, never position alone.
+// ---------------------------------------------------------------------------
+
+const schulteOrderCards: SchulteOrderCard[] = [
+  {
+    cardId: 'schulte-001',
+    creatorHandle: '@scanlab',
+    templateType: 'schulte_order',
+    category: 'processing_speed',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 16,
+    prompt: 'Tap 1 to 6 in order, as fast as you can.',
+    puzzleDna: {
+      mechanic: 'schulte-scan',
+      inputMode: 'tap',
+      measuredSignals: ['completion_time', 'errors', 'time_to_interaction'],
+    },
+    explanation: {
+      title: 'Ascending scan',
+      body: 'The fastest route is a steady visual sweep: hold the next number in mind and let your eyes find it.',
+    },
+    shareText: 'Swept the grid in order.',
+    config: {
+      rows: 3,
+      columns: 3,
+      targets: [
+        { id: 's1', label: '1', row: 2, column: 1 },
+        { id: 's2', label: '2', row: 0, column: 2 },
+        { id: 's3', label: '3', row: 1, column: 0 },
+        { id: 's4', label: '4', row: 2, column: 2 },
+        { id: 's5', label: '5', row: 0, column: 0 },
+        { id: 's6', label: '6', row: 1, column: 2 },
+      ],
+      timeLimitMs: 18000,
+    },
+  },
+  {
+    cardId: 'schulte-002',
+    creatorHandle: '@scanlab',
+    templateType: 'schulte_order',
+    category: 'visual_attention',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 18,
+    prompt: 'Tap 1 to 8 in order, as fast as you can.',
+    puzzleDna: {
+      mechanic: 'schulte-scan',
+      inputMode: 'tap',
+      measuredSignals: ['completion_time', 'errors', 'time_to_interaction'],
+    },
+    explanation: {
+      title: 'Bigger grid, same trick',
+      body: 'On a wider grid, keep your gaze near the centre and let each next value come to you instead of scanning row by row.',
+    },
+    config: {
+      rows: 3,
+      columns: 3,
+      targets: [
+        { id: 's1', label: '1', row: 1, column: 1 },
+        { id: 's2', label: '2', row: 0, column: 0 },
+        { id: 's3', label: '3', row: 2, column: 2 },
+        { id: 's4', label: '4', row: 0, column: 2 },
+        { id: 's5', label: '5', row: 2, column: 0 },
+        { id: 's6', label: '6', row: 1, column: 0 },
+        { id: 's7', label: '7', row: 0, column: 1 },
+        { id: 's8', label: '8', row: 2, column: 1 },
+      ],
+      timeLimitMs: 22000,
+    },
+  },
+  {
+    cardId: 'schulte-003',
+    creatorHandle: '@gridrunner',
+    templateType: 'schulte_order',
+    category: 'processing_speed',
+    difficulty: 'hard',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 22,
+    prompt: 'Tap the values in order: 1, A, 2, B, 3, C…',
+    puzzleDna: {
+      mechanic: 'schulte-scan',
+      inputMode: 'tap',
+      measuredSignals: ['completion_time', 'errors', 'time_to_interaction'],
+    },
+    explanation: {
+      title: 'Interleaved order',
+      body: 'Alternating numbers and letters forces you to switch tracks each tap — a steady rhythm beats rushing.',
+    },
+    config: {
+      rows: 3,
+      columns: 3,
+      targets: [
+        { id: 'n1', label: '1', row: 0, column: 1 },
+        { id: 'a', label: 'A', row: 2, column: 2 },
+        { id: 'n2', label: '2', row: 1, column: 0 },
+        { id: 'b', label: 'B', row: 0, column: 2 },
+        { id: 'n3', label: '3', row: 2, column: 0 },
+        { id: 'c', label: 'C', row: 1, column: 2 },
+        { id: 'n4', label: '4', row: 0, column: 0 },
+        { id: 'd', label: 'D', row: 2, column: 1 },
+      ],
+      timeLimitMs: 26000,
+    },
+  },
+  {
+    cardId: 'schulte-004',
+    creatorHandle: '@gridrunner',
+    templateType: 'schulte_order',
+    category: 'visual_attention',
+    difficulty: 'hard',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 24,
+    prompt: 'Tap 1 to 9 in order across the full grid.',
+    puzzleDna: {
+      mechanic: 'schulte-scan',
+      inputMode: 'tap',
+      measuredSignals: ['completion_time', 'errors', 'time_to_interaction'],
+    },
+    explanation: {
+      title: 'Full 3×3 sweep',
+      body: 'Every cell is a target, so the scan is densest here. Anchor on the centre and reach outward for each next value.',
+    },
+    config: {
+      rows: 3,
+      columns: 3,
+      targets: [
+        { id: 's1', label: '1', row: 2, column: 0 },
+        { id: 's2', label: '2', row: 0, column: 2 },
+        { id: 's3', label: '3', row: 1, column: 1 },
+        { id: 's4', label: '4', row: 2, column: 2 },
+        { id: 's5', label: '5', row: 0, column: 0 },
+        { id: 's6', label: '6', row: 1, column: 2 },
+        { id: 's7', label: '7', row: 2, column: 1 },
+        { id: 's8', label: '8', row: 0, column: 1 },
+        { id: 's9', label: '9', row: 1, column: 0 },
+      ],
+      timeLimitMs: 26000,
+    },
+  },
+  {
+    cardId: 'schulte-005',
+    creatorHandle: '@swiftscan',
+    templateType: 'schulte_order',
+    category: 'processing_speed',
+    difficulty: 'extremely_hard',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 28,
+    prompt: 'Tap 1 to 12 in order on the big grid.',
+    puzzleDna: {
+      mechanic: 'schulte-scan',
+      inputMode: 'tap',
+      measuredSignals: ['completion_time', 'errors', 'time_to_interaction'],
+    },
+    explanation: {
+      title: 'Twelve in a sweep',
+      body: 'A 4×3 board with twelve targets is a real endurance scan — keep your rhythm and resist jumping ahead.',
+    },
+    config: {
+      rows: 4,
+      columns: 3,
+      targets: [
+        { id: 's1', label: '1', row: 3, column: 1 },
+        { id: 's2', label: '2', row: 0, column: 2 },
+        { id: 's3', label: '3', row: 2, column: 0 },
+        { id: 's4', label: '4', row: 1, column: 2 },
+        { id: 's5', label: '5', row: 3, column: 2 },
+        { id: 's6', label: '6', row: 0, column: 0 },
+        { id: 's7', label: '7', row: 2, column: 2 },
+        { id: 's8', label: '8', row: 1, column: 0 },
+        { id: 's9', label: '9', row: 3, column: 0 },
+        { id: 's10', label: '10', row: 0, column: 1 },
+        { id: 's11', label: '11', row: 2, column: 1 },
+        { id: 's12', label: '12', row: 1, column: 1 },
+      ],
+      timeLimitMs: 30000,
+    },
+  },
+  {
+    cardId: 'schulte-006',
+    creatorHandle: '@swiftscan',
+    templateType: 'schulte_order',
+    category: 'visual_attention',
+    difficulty: 'extremely_hard',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 30,
+    prompt: 'Tap in order: 1, A, 2, B, 3, C, 4, D, 5, E.',
+    puzzleDna: {
+      mechanic: 'schulte-scan',
+      inputMode: 'tap',
+      measuredSignals: ['completion_time', 'errors', 'time_to_interaction'],
+    },
+    explanation: {
+      title: 'Long interleaved scan',
+      body: 'Ten targets alternating number/letter on a 4×3 board: the track-switch every tap is what makes this one tough.',
+    },
+    config: {
+      rows: 4,
+      columns: 3,
+      targets: [
+        { id: 'n1', label: '1', row: 0, column: 0 },
+        { id: 'a', label: 'A', row: 3, column: 2 },
+        { id: 'n2', label: '2', row: 1, column: 1 },
+        { id: 'b', label: 'B', row: 2, column: 0 },
+        { id: 'n3', label: '3', row: 0, column: 2 },
+        { id: 'c', label: 'C', row: 3, column: 0 },
+        { id: 'n4', label: '4', row: 1, column: 2 },
+        { id: 'd', label: 'D', row: 2, column: 2 },
+        { id: 'n5', label: '5', row: 0, column: 1 },
+        { id: 'e', label: 'E', row: 3, column: 1 },
+      ],
+      timeLimitMs: 30000,
+    },
+  },
+];
+
 /**
  * The complete authored catalog. Order groups cards by template for
  * readability; session selection / shuffling is the engine's concern, not the
@@ -4949,6 +5375,8 @@ export const catalog: readonly LiquidCard[] = [
   ...quickMathCards,
   ...colorWordCards,
   ...nBackCards,
+  ...oddOneOutCards,
+  ...schulteOrderCards,
 ];
 
 /**

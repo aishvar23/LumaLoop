@@ -26,10 +26,12 @@ import {
   type NBackCard,
   type LiquidCard,
   type MemorySequenceCard,
+  type OddOneOutCard,
   type PatternChainCard,
   type PrismMirrorOrientation,
   type PrismPathCard,
   type RuleFlipCard,
+  type SchulteOrderCard,
   type SignalSetCard,
   type SpotItCard,
   type StepLogicCard,
@@ -136,6 +138,8 @@ const templateAnswerValidators: {
   quick_math: validateQuickMathAnswer,
   color_word: validateColorWordAnswer,
   n_back: validateNBackAnswer,
+  odd_one_out: validateOddOneOutAnswer,
+  schulte_order: validateSchulteOrderAnswer,
 };
 
 /**
@@ -1309,6 +1313,174 @@ function validateNBackAnswer(card: NBackCard): ValidationError[] {
       answerError(
         card.cardId,
         `n_back stream length ${stream.length} leaves no scorable position for n=${n}`,
+      ),
+    );
+  }
+
+  return errors;
+}
+
+/** Inclusive bounds for an odd_one_out's item count. */
+export const MIN_ODD_ONE_OUT_ITEMS = 3;
+export const MAX_ODD_ONE_OUT_ITEMS = 6;
+
+function validateOddOneOutAnswer(card: OddOneOutCard): ValidationError[] {
+  const { items, oddItemId } = card.config;
+  const errors: ValidationError[] = [];
+
+  if (
+    items.length < MIN_ODD_ONE_OUT_ITEMS ||
+    items.length > MAX_ODD_ONE_OUT_ITEMS
+  ) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `odd_one_out item count ${items.length} is outside [${MIN_ODD_ONE_OUT_ITEMS}, ${MAX_ODD_ONE_OUT_ITEMS}]`,
+      ),
+    );
+  }
+
+  const ids = items.map((item) => item.id);
+  if (new Set(ids).size !== ids.length || ids.some((id) => id.trim().length === 0)) {
+    errors.push(
+      answerError(card.cardId, 'odd_one_out item ids must be unique and non-empty'),
+    );
+  }
+
+  if (
+    items.some(
+      (item) => typeof item.label !== 'string' || item.label.trim().length === 0,
+    )
+  ) {
+    errors.push(
+      answerError(
+        card.cardId,
+        'odd_one_out items must each have a non-empty label (the meaning is never colour/position alone)',
+      ),
+    );
+  }
+
+  // The odd item (answer key) must be present among the items.
+  if (!items.some((item) => item.id === oddItemId)) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `odd_one_out oddItemId "${oddItemId}" is not among items`,
+      ),
+    );
+  }
+
+  return errors;
+}
+
+/** Inclusive bounds for a schulte_order's target count. */
+export const MIN_SCHULTE_TARGETS = 4;
+export const MAX_SCHULTE_TARGETS = 16;
+/**
+ * schulte_order is a timed visual scan; its time limit lives in the tighter
+ * [5s, 30s] window (the same band the other timed-stream mechanics use), not the
+ * full [5s, 120s] catalog band.
+ */
+export const MAX_SCHULTE_TIME_LIMIT_MS = 30000;
+
+function validateSchulteOrderAnswer(card: SchulteOrderCard): ValidationError[] {
+  const { rows, columns, targets, timeLimitMs } = card.config;
+  const errors: ValidationError[] = [];
+
+  if (rows <= 0 || columns <= 0) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `schulte_order grid must have positive dimensions, got ${rows}x${columns}`,
+      ),
+    );
+  }
+
+  if (
+    targets.length < MIN_SCHULTE_TARGETS ||
+    targets.length > MAX_SCHULTE_TARGETS
+  ) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `schulte_order target count ${targets.length} is outside [${MIN_SCHULTE_TARGETS}, ${MAX_SCHULTE_TARGETS}]`,
+      ),
+    );
+  }
+
+  // Targets must fit on the grid (a grid can hold rows*columns cells).
+  if (rows > 0 && columns > 0 && targets.length > rows * columns) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `schulte_order has ${targets.length} targets but only ${rows * columns} cells`,
+      ),
+    );
+  }
+
+  const ids = targets.map((target) => target.id);
+  if (new Set(ids).size !== ids.length || ids.some((id) => id.trim().length === 0)) {
+    errors.push(
+      answerError(
+        card.cardId,
+        'schulte_order target ids must be unique and non-empty',
+      ),
+    );
+  }
+
+  const labels = targets.map((target) => target.label);
+  if (
+    new Set(labels).size !== labels.length ||
+    labels.some(
+      (label) => typeof label !== 'string' || label.trim().length === 0,
+    )
+  ) {
+    errors.push(
+      answerError(
+        card.cardId,
+        'schulte_order target labels must be unique and non-empty (the order is read from the value, never position alone)',
+      ),
+    );
+  }
+
+  // Every target coordinate must lie inside the grid, and no two may overlap.
+  const occupied = new Set<string>();
+  targets.forEach((target, index) => {
+    if (
+      !Number.isInteger(target.row) ||
+      target.row < 0 ||
+      target.row >= rows ||
+      !Number.isInteger(target.column) ||
+      target.column < 0 ||
+      target.column >= columns
+    ) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `schulte_order target ${index} (${target.row}, ${target.column}) is outside grid bounds [0, ${rows - 1}] x [0, ${columns - 1}]`,
+        ),
+      );
+      return;
+    }
+    const key = coordKey(target.row, target.column);
+    if (occupied.has(key)) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `schulte_order has overlapping targets at ${key}`,
+        ),
+      );
+    }
+    occupied.add(key);
+  });
+
+  // Tighter time-limit band for the timed scan (the [5s, 120s] base rule still
+  // applies via the shared check; this caps the upper end).
+  if (Number.isFinite(timeLimitMs) && timeLimitMs > MAX_SCHULTE_TIME_LIMIT_MS) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `schulte_order timeLimitMs ${timeLimitMs} exceeds the timed-scan maximum ${MAX_SCHULTE_TIME_LIMIT_MS}`,
       ),
     );
   }

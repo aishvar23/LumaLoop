@@ -25,10 +25,12 @@ import {
   type LiquidCard,
   type MemorySequenceCard,
   type NBackCard,
+  type OddOneOutCard,
   type PatternChainCard,
   type PrismPathCard,
   type PuzzleDna,
   type RuleFlipCard,
+  type SchulteOrderCard,
   type SignalSetCard,
   type SpotItCard,
   type StepLogicCard,
@@ -541,6 +543,60 @@ function validNBack(): NBackCard {
   };
 }
 
+function validOddOneOut(): OddOneOutCard {
+  return {
+    cardId: 'oddoneout-1',
+    creatorHandle: '@test',
+    templateType: 'odd_one_out',
+    category: 'pattern_recognition',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 12,
+    prompt: 'Tap the one that does not belong.',
+    puzzleDna: dna('odd-one-out'),
+    explanation: { title: 'Shared rule', body: 'Three are even; one is odd.' },
+    config: {
+      items: [
+        { id: 'a', label: '4' },
+        { id: 'b', label: '8' },
+        { id: 'c', label: '7' },
+        { id: 'd', label: '12' },
+      ],
+      oddItemId: 'c',
+      timeLimitMs: 12000,
+    },
+  };
+}
+
+function validSchulteOrder(): SchulteOrderCard {
+  return {
+    cardId: 'schulte-1',
+    creatorHandle: '@test',
+    templateType: 'schulte_order',
+    category: 'processing_speed',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 15,
+    prompt: 'Tap 1 to 5 in order, as fast as you can.',
+    puzzleDna: dna('schulte-scan'),
+    explanation: { title: 'Order', body: 'Scan and tap ascending.' },
+    config: {
+      rows: 3,
+      columns: 2,
+      targets: [
+        { id: 's1', label: '1', row: 2, column: 1 },
+        { id: 's2', label: '2', row: 0, column: 0 },
+        { id: 's3', label: '3', row: 1, column: 1 },
+        { id: 's4', label: '4', row: 2, column: 0 },
+        { id: 's5', label: '5', row: 0, column: 1 },
+      ],
+      timeLimitMs: 20000,
+    },
+  };
+}
+
 function validCatalog(): LiquidCard[] {
   return [
     validSpotIt(),
@@ -556,6 +612,8 @@ function validCatalog(): LiquidCard[] {
     validCircuitFlow(),
     validColorWord(),
     validNBack(),
+    validOddOneOut(),
+    validSchulteOrder(),
   ];
 }
 
@@ -1317,6 +1375,8 @@ const ALL_TEMPLATE_TYPES: TemplateType[] = [
   'quick_math',
   'color_word',
   'n_back',
+  'odd_one_out',
+  'schulte_order',
 ];
 
 const ALL_CATEGORIES: ChallengeCategory[] = [
@@ -1345,6 +1405,8 @@ const validCardFor: Record<TemplateType, () => LiquidCard> = {
   quick_math: validQuickMath,
   color_word: validColorWord,
   n_back: validNBack,
+  odd_one_out: validOddOneOut,
+  schulte_order: validSchulteOrder,
 };
 
 describe('templateCategoryMap <-> validation consistency', () => {
@@ -1578,6 +1640,146 @@ describe('n_back answer validation', () => {
       n: 1,
       matchIndices: [1],
     };
+    expect(validateCatalog([card]).valid).toBe(false);
+  });
+});
+
+describe('odd_one_out answer validation', () => {
+  it('accepts a well-formed card', () => {
+    expect(validateCatalog([validOddOneOut()]).valid).toBe(true);
+  });
+
+  it('rejects an oddItemId that is not among items', () => {
+    const card = validOddOneOut();
+    card.config = { ...card.config, oddItemId: 'nope' };
+    const result = validateCatalog([card]);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('rejects fewer than the minimum items', () => {
+    const card = validOddOneOut();
+    card.config = {
+      ...card.config,
+      items: [
+        { id: 'a', label: '4' },
+        { id: 'b', label: '8' },
+      ],
+      oddItemId: 'a',
+    };
+    expect(validateCatalog([card]).valid).toBe(false);
+  });
+
+  it('rejects duplicate item ids', () => {
+    const card = validOddOneOut();
+    card.config = {
+      ...card.config,
+      items: [
+        { id: 'a', label: '4' },
+        { id: 'a', label: '8' },
+        { id: 'c', label: '7' },
+      ],
+      oddItemId: 'c',
+    };
+    expect(validateCatalog([card]).valid).toBe(false);
+  });
+
+  it('rejects an empty item label', () => {
+    const card = validOddOneOut();
+    card.config = {
+      ...card.config,
+      items: [
+        { id: 'a', label: '' },
+        { id: 'b', label: '8' },
+        { id: 'c', label: '7' },
+      ],
+      oddItemId: 'c',
+    };
+    expect(validateCatalog([card]).valid).toBe(false);
+  });
+});
+
+describe('schulte_order answer validation', () => {
+  it('accepts a well-formed card', () => {
+    expect(validateCatalog([validSchulteOrder()]).valid).toBe(true);
+  });
+
+  it('rejects a target outside grid bounds', () => {
+    const card = validSchulteOrder();
+    card.config = {
+      ...card.config,
+      targets: [
+        { id: 's1', label: '1', row: 9, column: 0 },
+        { id: 's2', label: '2', row: 0, column: 0 },
+        { id: 's3', label: '3', row: 1, column: 1 },
+        { id: 's4', label: '4', row: 2, column: 0 },
+      ],
+    };
+    expect(validateCatalog([card]).valid).toBe(false);
+  });
+
+  it('rejects overlapping targets', () => {
+    const card = validSchulteOrder();
+    card.config = {
+      ...card.config,
+      targets: [
+        { id: 's1', label: '1', row: 0, column: 0 },
+        { id: 's2', label: '2', row: 0, column: 0 },
+        { id: 's3', label: '3', row: 1, column: 1 },
+        { id: 's4', label: '4', row: 2, column: 0 },
+      ],
+    };
+    expect(validateCatalog([card]).valid).toBe(false);
+  });
+
+  it('rejects duplicate target labels', () => {
+    const card = validSchulteOrder();
+    card.config = {
+      ...card.config,
+      targets: [
+        { id: 's1', label: '1', row: 0, column: 0 },
+        { id: 's2', label: '1', row: 0, column: 1 },
+        { id: 's3', label: '3', row: 1, column: 1 },
+        { id: 's4', label: '4', row: 2, column: 0 },
+      ],
+    };
+    expect(validateCatalog([card]).valid).toBe(false);
+  });
+
+  it('rejects fewer than the minimum targets', () => {
+    const card = validSchulteOrder();
+    card.config = {
+      ...card.config,
+      targets: [
+        { id: 's1', label: '1', row: 0, column: 0 },
+        { id: 's2', label: '2', row: 0, column: 1 },
+        { id: 's3', label: '3', row: 1, column: 1 },
+      ],
+    };
+    expect(validateCatalog([card]).valid).toBe(false);
+  });
+
+  it('rejects more targets than grid cells', () => {
+    const card = validSchulteOrder();
+    card.config = {
+      ...card.config,
+      rows: 2,
+      columns: 2,
+      targets: [
+        { id: 's1', label: '1', row: 0, column: 0 },
+        { id: 's2', label: '2', row: 0, column: 1 },
+        { id: 's3', label: '3', row: 1, column: 0 },
+        { id: 's4', label: '4', row: 1, column: 1 },
+        { id: 's5', label: '5', row: 0, column: 0 },
+      ],
+    };
+    expect(validateCatalog([card]).valid).toBe(false);
+  });
+
+  it('rejects a time limit beyond the timed-scan maximum', () => {
+    const card = validSchulteOrder();
+    card.config = { ...card.config, timeLimitMs: 45000 };
     expect(validateCatalog([card]).valid).toBe(false);
   });
 });

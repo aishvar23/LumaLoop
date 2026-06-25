@@ -71,6 +71,8 @@ describe('authored card catalog', () => {
       'quick_math',
       'color_word',
       'n_back',
+      'odd_one_out',
+      'schulte_order',
     ];
     for (const template of templates) {
       const count = catalog.filter(
@@ -102,6 +104,8 @@ describe('authored card catalog', () => {
       'quick_math',
       'color_word',
       'n_back',
+      'odd_one_out',
+      'schulte_order',
     ];
     const hardCount = catalog.filter(
       (card) => card.difficulty === 'hard',
@@ -155,6 +159,8 @@ describe('authored card catalog', () => {
       'quick_math',
       'color_word',
       'n_back',
+      'odd_one_out',
+      'schulte_order',
     ];
     for (const template of templates) {
       const perTemplate = new Set(

@@ -24,6 +24,8 @@ const ALL_TEMPLATE_TYPES: TemplateType[] = [
   'quick_math',
   'color_word',
   'n_back',
+  'odd_one_out',
+  'schulte_order',
 ];
 
 const ALL_CATEGORIES: ChallengeCategory[] = [
@@ -106,6 +108,8 @@ describe('templateCategoryMap', () => {
       quick_math: ['logical_reasoning'],
       color_word: ['cognitive_flexibility', 'processing_speed'],
       n_back: ['working_memory'],
+      odd_one_out: ['pattern_recognition', 'logical_reasoning'],
+      schulte_order: ['processing_speed', 'visual_attention'],
     });
   });
 });
@@ -164,6 +168,12 @@ function categoriesForCard(card: LiquidCard): ChallengeCategory {
     case 'n_back':
       void card.config.matchIndices;
       return 'working_memory';
+    case 'odd_one_out':
+      void card.config.oddItemId;
+      return 'pattern_recognition';
+    case 'schulte_order':
+      void card.config.targets;
+      return 'processing_speed';
     default: {
       // If a new TemplateType is added without a case above, `card` is no
       // longer `never` here and this assignment fails to compile.

@@ -64,7 +64,9 @@ export type TemplateType =
   | 'word_unscramble'
   | 'quick_math'
   | 'color_word'
-  | 'n_back';
+  | 'n_back'
+  | 'odd_one_out'
+  | 'schulte_order';
 
 export type Difficulty =
   | 'extremely_easy'
@@ -647,6 +649,94 @@ export type NBackCard = LiquidCardBase & {
 };
 
 /**
+ * One selectable item in an {@link OddOneOutCard}. `id` is referenced by the
+ * answer key and the player's pick; `label` is the readable item (a word, short
+ * concept, or simple glyph) — meaning is carried by the LABEL, never colour or
+ * position alone (Design §7 accessibility). Authored ids are stable,
+ * unique-within-a-card slugs.
+ */
+export type OddOneOutItem = {
+  id: string;
+  label: string;
+};
+
+/**
+ * Pick the ONE item that doesn't share a hidden rule the others all follow — a
+ * CONCEPTUAL odd-one-out mechanic (pattern_recognition / logical_reasoning).
+ *
+ * Distinct from `spot_it` (a PERCEPTUAL odd-glyph scan): here every distractor
+ * genuinely belongs to a shared category/parity/shape/property, so the odd item
+ * is found by REASONING about the rule, not by eyeballing a different glyph. The
+ * `explanation.body` states the shared rule. A small set of `items` is shown; the
+ * player taps the single one whose id equals `oddItemId`. The pure
+ * {@link evaluateOddOneOut} is the single source of truth: a pick is correct iff
+ * its id equals `oddItemId` (the renderer never re-derives the check inline). The
+ * first committed pick resolves the card (one-move conceptual choice, like
+ * tiny_logic), and a wrong pick is the recorded distractor.
+ */
+export type OddOneOutCard = LiquidCardBase & {
+  templateType: 'odd_one_out';
+  config: {
+    /**
+     * The candidate items; exactly one (`oddItemId`) breaks the shared rule and
+     * the rest follow it. Length 3–6 (enforced by catalog validation), unique ids.
+     */
+    items: ReadonlyArray<OddOneOutItem>;
+    /** The id of the single item that does NOT belong — the answer key. */
+    oddItemId: string;
+    timeLimitMs: number;
+  };
+};
+
+/**
+ * One target in a {@link SchulteOrderCard} grid. `id` is stable; `label` is the
+ * readable value shown on the cell (a number, or a number/letter for the harder
+ * interleaved variants) — the sequence is carried by the LABEL/value, never by
+ * colour or position alone (Design §7). `row`/`column` are zero-based positions
+ * into the `rows × columns` grid, scattered so the player must visually scan.
+ */
+export type SchulteTarget = GridCoordinate & {
+  id: string;
+  label: string;
+};
+
+/**
+ * Tap a grid of scattered items in the correct ascending/interleaved ORDER as
+ * fast as possible — a visual-scan / processing-speed mechanic (processing_speed
+ * / visual_attention).
+ *
+ * The grid shows every `target` at its scattered `row`/`column`. The correct
+ * order is the ARRAY ORDER of `targets` (so an interleaved order like 1, A, 2, B
+ * is authored simply by ordering the array that way). The renderer is MULTI-TAP
+ * and timed (mirroring `memory_sequence`/`spot_it`): it tracks the expected next
+ * target and only ADVANCES on a correct in-order tap; a wrong/out-of-order tap is
+ * COUNTED as an error but is NON-FATAL (the player keeps hunting for the same
+ * next target — like spot_it's false-tap-and-keep-going, so "time to complete"
+ * stays meaningful). The card resolves CORRECT once every target has been tapped
+ * in order within the time limit, and TIMEOUT on the clock (carrying how far the
+ * player got). The pure {@link evaluateSchulteOrder} is the single source of
+ * truth for whether a collected tap order completes the sequence and for the
+ * error tally — the renderer never re-derives ordering inline.
+ */
+export type SchulteOrderCard = LiquidCardBase & {
+  templateType: 'schulte_order';
+  config: {
+    /** Grid height (number of rows), positive. */
+    rows: number;
+    /** Grid width (number of columns), positive. */
+    columns: number;
+    /**
+     * The targets to tap, IN THE CORRECT ORDER. Length 4–16 (enforced by catalog
+     * validation); every coordinate must lie inside the grid and be unique, and
+     * ids/labels must be unique within the card.
+     */
+    targets: ReadonlyArray<SchulteTarget>;
+    /** Countdown for the whole solve (5–30s; see validation). */
+    timeLimitMs: number;
+  };
+};
+
+/**
  * The discriminated union of every card. Narrow on `templateType` to access a
  * card's typed `config`. Adding a template means adding a member here (step 2).
  */
@@ -665,7 +755,9 @@ export type LiquidCard =
   | WordUnscrambleCard
   | QuickMathCard
   | ColorWordCard
-  | NBackCard;
+  | NBackCard
+  | OddOneOutCard
+  | SchulteOrderCard;
 
 /**
  * The categories each template is allowed to map to (Technical Design §11).
@@ -736,4 +828,20 @@ export const templateCategoryMap: Readonly<
   // them — the canonical working_memory task (the same category as
   // memory_sequence). No new ChallengeCategory is warranted.
   n_back: Object.freeze(['working_memory'] as const),
+  // odd_one_out is CONCEPTUAL: the player infers the shared rule the set follows
+  // and picks the one item that breaks it — squarely pattern_recognition (with
+  // logical_reasoning for the rules that are deductive rather than categorical).
+  // No new ChallengeCategory is warranted.
+  odd_one_out: Object.freeze([
+    'pattern_recognition',
+    'logical_reasoning',
+  ] as const),
+  // schulte_order is a timed visual scan: find each next value scattered on the
+  // grid and tap them in order, as fast as possible — squarely processing_speed
+  // (the same category as spot_it), with visual_attention for the scan. No new
+  // ChallengeCategory is warranted.
+  schulte_order: Object.freeze([
+    'processing_speed',
+    'visual_attention',
+  ] as const),
 }) satisfies Readonly<Record<TemplateType, readonly ChallengeCategory[]>>;
