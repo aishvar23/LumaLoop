@@ -9,6 +9,7 @@ import HomeScreen from './HomeScreen';
 import { AuthProvider } from './auth/AuthProvider';
 import { createFakeAuthClient, makeProfile, makeSession } from './auth/testFakes';
 import type { FeaturedGame } from './core/cards/featured';
+import type { ActivityItem } from './social/activityFeed';
 
 const FEATURED: FeaturedGame[] = [
   {
@@ -31,7 +32,22 @@ const FEATURED: FeaturedGame[] = [
   },
 ];
 
-function renderHome() {
+const ACTIVITY: ActivityItem[] = [
+  {
+    kind: 'comment',
+    id: 'c1',
+    userId: 'u9',
+    handle: 'gridwise',
+    displayName: 'Grid Wise',
+    avatarUrl: null,
+    cardId: 'spot_it-1',
+    createdAt: '2026-06-03T00:00:00Z',
+    gameTitle: 'Spot it',
+    monogram: 'G',
+  },
+];
+
+function renderHome(activityItems?: ActivityItem[]) {
   const onStart = jest.fn();
   const onOpenProfile = jest.fn();
   const auth = createFakeAuthClient({
@@ -45,6 +61,7 @@ function renderHome() {
         onStart={onStart}
         onOpenProfile={onOpenProfile}
         featuredGames={FEATURED}
+        activityItems={activityItems}
       />
     </AuthProvider>,
   );
@@ -72,6 +89,13 @@ describe('HomeScreen', () => {
     const { onStart } = renderHome();
     await waitFor(() => expect(screen.getByTestId('home-tile-spot_it')).toBeTruthy());
     fireEvent.press(screen.getByTestId('home-tile-spot_it'));
+    expect(onStart).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a Recent activity rail and enters the feed from a story', async () => {
+    const { onStart } = renderHome(ACTIVITY);
+    const story = await screen.findByTestId('home-story-c1');
+    fireEvent.press(story);
     expect(onStart).toHaveBeenCalledTimes(1);
   });
 

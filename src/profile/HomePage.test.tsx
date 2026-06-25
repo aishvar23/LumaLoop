@@ -10,6 +10,7 @@ import {
   makeSession,
 } from '../auth/testFakes';
 import type { FeaturedGame } from '../cards/featured';
+import type { ActivityItem } from '../social/activityFeed';
 import type { GamePlay } from '../auth/types';
 
 const FEATURED: FeaturedGame[] = [
@@ -33,7 +34,22 @@ const FEATURED: FeaturedGame[] = [
   },
 ];
 
-function renderHome(plays: GamePlay[] = []) {
+const ACTIVITY: ActivityItem[] = [
+  {
+    kind: 'comment',
+    id: 'c1',
+    userId: 'u9',
+    handle: 'gridwise',
+    displayName: 'Grid Wise',
+    avatarUrl: null,
+    cardId: 'spot_it-1',
+    createdAt: '2026-06-03T00:00:00Z',
+    gameTitle: 'Spot it',
+    monogram: 'G',
+  },
+];
+
+function renderHome(plays: GamePlay[] = [], activityItems?: ActivityItem[]) {
   const auth = createFakeAuthClient({
     session: makeSession(),
     profile: makeProfile(),
@@ -42,7 +58,7 @@ function renderHome(plays: GamePlay[] = []) {
   render(
     <AuthProvider client={auth.client}>
       <MemoryRouter>
-        <HomePage featuredGames={FEATURED} />
+        <HomePage featuredGames={FEATURED} activityItems={activityItems} />
       </MemoryRouter>
     </AuthProvider>,
   );
@@ -85,6 +101,25 @@ describe('HomePage', () => {
       'href',
       '/feed',
     );
+  });
+
+  it('shows a Recent activity rail of community updates, each entering the feed', async () => {
+    renderHome([], ACTIVITY);
+    await screen.findByRole('heading', { name: /welcome back/i });
+    expect(screen.getByRole('heading', { name: /recent activity/i })).toBeInTheDocument();
+    const story = screen.getByRole('link', {
+      name: /@gridwise commented on spot it/i,
+    });
+    expect(story).toHaveAttribute('href', '/feed');
+    expect(screen.getByText('@gridwise')).toBeInTheDocument();
+  });
+
+  it('omits the Recent activity rail when there is no activity', async () => {
+    renderHome([], []);
+    await screen.findByRole('heading', { name: /welcome back/i });
+    expect(
+      screen.queryByRole('heading', { name: /recent activity/i }),
+    ).not.toBeInTheDocument();
   });
 
   it('reveals a "coming soon" notice when the greyed Upload puzzle button is clicked', async () => {

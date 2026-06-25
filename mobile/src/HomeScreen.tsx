@@ -2,16 +2,18 @@
  * Home / Discover landing screen for React Native (accounts pivot — mobile
  * parallel of web `src/profile/HomePage.tsx`).
  *
- * The DEFAULT surface a signed-in user lands on (before the feed): a greeting, a
- * snapshot of their game stats, a grid of featured games, and a prominent "Start
- * playing" CTA that enters the immersive feed. It replaces dropping straight into
- * a game card on launch.
+ * The DEFAULT surface a signed-in user lands on (before the feed), visually
+ * distinct from the /you profile: a "Recent activity" stories rail, a bold
+ * gradient-ish hero with the "Start playing" CTA, a slim stat strip, and a grid
+ * of featured games. It replaces dropping straight into a game card on launch.
  *
  * Separation of concerns (CLAUDE.md §4): presentational only. Navigation is the
  * parent's job — `onStart` enters the feed, `onOpenProfile` opens /you (native has
- * no router; App.tsx owns the view toggle). Stats reuse the SAME pipeline the
- * profile screen uses ({@link fetchGamePlays} + the ported {@link computeStats}).
- * Featured tiles come from the pure {@link selectFeaturedGames} (template-agnostic).
+ * no router; App.tsx owns the view toggle). Stats reuse the profile pipeline
+ * ({@link fetchGamePlays} + ported {@link computeStats}); the activity rail reuses
+ * the cross-readable social tables via {@link fetchRecentActivity} (no follow
+ * graph yet — recent COMMUNITY activity). Featured tiles come from the pure
+ * {@link selectFeaturedGames}.
  *
  * POSITIONING GUARDRAIL (Design §7 / §21.8): copy stays about playing games and
  * GAME activity — no IQ / brain-training / ability / clinical framing.
@@ -24,7 +26,9 @@ import { useAuth } from './auth/AuthProvider';
 import type { AuthClient } from './auth/authClient';
 import { fetchGamePlays } from './auth/profileApi';
 import { supabase } from './auth/supabaseClient';
-import { selectFeaturedGames, type FeaturedGame } from './core/cards/featured';
+import { getCardById as defaultGetCardById } from './core/cards/catalog';
+import { selectFeaturedGames, templateLabel, type FeaturedGame } from './core/cards/featured';
+import type { LiquidCard } from './core/cards/types';
 import type { GamePlay } from './core/auth/types';
 import {
   computeStats,
@@ -32,6 +36,8 @@ import {
   formatAccuracy,
   type ProfileStats,
 } from './core/profile/computeStats';
+import { fetchRecentActivity } from './social/activityApi';
+import { activityCaption, type ActivityItem } from './social/activityFeed';
 import { authStyles as a } from './auth/authStyles';
 import {
   categoryAccent,
@@ -52,7 +58,20 @@ export interface HomeScreenProps {
   client?: AuthClient;
   /** Test seam: the featured games to show. Defaults to the catalog selection. */
   featuredGames?: readonly FeaturedGame[];
+  /** Test seam: preset activity items (skips the network read when provided). */
+  activityItems?: readonly ActivityItem[];
+  /** Test seam: cardId → card resolver for activity game titles. */
+  getCardById?: (cardId: string) => LiquidCard | undefined;
 }
+
+/** Ring colors cycled across story bubbles for an Instagram-like accent. */
+const RING_TONES = [
+  'processing_speed',
+  'cognitive_flexibility',
+  'visual_attention',
+  'pattern_recognition',
+  'working_memory',
+] as const;
 
 /** Format a category id ("visual_attention") into a label ("Visual attention"). */
 function categoryLabel(category: string): string {
@@ -81,6 +100,8 @@ export default function HomeScreen({
   onOpenProfile,
   client: clientProp,
   featuredGames,
+  activityItems,
+  getCardById = defaultGetCardById,
 }: HomeScreenProps) {
   const auth = useAuth();
   const { user, profile } = auth;
@@ -90,6 +111,7 @@ export default function HomeScreen({
 
   const [stats, setStats] = useState<ProfileStats>(EMPTY_PROFILE_STATS);
   const [loading, setLoading] = useState(true);
+  const [activity, setActivity] = useState<readonly ActivityItem[]>(activityItems ?? []);
   const [uploadNotice, setUploadNotice] = useState(false);
 
   useEffect(() => {
@@ -109,6 +131,29 @@ export default function HomeScreen({
       active = false;
     };
   }, [client, user]);
+
+  // Recent COMMUNITY activity for the stories rail (skipped when a test injects it).
+  useEffect(() => {
+    if (activityItems !== undefined) return;
+    let active = true;
+    void (async () => {
+      const items = await fetchRecentActivity(client, {
+        // Prototype: there's no follow graph yet and often a single account, so
+        // INCLUDE the viewer's own recent activity (like IG showing "your story")
+        // — otherwise the rail is empty until other users exist. Pass the viewer
+        // id here to switch to "others only" once there's a real community.
+        excludeUserId: null,
+        resolveTitle: (cardId) => {
+          const card = getCardById(cardId);
+          return card ? templateLabel(card.templateType) : cardId;
+        },
+      });
+      if (active) setActivity(items);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [client, user, activityItems, getCardById]);
 
   if (!profile) {
     return (
@@ -170,7 +215,53 @@ export default function HomeScreen({
         </Text>
       )}
 
+      {activity.length > 0 && (
+        <View accessibilityLabel="Recent activity">
+          <Text style={styles.sectionTitle}>Recent activity</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.stories}
+          >
+            {activity.map((item, index) => {
+              const ring = categoryAccent(RING_TONES[index % RING_TONES.length]).accent;
+              return (
+                <Pressable
+                  key={`${item.kind}:${item.id}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${activityCaption(item)} — open the feed`}
+                  testID={`home-story-${item.id}`}
+                  onPress={onStart}
+                  style={styles.story}
+                >
+                  <View style={[styles.storyRing, { borderColor: ring }]}>
+                    {item.avatarUrl ? (
+                      <Image
+                        style={styles.storyAvatar}
+                        source={{ uri: item.avatarUrl }}
+                        accessibilityIgnoresInvertColors
+                      />
+                    ) : (
+                      <View style={styles.storyAvatar}>
+                        <Text style={styles.storyAvatarText}>{item.monogram}</Text>
+                      </View>
+                    )}
+                    <Text style={styles.storyBadge}>
+                      {item.kind === 'like' ? '♥' : '💬'}
+                    </Text>
+                  </View>
+                  <Text style={styles.storyName} numberOfLines={1}>
+                    {item.handle ? `@${item.handle}` : item.displayName ?? 'Someone'}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
+
       <View style={styles.hero}>
+        <Text style={styles.heroEyebrow}>TODAY’S LOOP</Text>
         <Text style={styles.greeting}>Welcome back, {profile.display_name}</Text>
         <Text style={styles.subtitle}>
           Pick up where you left off, or jump into something new.
@@ -188,17 +279,12 @@ export default function HomeScreen({
         >
           <Text style={a.primaryBtnText}>▶ Start playing</Text>
         </Pressable>
-      </View>
-
-      <View accessibilityLabel="Your game activity">
-        {loading ? (
-          <Text style={a.note}>Loading your stats…</Text>
-        ) : (
-          <View style={styles.statsGrid}>
-            <Stat value={String(stats.gamesPlayed)} label="Games played" tone="visual_attention" />
-            <Stat value={formatAccuracy(stats.accuracy)} label="Accuracy" tone="logical_reasoning" />
-            <Stat value={String(stats.bestStreak)} label="Best streak" tone="cognitive_flexibility" />
-            <Stat value={String(stats.totalPoints)} label="Total points" tone="processing_speed" />
+        {!loading && (
+          <View style={styles.statStrip} accessibilityLabel="Your game activity">
+            <StatChip icon="🎮" value={String(stats.gamesPlayed)} label="Games played" />
+            <StatChip icon="🎯" value={formatAccuracy(stats.accuracy)} label="Accuracy" />
+            <StatChip icon="🔥" value={String(stats.bestStreak)} label="Best streak" />
+            <StatChip icon="⭐" value={String(stats.totalPoints)} label="Total points" />
           </View>
         )}
       </View>
@@ -226,6 +312,7 @@ export default function HomeScreen({
                 <Text style={styles.tileMeta} numberOfLines={1}>
                   {categoryLabel(game.category)} · ~{game.estimatedSeconds}s
                 </Text>
+                <Text style={[styles.tilePlay, { color: accent }]}>Play ▸</Text>
               </Pressable>
             );
           })}
@@ -235,22 +322,20 @@ export default function HomeScreen({
   );
 }
 
-function Stat({
+function StatChip({
+  icon,
   value,
   label,
-  tone,
 }: {
+  icon: string;
   value: string;
   label: string;
-  /** Category id whose accent tints the card stripe; cosmetic only. */
-  tone: string;
 }) {
-  const accent = categoryAccent(tone).accent;
   return (
-    <View style={styles.stat}>
-      <View style={[styles.statStripe, { backgroundColor: accent }]} />
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
+    <View style={styles.statChip}>
+      <Text style={styles.statChipIcon}>{icon}</Text>
+      <Text style={styles.statChipValue}>{value}</Text>
+      <Text style={styles.statChipLabel}>{label}</Text>
     </View>
   );
 }
@@ -316,13 +401,68 @@ const styles = StyleSheet.create({
     fontSize: fontSize.md,
     fontWeight: fontWeight.bold,
   },
+  // Stories rail.
+  stories: {
+    flexDirection: 'row',
+    gap: space.lg,
+    paddingVertical: space.xs,
+  },
+  story: {
+    width: 64,
+    alignItems: 'center',
+    gap: space.xs,
+  },
+  storyRing: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 2,
+    padding: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  storyAvatar: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 26,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  storyAvatarText: {
+    color: colors.text,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.bold,
+  },
+  storyBadge: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    fontSize: 12,
+    backgroundColor: colors.surface,
+    borderRadius: 10,
+    overflow: 'hidden',
+    paddingHorizontal: 3,
+  },
+  storyName: {
+    maxWidth: '100%',
+    color: colors.textMuted,
+    fontSize: fontSize.sm,
+  },
+  // Hero.
   hero: {
     gap: space.md,
     padding: space.xl,
     borderRadius: radius.lg,
-    backgroundColor: colors.surface,
+    backgroundColor: '#1a1e30',
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  heroEyebrow: {
+    color: colors.accent,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.semibold,
+    letterSpacing: 1.5,
   },
   greeting: {
     color: colors.text,
@@ -337,50 +477,45 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     paddingHorizontal: space.xl,
   },
-  statsGrid: {
+  // Slim stat strip.
+  statStrip: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: space.md,
+    gap: space.sm,
+    marginTop: space.sm,
   },
-  stat: {
-    position: 'relative',
-    overflow: 'hidden',
-    flexGrow: 1,
-    flexBasis: '45%',
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
+  statChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: space.md,
+    paddingVertical: space.xs,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 1,
     borderColor: colors.border,
-    paddingVertical: space.lg,
-    paddingHorizontal: space.lg,
-    alignItems: 'center',
   },
-  statStripe: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 4,
-    opacity: 0.9,
+  statChipIcon: {
+    fontSize: fontSize.sm,
   },
-  statValue: {
+  statChipValue: {
     color: colors.text,
-    fontSize: fontSize.xl,
-    fontWeight: fontWeight.heavy,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.bold,
   },
-  statLabel: {
+  statChipLabel: {
     color: colors.textMuted,
     fontSize: fontSize.sm,
-    marginTop: space.xs,
   },
+  // Featured games.
   featured: {
     gap: space.sm,
   },
   sectionTitle: {
-    color: colors.text,
+    color: colors.textMuted,
     fontSize: fontSize.md,
     fontWeight: fontWeight.semibold,
-    marginBottom: space.xs,
+    marginBottom: space.sm,
   },
   featuredGrid: {
     flexDirection: 'row',
@@ -390,6 +525,7 @@ const styles = StyleSheet.create({
   tile: {
     flexGrow: 1,
     flexBasis: '45%',
+    minHeight: 120,
     gap: space.sm,
     padding: space.lg,
     borderRadius: radius.md,
@@ -398,8 +534,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   tileMonogram: {
-    width: 36,
-    height: 36,
+    width: 38,
+    height: 38,
     borderRadius: radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
@@ -417,5 +553,10 @@ const styles = StyleSheet.create({
   tileMeta: {
     color: colors.textMuted,
     fontSize: fontSize.sm,
+  },
+  tilePlay: {
+    marginTop: 'auto',
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.semibold,
   },
 });

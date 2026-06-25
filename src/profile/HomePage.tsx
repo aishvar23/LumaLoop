@@ -2,17 +2,19 @@
  * Home / Discover landing page (accounts pivot).
  *
  * The DEFAULT surface a signed-in user lands on (mounted at `/`, behind
- * RequireAuth) — an Instagram/Facebook-style home: a greeting, a snapshot of the
- * user's game stats, a grid of featured games, and a prominent "Start playing"
- * CTA that enters the immersive feed at `/feed`. It replaces dropping straight
- * into a game card on login.
+ * RequireAuth) — an Instagram/Facebook-style home, visually distinct from the
+ * /you profile: a "Recent activity" stories rail, a bold gradient hero with the
+ * "Start playing" CTA, a slim stats strip, and a grid of featured games. It
+ * replaces dropping straight into a game card on login.
  *
  * Separation of concerns (CLAUDE.md §4): this is a PRESENTATIONAL surface only.
- * It never touches the feed/session controller — "Start playing" and the featured
- * tiles are plain client-side links to `/feed`; the feed owns progression. Stats
- * reuse the SAME pipeline the /you profile uses ({@link fetchGamePlays} +
- * {@link computeStats}) — no new aggregation logic here. Featured tiles come from
- * the pure, data-driven {@link selectFeaturedGames} (template-agnostic).
+ * It never touches the feed/session controller — "Start playing", the activity
+ * bubbles, and the featured tiles are plain client-side links to `/feed`; the
+ * feed owns progression. Stats reuse the SAME pipeline the /you profile uses
+ * ({@link fetchGamePlays} + {@link computeStats}); the activity rail reuses the
+ * cross-readable social tables via {@link fetchRecentActivity} (no follow graph
+ * yet — it shows recent COMMUNITY activity). Featured tiles come from the pure
+ * {@link selectFeaturedGames}.
  *
  * POSITIONING GUARDRAIL (Design §7 / §21.8): copy stays about playing games and
  * GAME activity — no IQ / brain-training / ability / clinical framing.
@@ -26,7 +28,11 @@ import type { AuthClient } from '../auth/authClient';
 import { fetchGamePlays } from '../auth/profileApi';
 import { supabase } from '../auth/supabaseClient';
 import type { GamePlay } from '../auth/types';
-import { selectFeaturedGames, type FeaturedGame } from '../cards/featured';
+import { getCardById as defaultGetCardById } from '../cards/catalog';
+import { selectFeaturedGames, templateLabel, type FeaturedGame } from '../cards/featured';
+import type { LiquidCard } from '../cards/types';
+import { fetchRecentActivity } from '../social/activityApi';
+import { activityCaption, type ActivityItem } from '../social/activityFeed';
 import { resolveCategoryTheme } from '../ui/categoryTheme';
 import {
   computeStats,
@@ -45,6 +51,10 @@ export interface HomePageProps {
   client?: AuthClient;
   /** Test seam: the featured games to show. Defaults to the catalog selection. */
   featuredGames?: readonly FeaturedGame[];
+  /** Test seam: preset activity items (skips the network read when provided). */
+  activityItems?: readonly ActivityItem[];
+  /** Test seam: cardId → card resolver for activity game titles. */
+  getCardById?: (cardId: string) => LiquidCard | undefined;
 }
 
 /** Format a category id ("visual_attention") into a label ("Visual attention"). */
@@ -62,6 +72,8 @@ function monogram(displayName: string, handle: string): string {
 export default function HomePage({
   client: clientProp,
   featuredGames,
+  activityItems,
+  getCardById = defaultGetCardById,
 }: HomePageProps = {}) {
   const auth = useAuth();
   const { user, profile } = auth;
@@ -70,6 +82,7 @@ export default function HomePage({
 
   const [stats, setStats] = useState<ProfileStats>(EMPTY_PROFILE_STATS);
   const [loading, setLoading] = useState(true);
+  const [activity, setActivity] = useState<readonly ActivityItem[]>(activityItems ?? []);
   // The "Upload puzzle" creator feature isn't built yet — clicking the greyed
   // affordance reveals this notice (hover shows it via the native tooltip).
   const [uploadNotice, setUploadNotice] = useState(false);
@@ -91,6 +104,29 @@ export default function HomePage({
       active = false;
     };
   }, [client, user]);
+
+  // Recent COMMUNITY activity for the stories rail (skipped when a test injects it).
+  useEffect(() => {
+    if (activityItems !== undefined) return;
+    let active = true;
+    void (async () => {
+      const items = await fetchRecentActivity(client, {
+        // Prototype: there's no follow graph yet and often a single account, so
+        // INCLUDE the viewer's own recent activity (like IG showing "your story")
+        // — otherwise the rail is empty until other users exist. Pass the viewer
+        // id here to switch to "others only" once there's a real community.
+        excludeUserId: null,
+        resolveTitle: (cardId) => {
+          const card = getCardById(cardId);
+          return card ? templateLabel(card.templateType) : cardId;
+        },
+      });
+      if (active) setActivity(items);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [client, user, activityItems, getCardById]);
 
   if (!profile) {
     return (
@@ -146,25 +182,59 @@ export default function HomePage({
         </p>
       )}
 
+      {activity.length > 0 && (
+        <section aria-label="Recent activity" className="home-activity">
+          <h2 className="home-section-title">Recent activity</h2>
+          <div className="home-stories">
+            {activity.map((item) => (
+              <Link
+                key={`${item.kind}:${item.id}`}
+                to={ROUTES.feed}
+                className="home-story"
+                aria-label={`${activityCaption(item)} — open the feed`}
+                title={activityCaption(item)}
+              >
+                <span className="home-story__ring" aria-hidden="true">
+                  {item.avatarUrl ? (
+                    <img className="home-story__avatar" src={item.avatarUrl} alt="" />
+                  ) : (
+                    <span className="home-story__avatar">{item.monogram}</span>
+                  )}
+                  <span
+                    className="home-story__badge"
+                    data-kind={item.kind}
+                    aria-hidden="true"
+                  >
+                    {item.kind === 'like' ? '♥' : '💬'}
+                  </span>
+                </span>
+                <span className="home-story__name">
+                  {item.handle ? `@${item.handle}` : item.displayName ?? 'Someone'}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className="home-hero">
-        <h1 className="home-greeting">Welcome back, {profile.display_name}</h1>
+        <div className="home-hero__glow" aria-hidden="true" />
+        <p className="home-hero__eyebrow">Today’s loop</p>
+        <h1 className="home-greeting">
+          Welcome back, {profile.display_name}
+        </h1>
         <p className="home-subtitle">
           Pick up where you left off, or jump into something new.
         </p>
         <Link to={ROUTES.feed} className="home-start-btn">
           ▶ Start playing
         </Link>
-      </section>
-
-      <section aria-label="Your game activity" className="home-stats">
-        {loading ? (
-          <p className="profile-empty">Loading your stats…</p>
-        ) : (
-          <div className="home-stats-grid">
-            <HomeStat value={String(stats.gamesPlayed)} label="Games played" tone="visual_attention" />
-            <HomeStat value={formatAccuracy(stats.accuracy)} label="Accuracy" tone="logical_reasoning" />
-            <HomeStat value={String(stats.bestStreak)} label="Best streak" tone="cognitive_flexibility" />
-            <HomeStat value={String(stats.totalPoints)} label="Total points" tone="processing_speed" />
+        {!loading && (
+          <div className="home-stat-strip" aria-label="Your game activity">
+            <StatChip icon="🎮" value={String(stats.gamesPlayed)} label="Games played" />
+            <StatChip icon="🎯" value={formatAccuracy(stats.accuracy)} label="Accuracy" />
+            <StatChip icon="🔥" value={String(stats.bestStreak)} label="Best streak" />
+            <StatChip icon="⭐" value={String(stats.totalPoints)} label="Total points" />
           </div>
         )}
       </section>
@@ -179,6 +249,7 @@ export default function HomePage({
               className="home-game-tile"
               style={{
                 ['--tile-accent' as string]: resolveCategoryTheme(game.category).accent,
+                ['--tile-deep' as string]: resolveCategoryTheme(game.category).accentDeep,
                 ['--tile-tint' as string]: resolveCategoryTheme(game.category).accentTint,
               }}
             >
@@ -194,6 +265,9 @@ export default function HomePage({
               <span className="home-game-meta">
                 {categoryLabel(game.category)} · ~{game.estimatedSeconds}s
               </span>
+              <span className="home-game-play" aria-hidden="true">
+                Play ▸
+              </span>
             </Link>
           ))}
         </div>
@@ -202,21 +276,23 @@ export default function HomePage({
   );
 }
 
-function HomeStat({
+/** A compact inline stat chip (slim strip, distinct from the profile's card grid). */
+function StatChip({
+  icon,
   value,
   label,
-  tone,
 }: {
+  icon: string;
   value: string;
   label: string;
-  /** Category id whose accent tints the card; cosmetic only. */
-  tone: string;
 }) {
-  const accent = resolveCategoryTheme(tone).accent;
   return (
-    <div className="home-stat" style={{ ['--stat-accent' as string]: accent }}>
-      <span className="home-stat__value">{value}</span>
-      <span className="home-stat__label">{label}</span>
-    </div>
+    <span className="home-stat-chip">
+      <span className="home-stat-chip__icon" aria-hidden="true">
+        {icon}
+      </span>
+      <span className="home-stat-chip__value">{value}</span>
+      <span className="home-stat-chip__label">{label}</span>
+    </span>
   );
 }

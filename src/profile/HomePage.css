@@ -1,19 +1,23 @@
 /**
  * Home / Discover landing styles (accounts pivot). Token-driven (no scattered
- * hex), mobile-first, scrollable. Mirrors the visual language of the auth screens
- * and feed: dark surfaces, category-accent tints, pill buttons.
+ * hex), mobile-first, scrollable. Deliberately distinct from the /you profile:
+ * a stories rail, a bold gradient hero, a slim inline stat strip, and accent-
+ * gradient game tiles — not the profile's bordered stat-card grid.
  */
 .home-page {
   min-height: 100dvh;
   box-sizing: border-box;
-  background: var(--color-bg);
+  background:
+    radial-gradient(90% 60% at 100% -10%, rgba(108, 123, 255, 0.16), transparent 70%),
+    radial-gradient(70% 50% at -10% 0%, rgba(63, 214, 201, 0.1), transparent 70%),
+    var(--color-bg);
   color: var(--color-text);
   padding: calc(var(--safe-top) + var(--space-3)) var(--space-3)
-    calc(var(--safe-bottom) + var(--space-5));
+    calc(var(--safe-bottom) + var(--space-6));
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-  max-width: 640px;
+  gap: var(--space-5);
+  max-width: 680px;
   margin: 0 auto;
 }
 
@@ -99,33 +103,159 @@
   border: 1px solid var(--color-border);
 }
 
-/* Hero: greeting + primary CTA into the feed. */
+/* Section titles. */
+.home-section-title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-muted);
+}
+
+/* ---- Recent activity (stories rail) ------------------------------------- */
+.home-activity {
+  margin: 0;
+}
+
+.home-stories {
+  display: flex;
+  gap: var(--space-3);
+  overflow-x: auto;
+  padding-bottom: var(--space-2);
+  scrollbar-width: none;
+  scroll-snap-type: x proximity;
+}
+
+.home-stories::-webkit-scrollbar {
+  display: none;
+}
+
+.home-story {
+  flex: 0 0 auto;
+  width: 68px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  text-decoration: none;
+  color: var(--color-text-muted);
+  scroll-snap-align: start;
+}
+
+/* The Instagram-style gradient ring around each avatar. */
+.home-story__ring {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  border-radius: var(--radius-pill);
+  padding: 2px;
+  background: conic-gradient(
+    from 210deg,
+    var(--cat-processing_speed),
+    var(--cat-cognitive_flexibility),
+    var(--cat-visual_attention),
+    var(--color-accent),
+    var(--cat-processing_speed)
+  );
+}
+
+.home-story__avatar {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  object-fit: cover;
+  background: var(--color-surface-raised);
+  border: 2px solid var(--color-bg);
+  color: var(--color-text);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-md);
+}
+
+.home-story__badge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.home-story__badge[data-kind='like'] {
+  color: #ff6b88;
+}
+
+.home-story__name {
+  max-width: 100%;
+  font-size: var(--font-size-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-story:hover .home-story__name,
+.home-story:focus-visible .home-story__name {
+  color: var(--color-text);
+}
+
+/* ---- Hero --------------------------------------------------------------- */
 .home-hero {
+  position: relative;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  padding: var(--space-4);
+  padding: var(--space-5) var(--space-4);
   border-radius: var(--radius-lg);
-  background:
-    radial-gradient(120% 140% at 0% 0%, rgba(108, 123, 255, 0.18), transparent 60%),
-    var(--color-surface);
+  background: linear-gradient(150deg, #20253d 0%, #171a26 55%, var(--color-surface) 100%);
   border: 1px solid var(--color-border);
 }
 
+.home-hero__glow {
+  position: absolute;
+  inset: -40% 30% auto -10%;
+  height: 220px;
+  background: radial-gradient(circle, rgba(108, 123, 255, 0.35), transparent 65%);
+  filter: blur(8px);
+  pointer-events: none;
+}
+
+.home-hero__eyebrow {
+  position: relative;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-accent);
+}
+
 .home-greeting {
+  position: relative;
   margin: 0;
   font-size: var(--font-size-xl);
   font-weight: var(--font-weight-bold);
-  line-height: 1.15;
+  line-height: 1.12;
 }
 
 .home-subtitle {
+  position: relative;
   margin: 0;
   color: var(--color-text-muted);
   font-size: var(--font-size-md);
 }
 
 .home-start-btn {
+  position: relative;
   align-self: flex-start;
   text-decoration: none;
   background: linear-gradient(135deg, var(--color-accent), #4f5dff);
@@ -134,6 +264,7 @@
   padding: var(--space-3) var(--space-5);
   font-weight: var(--font-weight-bold);
   font-size: var(--font-size-md);
+  box-shadow: 0 8px 24px rgba(79, 93, 255, 0.35);
 }
 
 .home-start-btn:hover,
@@ -142,52 +273,43 @@
   outline: none;
 }
 
-/* Stats snapshot. */
-.home-section-title {
-  margin: 0 0 var(--space-3);
-  font-size: var(--font-size-md);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text-muted);
-}
-
-.home-stats-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--space-2);
-}
-
-@media (min-width: 480px) {
-  .home-stats-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
-}
-
-.home-stat {
+/* Slim inline stat strip — distinct from the profile's stat-card grid. */
+.home-stat-strip {
+  position: relative;
   display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--space-3);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-top: 2px solid var(--stat-accent, var(--color-accent));
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
 }
 
-.home-stat__value {
-  font-size: var(--font-size-lg);
+.home-stat-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--color-border);
+}
+
+.home-stat-chip__icon {
+  font-size: var(--font-size-sm);
+}
+
+.home-stat-chip__value {
   font-weight: var(--font-weight-bold);
 }
 
-.home-stat__label {
+.home-stat-chip__label {
   font-size: var(--font-size-sm);
   color: var(--color-text-muted);
 }
 
-/* Featured games grid. */
+/* ---- Featured games ----------------------------------------------------- */
 .home-featured-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: var(--space-2);
+  gap: var(--space-3);
 }
 
 @media (min-width: 480px) {
@@ -197,30 +319,35 @@
 }
 
 .home-game-tile {
+  position: relative;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
   padding: var(--space-3);
+  min-height: 124px;
   border-radius: var(--radius-md);
   text-decoration: none;
   color: var(--color-text);
-  background: linear-gradient(160deg, var(--tile-tint, transparent), var(--color-surface));
+  background: linear-gradient(160deg, var(--tile-tint, transparent), var(--color-surface) 70%);
   border: 1px solid var(--color-border);
+  transition: transform 0.12s ease, border-color 0.12s ease;
 }
 
 .home-game-tile:hover,
 .home-game-tile:focus-visible {
   border-color: var(--tile-accent, var(--color-accent));
+  transform: translateY(-2px);
   outline: none;
 }
 
 .home-game-monogram {
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   border-radius: var(--radius-sm);
-  background: var(--tile-accent, var(--color-accent));
+  background: linear-gradient(135deg, var(--tile-accent, var(--color-accent)), var(--tile-deep, #4f5dff));
   color: var(--color-accent-on, #0b0b0f);
   font-weight: var(--font-weight-bold);
   font-size: var(--font-size-sm);
@@ -233,4 +360,11 @@
 .home-game-meta {
   font-size: var(--font-size-sm);
   color: var(--color-text-muted);
+}
+
+.home-game-play {
+  margin-top: auto;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--tile-accent, var(--color-accent));
 }
