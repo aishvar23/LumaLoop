@@ -64,7 +64,9 @@ export type TemplateType =
   | 'signal_set'
   | 'circuit_flow'
   | 'word_unscramble'
-  | 'quick_math';
+  | 'quick_math'
+  | 'color_word'
+  | 'n_back';
 
 export type Difficulty =
   | 'extremely_easy'
@@ -534,6 +536,119 @@ export type QuickMathCard = LiquidCardBase & {
 };
 
 /**
+ * One trial in a {@link ColorWordCard} stream. A color WORD (`word`, e.g.
+ * "RED") is rendered in an `ink` color that is usually MISMATCHED. The player
+ * must respond to the INK, not the word — picking the swatch whose `colorId`
+ * equals `inkColorId`. `congruent` records whether the word and ink agree (the
+ * easy trials) vs disagree (the interfering ones); the evaluator splits accuracy
+ * by it. Authored trial ids are stable, unique-within-a-card slugs.
+ */
+export type ColorWordTrial = {
+  /** Stable id for this trial (unique within the card). */
+  id: string;
+  /** The color word shown as TEXT, e.g. "RED" — what the player must IGNORE. */
+  word: string;
+  /**
+   * The id (into the card's `colors`) of the INK the word is drawn in — the
+   * correct response. This is the answer key for the trial.
+   */
+  inkColorId: string;
+  /**
+   * True iff the word names the same color as its ink (a congruent trial); false
+   * for the interfering, mismatched trials. Pure metadata for accuracy splits —
+   * the evaluator recomputes correctness from `inkColorId`, never from this.
+   */
+  congruent: boolean;
+};
+
+/**
+ * A selectable color swatch. `id` is referenced by a trial's `inkColorId` and by
+ * the player's pick; `label` is the accessible name (e.g. "Red"); `hex` is the
+ * swatch fill the renderer paints. Color is never the sole signal — the swatch
+ * label carries the meaning (Design §7 accessibility).
+ */
+export type ColorWordSwatch = {
+  id: string;
+  label: string;
+  hex: string;
+};
+
+/**
+ * Stroop-style interference: respond to the INK a color word is printed in, not
+ * the word itself — a short timed SERIES of trials (cognitive_flexibility).
+ *
+ * The renderer streams `trials` one at a time. Each trial shows `word` painted in
+ * the ink named by `trial.inkColorId`; the player taps the swatch (from `colors`)
+ * matching that INK. The pure {@link evaluateColorWord} is the single source of
+ * truth: it knows the correct ink per trial and scores accuracy, the
+ * congruent/incongruent split, false taps (wrong swatch), and timing. The stream
+ * playback gates on `isActive` so a pre-mounted off-screen card never elapses
+ * before the user swipes to it; `config.timeLimitMs` bounds the measured stream.
+ */
+export type ColorWordCard = LiquidCardBase & {
+  templateType: 'color_word';
+  config: {
+    /** The selectable color swatches (the response options). Length 2–6. */
+    colors: ReadonlyArray<ColorWordSwatch>;
+    /**
+     * The ordered Stroop trials. Each names the ink to respond to. Length 4–12;
+     * every `inkColorId` must be one of `colors` (enforced by validation).
+     */
+    trials: ReadonlyArray<ColorWordTrial>;
+    /** How long each trial stays on screen, in ms (renderer-owned cadence). */
+    trialDurationMs: number;
+    /** Blank gap between consecutive trials, in ms. */
+    interTrialGapMs: number;
+    /** Countdown for the whole measured stream (5–30s; see validation). */
+    timeLimitMs: number;
+  };
+};
+
+/** The kind of item streamed by an {@link NBackCard}. */
+export type NBackItemKind = 'letter' | 'shape' | 'position';
+
+/**
+ * Present a timed STREAM of items; flag each one that matches the item N steps
+ * back — a working-memory mechanic (working_memory).
+ *
+ * The renderer streams `stream` (display tokens) one at a time at the configured
+ * cadence; the player taps MATCH on any item equal to the one `n` positions
+ * earlier. The config is FULLY SPECIFYING and self-consistent: `matchIndices`
+ * lists exactly the positions `i` where `stream[i] === stream[i - n]` (the answer
+ * key), so the pure {@link evaluateNBack} is deterministic. The evaluator is the
+ * single source of truth — from the stream + `n` it derives the true match set
+ * and scores the player's flags into hits / misses / false-alarms, validation
+ * proves `matchIndices` equals the derived set. Playback gates on `isActive`;
+ * `config.timeLimitMs` bounds the measured stream.
+ */
+export type NBackCard = LiquidCardBase & {
+  templateType: 'n_back';
+  config: {
+    /** What the stream items represent (drives the renderer's presentation). */
+    itemKind: NBackItemKind;
+    /**
+     * The ordered stream of display tokens (letters, shape glyphs, or position
+     * labels). Length 5–16. Two items "match" iff their tokens are equal.
+     */
+    stream: ReadonlyArray<string>;
+    /** How many steps back a match is measured against (1 or 2). */
+    n: number;
+    /**
+     * The answer key: the sorted, ascending positions `i` (i >= n) where
+     * `stream[i] === stream[i - n]`. Validation proves it equals the set the
+     * evaluator derives from `stream` + `n`, so a mis-authored key is rejected.
+     */
+    matchIndices: ReadonlyArray<number>;
+    /** How long each item stays on screen, in ms (renderer-owned cadence). */
+    itemDurationMs: number;
+    /** Blank gap between consecutive items, in ms. */
+    interItemGapMs: number;
+    /** Countdown for the whole measured stream (5–30s; see validation). */
+    timeLimitMs: number;
+  };
+};
+
+/**
  * The discriminated union of every card. Narrow on `templateType` to access a
  * card's typed `config`. Adding a template means adding a member here (step 2).
  */
@@ -550,7 +665,9 @@ export type LiquidCard =
   | SignalSetCard
   | CircuitFlowCard
   | WordUnscrambleCard
-  | QuickMathCard;
+  | QuickMathCard
+  | ColorWordCard
+  | NBackCard;
 
 /**
  * The categories each template is allowed to map to (Technical Design §11).
@@ -609,4 +726,16 @@ export const templateCategoryMap: Readonly<
   // expression. That maps to logical_reasoning (the same category as the other
   // deductive mechanics) — no new ChallengeCategory is warranted.
   quick_math: Object.freeze(['logical_reasoning'] as const),
+  // color_word is Stroop interference: suppress the (automatic) word-reading
+  // response and respond to the ink instead — squarely cognitive_flexibility
+  // (the same category as rule_flip), with processing_speed for the timed
+  // stream. No new ChallengeCategory is warranted.
+  color_word: Object.freeze([
+    'cognitive_flexibility',
+    'processing_speed',
+  ] as const),
+  // n_back holds the last N items in mind and compares each new item against
+  // them — the canonical working_memory task (the same category as
+  // memory_sequence). No new ChallengeCategory is warranted.
+  n_back: Object.freeze(['working_memory'] as const),
 }) satisfies Readonly<Record<TemplateType, readonly ChallengeCategory[]>>;

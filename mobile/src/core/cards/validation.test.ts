@@ -21,16 +21,18 @@ import {
   type ChallengeCategory,
   type CodeBreakCard,
   type CircuitFlowCard,
+  type ColorWordCard,
   type LiquidCard,
   type MemorySequenceCard,
+  type NBackCard,
   type PatternChainCard,
   type PrismPathCard,
   type PuzzleDna,
   type RuleFlipCard,
   type SignalSetCard,
-  type QuickMathCard,
   type SpotItCard,
   type StepLogicCard,
+  type QuickMathCard,
   type TemplateType,
   type TinyLogicCard,
   type WhatChangedCard,
@@ -482,6 +484,63 @@ function validQuickMath(): QuickMathCard {
   };
 }
 
+function validColorWord(): ColorWordCard {
+  return {
+    cardId: 'colorword-1',
+    creatorHandle: '@test',
+    templateType: 'color_word',
+    category: 'cognitive_flexibility',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 14,
+    prompt: 'Tap the colour the word is printed in.',
+    puzzleDna: dna('stroop-interference'),
+    explanation: { title: 'Ink over word', body: 'Answer the ink colour.' },
+    config: {
+      colors: [
+        { id: 'red', label: 'Red', hex: '#e5484d' },
+        { id: 'blue', label: 'Blue', hex: '#3e63dd' },
+        { id: 'green', label: 'Green', hex: '#46a758' },
+      ],
+      trials: [
+        { id: 't0', word: 'RED', inkColorId: 'red', congruent: true },
+        { id: 't1', word: 'BLUE', inkColorId: 'green', congruent: false },
+        { id: 't2', word: 'GREEN', inkColorId: 'red', congruent: false },
+        { id: 't3', word: 'BLUE', inkColorId: 'blue', congruent: true },
+      ],
+      trialDurationMs: 2000,
+      interTrialGapMs: 300,
+      timeLimitMs: 16000,
+    },
+  };
+}
+
+function validNBack(): NBackCard {
+  return {
+    cardId: 'nback-1',
+    creatorHandle: '@test',
+    templateType: 'n_back',
+    category: 'working_memory',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 18,
+    prompt: 'Flag each letter that repeats the one just before it.',
+    puzzleDna: dna('n-back'),
+    explanation: { title: '1-back', body: 'Match the item one step back.' },
+    config: {
+      itemKind: 'letter',
+      stream: ['A', 'B', 'B', 'C', 'D', 'D', 'E'],
+      n: 1,
+      matchIndices: [2, 5],
+      itemDurationMs: 1600,
+      interItemGapMs: 400,
+      timeLimitMs: 18000,
+    },
+  };
+}
+
 function validCatalog(): LiquidCard[] {
   return [
     validSpotIt(),
@@ -495,6 +554,8 @@ function validCatalog(): LiquidCard[] {
     validPrismPath(),
     validSignalSet(),
     validCircuitFlow(),
+    validColorWord(),
+    validNBack(),
   ];
 }
 
@@ -1254,6 +1315,8 @@ const ALL_TEMPLATE_TYPES: TemplateType[] = [
   'circuit_flow',
   'word_unscramble',
   'quick_math',
+  'color_word',
+  'n_back',
 ];
 
 const ALL_CATEGORIES: ChallengeCategory[] = [
@@ -1280,6 +1343,8 @@ const validCardFor: Record<TemplateType, () => LiquidCard> = {
   circuit_flow: validCircuitFlow,
   word_unscramble: validWordUnscramble,
   quick_math: validQuickMath,
+  color_word: validColorWord,
+  n_back: validNBack,
 };
 
 describe('templateCategoryMap <-> validation consistency', () => {
@@ -1366,7 +1431,7 @@ describe('word_unscramble answer validation', () => {
 
   it('rejects a correct option whose label is not the answer', () => {
     const card = validWordUnscramble();
-    card.config = { ...card.config, correctOptionId: 'b' };
+    card.config = { ...card.config, correctOptionId: 'b' }; // label "store" != answer
     expect(validateCatalog([card]).valid).toBe(false);
   });
 
@@ -1384,6 +1449,7 @@ describe('quick_math answer validation', () => {
 
   it('rejects a correct option whose value does not equal the computed result', () => {
     const card = validQuickMath();
+    // Computed = 31; point correct at the wrong value.
     card.config = { ...card.config, correctOptionId: 'b' };
     const result = validateCatalog([card]);
     expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
@@ -1409,6 +1475,108 @@ describe('quick_math answer validation', () => {
         { id: 'b', label: '31', value: 31 },
         { id: 'c', label: '30', value: 30 },
       ],
+    };
+    expect(validateCatalog([card]).valid).toBe(false);
+  });
+});
+
+describe('color_word answer validation', () => {
+  it('accepts a well-formed card', () => {
+    expect(validateCatalog([validColorWord()]).valid).toBe(true);
+  });
+
+  it('rejects a trial whose inkColorId is not a defined color', () => {
+    const card = validColorWord();
+    card.config = {
+      ...card.config,
+      trials: [
+        ...card.config.trials.slice(0, 3),
+        { id: 't3', word: 'BLUE', inkColorId: 'purple', congruent: false },
+      ],
+    };
+    const result = validateCatalog([card]);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('rejects too few trials', () => {
+    const card = validColorWord();
+    card.config = { ...card.config, trials: card.config.trials.slice(0, 2) };
+    expect(validateCatalog([card]).valid).toBe(false);
+  });
+
+  it('rejects duplicate color ids', () => {
+    const card = validColorWord();
+    card.config = {
+      ...card.config,
+      colors: [
+        { id: 'red', label: 'Red', hex: '#e5484d' },
+        { id: 'red', label: 'Crimson', hex: '#c00' },
+      ],
+    };
+    expect(validateCatalog([card]).valid).toBe(false);
+  });
+
+  it('rejects a color swatch missing its label (colour is never the sole signal)', () => {
+    const card = validColorWord();
+    card.config = {
+      ...card.config,
+      colors: [
+        { id: 'red', label: '', hex: '#e5484d' },
+        { id: 'blue', label: 'Blue', hex: '#3e63dd' },
+        { id: 'green', label: 'Green', hex: '#46a758' },
+      ],
+    };
+    expect(validateCatalog([card]).valid).toBe(false);
+  });
+});
+
+describe('n_back answer validation', () => {
+  it('accepts a well-formed card', () => {
+    expect(validateCatalog([validNBack()]).valid).toBe(true);
+  });
+
+  it('accepts a 2-back card with a derived match set', () => {
+    const card = validNBack();
+    card.config = {
+      ...card.config,
+      stream: ['F', 'K', 'F', 'M', 'K', 'P', 'M', 'P'],
+      n: 2,
+      matchIndices: [2, 7],
+    };
+    expect(validateCatalog([card]).valid).toBe(true);
+  });
+
+  it('rejects matchIndices that disagree with the derived match set', () => {
+    const card = validNBack();
+    // Derived for this stream/n is [2, 5]; claim a wrong set.
+    card.config = { ...card.config, matchIndices: [2, 3] };
+    const result = validateCatalog([card]);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('rejects a matchIndex inside the first-n window', () => {
+    const card = validNBack();
+    card.config = { ...card.config, matchIndices: [0, 2, 5] };
+    expect(validateCatalog([card]).valid).toBe(false);
+  });
+
+  it('rejects an out-of-range n', () => {
+    const card = validNBack();
+    card.config = { ...card.config, n: 3, matchIndices: [] };
+    expect(validateCatalog([card]).valid).toBe(false);
+  });
+
+  it('rejects a stream shorter than the minimum', () => {
+    const card = validNBack();
+    card.config = {
+      ...card.config,
+      stream: ['A', 'A'],
+      n: 1,
+      matchIndices: [1],
     };
     expect(validateCatalog([card]).valid).toBe(false);
   });

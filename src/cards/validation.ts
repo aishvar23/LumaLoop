@@ -21,7 +21,9 @@ import {
   templateCategoryMap,
   type CodeBreakCard,
   type CircuitFlowCard,
+  type ColorWordCard,
   type EvidenceTier,
+  type NBackCard,
   type LiquidCard,
   type MemorySequenceCard,
   type PatternChainCard,
@@ -48,6 +50,7 @@ import {
 import { isValidSignalTrio } from '../templates/signalSet/signalSetEvaluator';
 import { isValidUnscramble } from '../templates/wordUnscramble/wordUnscrambleEvaluator';
 import { computeQuickMath } from '../templates/quickMath/quickMathEvaluator';
+import { matchIndicesAreConsistent } from '../templates/nBack/nBackEvaluator';
 
 /** Inclusive lower bound for any template's `config.timeLimitMs` (5 seconds). */
 export const MIN_TIME_LIMIT_MS = 5000;
@@ -131,6 +134,8 @@ const templateAnswerValidators: {
   circuit_flow: validateCircuitFlowAnswer,
   word_unscramble: validateWordUnscrambleAnswer,
   quick_math: validateQuickMathAnswer,
+  color_word: validateColorWordAnswer,
+  n_back: validateNBackAnswer,
 };
 
 /**
@@ -1141,6 +1146,169 @@ function validateQuickMathAnswer(card: QuickMathCard): ValidationError[] {
       answerError(
         card.cardId,
         `quick_math has ${matching.length} options equal to the computed result (must be exactly one)`,
+      ),
+    );
+  }
+
+  return errors;
+}
+
+/** Inclusive bounds for a color_word's swatch (response option) count. */
+export const MIN_COLOR_WORD_COLORS = 2;
+export const MAX_COLOR_WORD_COLORS = 6;
+/** Inclusive bounds for a color_word's number of trials. */
+export const MIN_COLOR_WORD_TRIALS = 4;
+export const MAX_COLOR_WORD_TRIALS = 12;
+
+function validateColorWordAnswer(card: ColorWordCard): ValidationError[] {
+  const { colors, trials } = card.config;
+  const errors: ValidationError[] = [];
+
+  if (
+    colors.length < MIN_COLOR_WORD_COLORS ||
+    colors.length > MAX_COLOR_WORD_COLORS
+  ) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `color_word color count ${colors.length} is outside [${MIN_COLOR_WORD_COLORS}, ${MAX_COLOR_WORD_COLORS}]`,
+      ),
+    );
+  }
+  const colorIds = colors.map((color) => color.id);
+  if (
+    new Set(colorIds).size !== colorIds.length ||
+    colorIds.some((id) => id.trim().length === 0)
+  ) {
+    errors.push(
+      answerError(card.cardId, 'color_word color ids must be unique and non-empty'),
+    );
+  }
+  if (
+    colors.some(
+      (color) =>
+        typeof color.label !== 'string' || color.label.trim().length === 0,
+    )
+  ) {
+    errors.push(
+      answerError(
+        card.cardId,
+        'color_word colors must each have a non-empty label (color is never the sole signal)',
+      ),
+    );
+  }
+
+  if (
+    trials.length < MIN_COLOR_WORD_TRIALS ||
+    trials.length > MAX_COLOR_WORD_TRIALS
+  ) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `color_word trial count ${trials.length} is outside [${MIN_COLOR_WORD_TRIALS}, ${MAX_COLOR_WORD_TRIALS}]`,
+      ),
+    );
+  }
+
+  const colorIdSet = new Set(colorIds);
+  const trialIds = trials.map((trial) => trial.id);
+  if (
+    new Set(trialIds).size !== trialIds.length ||
+    trialIds.some((id) => id.trim().length === 0)
+  ) {
+    errors.push(
+      answerError(card.cardId, 'color_word trial ids must be unique and non-empty'),
+    );
+  }
+
+  trials.forEach((trial, index) => {
+    if (typeof trial.word !== 'string' || trial.word.trim().length === 0) {
+      errors.push(
+        answerError(card.cardId, `color_word trial ${index} has an empty word`),
+      );
+    }
+    if (!colorIdSet.has(trial.inkColorId)) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `color_word trial ${index} inkColorId "${trial.inkColorId}" is not a defined color`,
+        ),
+      );
+    }
+  });
+
+  return errors;
+}
+
+/** Inclusive bounds for an n_back's stream length, in items. */
+export const MIN_NBACK_STREAM = 5;
+export const MAX_NBACK_STREAM = 16;
+/** Allowed N values for n_back (1 or 2, per the difficulty ramp). */
+export const ALLOWED_NBACK_N: readonly number[] = [1, 2];
+
+function validateNBackAnswer(card: NBackCard): ValidationError[] {
+  const { stream, n, matchIndices } = card.config;
+  const errors: ValidationError[] = [];
+
+  if (stream.length < MIN_NBACK_STREAM || stream.length > MAX_NBACK_STREAM) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `n_back stream length ${stream.length} is outside [${MIN_NBACK_STREAM}, ${MAX_NBACK_STREAM}]`,
+      ),
+    );
+  }
+  if (
+    stream.some((item) => typeof item !== 'string' || item.length === 0)
+  ) {
+    errors.push(
+      answerError(card.cardId, 'n_back stream items must be non-empty strings'),
+    );
+  }
+  if (!ALLOWED_NBACK_N.includes(n)) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `n_back n ${n} is not allowed (must be one of ${ALLOWED_NBACK_N.join(', ')})`,
+      ),
+    );
+  }
+
+  // matchIndices must be in-bounds (>= n, < length); the authored key is then
+  // cross-checked against the truth derived from the stream + n.
+  matchIndices.forEach((matchIndex, position) => {
+    if (
+      !Number.isInteger(matchIndex) ||
+      matchIndex < n ||
+      matchIndex >= stream.length
+    ) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `n_back matchIndices[${position}] ${matchIndex} is outside the scorable window [${n}, ${stream.length - 1}]`,
+        ),
+      );
+    }
+  });
+
+  // Only cross-check the authored key once the structure is sound (otherwise the
+  // derived set would be compared against an obviously-malformed authored list).
+  if (errors.length === 0 && !matchIndicesAreConsistent(card.config)) {
+    errors.push(
+      answerError(
+        card.cardId,
+        'n_back matchIndices do not match the positions derived from the stream and n',
+      ),
+    );
+  }
+
+  // The pre-match window (the first n items) must exist for the puzzle to make
+  // sense — n must leave at least one scorable position.
+  if (errors.length === 0 && stream.length <= n) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `n_back stream length ${stream.length} leaves no scorable position for n=${n}`,
       ),
     );
   }

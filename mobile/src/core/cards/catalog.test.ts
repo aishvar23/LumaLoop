@@ -46,9 +46,9 @@ describe('authored card catalog', () => {
     expect(result.valid).toBe(true);
   });
 
-  it('contains 20-120 cards total', () => {
+  it('contains 20-150 cards total', () => {
     expect(catalog.length).toBeGreaterThanOrEqual(20);
-    expect(catalog.length).toBeLessThanOrEqual(120);
+    expect(catalog.length).toBeLessThanOrEqual(150);
   });
 
   it('has at least 5 cards for every template', () => {
@@ -66,6 +66,8 @@ describe('authored card catalog', () => {
       'circuit_flow',
       'word_unscramble',
       'quick_math',
+      'color_word',
+      'n_back',
     ];
     for (const template of templates) {
       const count = catalog.filter(
@@ -89,6 +91,8 @@ describe('authored card catalog', () => {
       'circuit_flow',
       'word_unscramble',
       'quick_math',
+      'color_word',
+      'n_back',
     ];
     const hardCount = catalog.filter(
       (card) => card.difficulty === 'hard',
@@ -134,6 +138,8 @@ describe('authored card catalog', () => {
       'circuit_flow',
       'word_unscramble',
       'quick_math',
+      'color_word',
+      'n_back',
     ];
     for (const template of templates) {
       const perTemplate = new Set(

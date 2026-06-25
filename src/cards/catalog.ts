@@ -28,7 +28,9 @@
 import type {
   CircuitFlowCard,
   CodeBreakCard,
+  ColorWordCard,
   LiquidCard,
+  NBackCard,
   MemorySequenceCard,
   PatternChainCard,
   PrismPathCard,
@@ -4497,6 +4499,434 @@ const quickMathCards: QuickMathCard[] = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// color_word — Stroop interference: respond to the INK a colour word is printed
+// in, NOT the word. A short timed SERIES of trials (congruent vs incongruent).
+// Categories allowed: cognitive_flexibility | processing_speed. The evaluator is
+// the answer key (the ink colour per trial). Swatch fills are authored content
+// (the puzzle is about colour); every swatch carries a LABEL so colour is never
+// the sole signal (Design §7). Copy stays playful, non-clinical.
+// ---------------------------------------------------------------------------
+
+// Shared swatch palettes (authored content — the Stroop inks).
+const CW_THREE = [
+  { id: 'red', label: 'Red', hex: '#e5484d' },
+  { id: 'blue', label: 'Blue', hex: '#3e63dd' },
+  { id: 'green', label: 'Green', hex: '#46a758' },
+] as const;
+const CW_FOUR = [
+  { id: 'red', label: 'Red', hex: '#e5484d' },
+  { id: 'blue', label: 'Blue', hex: '#3e63dd' },
+  { id: 'green', label: 'Green', hex: '#46a758' },
+  { id: 'yellow', label: 'Yellow', hex: '#f0c000' },
+] as const;
+
+const colorWordCards: ColorWordCard[] = [
+  {
+    cardId: 'colorword-001',
+    creatorHandle: '@hueloop',
+    templateType: 'color_word',
+    category: 'cognitive_flexibility',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 14,
+    prompt: 'Tap the colour each word is printed in.',
+    puzzleDna: {
+      mechanic: 'stroop-interference',
+      inputMode: 'tap',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'Ink over word',
+      body: 'Each answer is the colour the word is printed in. When the word and ink disagree, the word tries to pull you the wrong way.',
+    },
+    shareText: 'Beat the colour words at their own game.',
+    config: {
+      colors: [...CW_THREE],
+      trials: [
+        { id: 't0', word: 'RED', inkColorId: 'red', congruent: true },
+        { id: 't1', word: 'BLUE', inkColorId: 'green', congruent: false },
+        { id: 't2', word: 'GREEN', inkColorId: 'red', congruent: false },
+        { id: 't3', word: 'BLUE', inkColorId: 'blue', congruent: true },
+        { id: 't4', word: 'RED', inkColorId: 'green', congruent: false },
+      ],
+      trialDurationMs: 2500,
+      interTrialGapMs: 350,
+      timeLimitMs: 16000,
+    },
+  },
+  {
+    cardId: 'colorword-002',
+    creatorHandle: '@hueloop',
+    templateType: 'color_word',
+    category: 'processing_speed',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 16,
+    prompt: 'Tap the colour each word is printed in.',
+    puzzleDna: {
+      mechanic: 'stroop-interference',
+      inputMode: 'tap',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'Read the ink, not the word',
+      body: 'Every trial here is mismatched, so the fast move is to look only at the colour and ignore what the word says.',
+    },
+    config: {
+      colors: [...CW_THREE],
+      trials: [
+        { id: 't0', word: 'GREEN', inkColorId: 'red', congruent: false },
+        { id: 't1', word: 'RED', inkColorId: 'blue', congruent: false },
+        { id: 't2', word: 'BLUE', inkColorId: 'green', congruent: false },
+        { id: 't3', word: 'GREEN', inkColorId: 'blue', congruent: false },
+        { id: 't4', word: 'RED', inkColorId: 'green', congruent: false },
+        { id: 't5', word: 'BLUE', inkColorId: 'red', congruent: false },
+      ],
+      trialDurationMs: 2200,
+      interTrialGapMs: 300,
+      timeLimitMs: 18000,
+    },
+  },
+  {
+    cardId: 'colorword-003',
+    creatorHandle: '@tintandtone',
+    templateType: 'color_word',
+    category: 'cognitive_flexibility',
+    difficulty: 'hard',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 20,
+    prompt: 'Tap the colour each word is printed in.',
+    puzzleDna: {
+      mechanic: 'stroop-interference',
+      inputMode: 'tap',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'Four colours, faster pace',
+      body: 'With four swatches and a quicker stream, the mismatched trials need a steady focus on the ink alone.',
+    },
+    config: {
+      colors: [...CW_FOUR],
+      trials: [
+        { id: 't0', word: 'YELLOW', inkColorId: 'blue', congruent: false },
+        { id: 't1', word: 'RED', inkColorId: 'yellow', congruent: false },
+        { id: 't2', word: 'GREEN', inkColorId: 'green', congruent: true },
+        { id: 't3', word: 'BLUE', inkColorId: 'red', congruent: false },
+        { id: 't4', word: 'YELLOW', inkColorId: 'green', congruent: false },
+        { id: 't5', word: 'RED', inkColorId: 'blue', congruent: false },
+        { id: 't6', word: 'GREEN', inkColorId: 'yellow', congruent: false },
+      ],
+      trialDurationMs: 1900,
+      interTrialGapMs: 300,
+      timeLimitMs: 20000,
+    },
+  },
+  {
+    cardId: 'colorword-004',
+    creatorHandle: '@tintandtone',
+    templateType: 'color_word',
+    category: 'cognitive_flexibility',
+    difficulty: 'hard',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 22,
+    prompt: 'Tap the colour each word is printed in.',
+    puzzleDna: {
+      mechanic: 'stroop-interference',
+      inputMode: 'tap',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'All four, mostly mismatched',
+      body: 'Almost every word fights its ink here. Trust the colour you see, not the colour you read.',
+    },
+    config: {
+      colors: [...CW_FOUR],
+      trials: [
+        { id: 't0', word: 'BLUE', inkColorId: 'yellow', congruent: false },
+        { id: 't1', word: 'GREEN', inkColorId: 'red', congruent: false },
+        { id: 't2', word: 'YELLOW', inkColorId: 'red', congruent: false },
+        { id: 't3', word: 'RED', inkColorId: 'green', congruent: false },
+        { id: 't4', word: 'BLUE', inkColorId: 'blue', congruent: true },
+        { id: 't5', word: 'GREEN', inkColorId: 'yellow', congruent: false },
+        { id: 't6', word: 'YELLOW', inkColorId: 'blue', congruent: false },
+        { id: 't7', word: 'RED', inkColorId: 'yellow', congruent: false },
+      ],
+      trialDurationMs: 1800,
+      interTrialGapMs: 250,
+      timeLimitMs: 22000,
+    },
+  },
+  {
+    cardId: 'colorword-005',
+    creatorHandle: '@chromaqueue',
+    templateType: 'color_word',
+    category: 'processing_speed',
+    difficulty: 'extremely_hard',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 26,
+    prompt: 'Tap the colour each word is printed in.',
+    puzzleDna: {
+      mechanic: 'stroop-interference',
+      inputMode: 'tap',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'Fast and four-wide',
+      body: 'A long, rapid, mostly mismatched run. Keeping the word out of your decision is the whole challenge.',
+    },
+    config: {
+      colors: [...CW_FOUR],
+      trials: [
+        { id: 't0', word: 'RED', inkColorId: 'blue', congruent: false },
+        { id: 't1', word: 'YELLOW', inkColorId: 'green', congruent: false },
+        { id: 't2', word: 'BLUE', inkColorId: 'red', congruent: false },
+        { id: 't3', word: 'GREEN', inkColorId: 'yellow', congruent: false },
+        { id: 't4', word: 'RED', inkColorId: 'green', congruent: false },
+        { id: 't5', word: 'YELLOW', inkColorId: 'red', congruent: false },
+        { id: 't6', word: 'BLUE', inkColorId: 'yellow', congruent: false },
+        { id: 't7', word: 'GREEN', inkColorId: 'blue', congruent: false },
+        { id: 't8', word: 'YELLOW', inkColorId: 'blue', congruent: false },
+        { id: 't9', word: 'RED', inkColorId: 'yellow', congruent: false },
+      ],
+      trialDurationMs: 1500,
+      interTrialGapMs: 200,
+      timeLimitMs: 24000,
+    },
+  },
+  {
+    cardId: 'colorword-006',
+    creatorHandle: '@chromaqueue',
+    templateType: 'color_word',
+    category: 'cognitive_flexibility',
+    difficulty: 'extremely_hard',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 28,
+    prompt: 'Tap the colour each word is printed in.',
+    puzzleDna: {
+      mechanic: 'stroop-interference',
+      inputMode: 'tap',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'The full gauntlet',
+      body: 'Twelve fast trials, nearly all fighting the word. A clean run means you answered the ink every single time.',
+    },
+    config: {
+      colors: [...CW_FOUR],
+      trials: [
+        { id: 't0', word: 'GREEN', inkColorId: 'red', congruent: false },
+        { id: 't1', word: 'BLUE', inkColorId: 'yellow', congruent: false },
+        { id: 't2', word: 'RED', inkColorId: 'green', congruent: false },
+        { id: 't3', word: 'YELLOW', inkColorId: 'blue', congruent: false },
+        { id: 't4', word: 'GREEN', inkColorId: 'green', congruent: true },
+        { id: 't5', word: 'BLUE', inkColorId: 'red', congruent: false },
+        { id: 't6', word: 'RED', inkColorId: 'yellow', congruent: false },
+        { id: 't7', word: 'YELLOW', inkColorId: 'green', congruent: false },
+        { id: 't8', word: 'GREEN', inkColorId: 'blue', congruent: false },
+        { id: 't9', word: 'BLUE', inkColorId: 'green', congruent: false },
+        { id: 't10', word: 'RED', inkColorId: 'blue', congruent: false },
+        { id: 't11', word: 'YELLOW', inkColorId: 'red', congruent: false },
+      ],
+      trialDurationMs: 1500,
+      interTrialGapMs: 200,
+      timeLimitMs: 28000,
+    },
+  },
+];
+
+// ---------------------------------------------------------------------------
+// n_back — flag each streamed item that matches the one N steps back (N=1, 2).
+// Category allowed: working_memory. `matchIndices` is the answer key, but the
+// evaluator RE-DERIVES the truth from the stream + N; validation proves the two
+// agree. Stream playback is isActive-gated. Item glyphs are plain letters /
+// shapes / position labels (never colour-dependent). Copy stays playful.
+// ---------------------------------------------------------------------------
+
+const nBackCards: NBackCard[] = [
+  {
+    cardId: 'nback-001',
+    creatorHandle: '@recallrelay',
+    templateType: 'n_back',
+    category: 'working_memory',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 18,
+    prompt: 'Flag each letter that repeats the one just before it.',
+    puzzleDna: {
+      mechanic: 'n-back',
+      inputMode: 'tap',
+      measuredSignals: ['accuracy', 'working_memory_load', 'reaction_time'],
+    },
+    explanation: {
+      title: '1-back letters',
+      body: 'The matches are the second B (after the first B) and the second D — each repeats the letter immediately before it.',
+    },
+    shareText: 'Kept the whole stream in mind, one step back.',
+    config: {
+      itemKind: 'letter',
+      stream: ['A', 'B', 'B', 'C', 'D', 'D', 'E'],
+      n: 1,
+      matchIndices: [2, 5],
+      itemDurationMs: 1600,
+      interItemGapMs: 400,
+      timeLimitMs: 18000,
+    },
+  },
+  {
+    cardId: 'nback-002',
+    creatorHandle: '@recallrelay',
+    templateType: 'n_back',
+    category: 'working_memory',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 18,
+    prompt: 'Flag each shape that repeats the one just before it.',
+    puzzleDna: {
+      mechanic: 'n-back',
+      inputMode: 'tap',
+      measuredSignals: ['accuracy', 'working_memory_load', 'reaction_time'],
+    },
+    explanation: {
+      title: '1-back shapes',
+      body: 'The matches are the second square (right after the first square) and the second diamond at the end.',
+    },
+    config: {
+      itemKind: 'shape',
+      stream: ['●', '■', '■', '▲', '■', '◆', '◆'],
+      n: 1,
+      matchIndices: [2, 6],
+      itemDurationMs: 1600,
+      interItemGapMs: 400,
+      timeLimitMs: 18000,
+    },
+  },
+  {
+    cardId: 'nback-003',
+    creatorHandle: '@memolane',
+    templateType: 'n_back',
+    category: 'working_memory',
+    difficulty: 'hard',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 24,
+    prompt: 'Flag each letter that matches the one two steps back.',
+    puzzleDna: {
+      mechanic: 'n-back',
+      inputMode: 'tap',
+      measuredSignals: ['accuracy', 'working_memory_load', 'reaction_time'],
+    },
+    explanation: {
+      title: '2-back letters',
+      body: 'Compare each letter with the one two earlier: the F at position 3 matches the opening F, and the final P matches the P two before it.',
+    },
+    config: {
+      itemKind: 'letter',
+      stream: ['F', 'K', 'F', 'M', 'K', 'P', 'M', 'P'],
+      n: 2,
+      matchIndices: [2, 7],
+      itemDurationMs: 1500,
+      interItemGapMs: 400,
+      timeLimitMs: 22000,
+    },
+  },
+  {
+    cardId: 'nback-004',
+    creatorHandle: '@memolane',
+    templateType: 'n_back',
+    category: 'working_memory',
+    difficulty: 'hard',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 24,
+    prompt: 'Flag each position that matches the one two steps back.',
+    puzzleDna: {
+      mechanic: 'n-back',
+      inputMode: 'tap',
+      measuredSignals: ['accuracy', 'working_memory_load', 'reaction_time'],
+    },
+    explanation: {
+      title: '2-back positions',
+      body: 'Only one item repeats a position two steps earlier: the top-left at position 3 echoes the opening top-left.',
+    },
+    config: {
+      itemKind: 'position',
+      stream: ['TL', 'BR', 'TL', 'TR', 'BR', 'BL', 'TR'],
+      n: 2,
+      matchIndices: [2],
+      itemDurationMs: 1500,
+      interItemGapMs: 400,
+      timeLimitMs: 22000,
+    },
+  },
+  {
+    cardId: 'nback-005',
+    creatorHandle: '@deepstack',
+    templateType: 'n_back',
+    category: 'working_memory',
+    difficulty: 'extremely_hard',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 30,
+    prompt: 'Flag each letter that matches the one two steps back.',
+    puzzleDna: {
+      mechanic: 'n-back',
+      inputMode: 'tap',
+      measuredSignals: ['accuracy', 'working_memory_load', 'reaction_time'],
+    },
+    explanation: {
+      title: 'Long 2-back run',
+      body: 'Three matches hide in this ten-letter stream: the second R, then the T that repeats an earlier T, then the final T — each echoing the letter two steps before it.',
+    },
+    config: {
+      itemKind: 'letter',
+      stream: ['Q', 'R', 'S', 'R', 'Q', 'T', 'S', 'T', 'U', 'T'],
+      n: 2,
+      matchIndices: [3, 7, 9],
+      itemDurationMs: 1400,
+      interItemGapMs: 350,
+      timeLimitMs: 26000,
+    },
+  },
+  {
+    cardId: 'nback-006',
+    creatorHandle: '@deepstack',
+    templateType: 'n_back',
+    category: 'working_memory',
+    difficulty: 'extremely_hard',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 30,
+    prompt: 'Flag each shape that matches the one two steps back.',
+    puzzleDna: {
+      mechanic: 'n-back',
+      inputMode: 'tap',
+      measuredSignals: ['accuracy', 'working_memory_load', 'reaction_time'],
+    },
+    explanation: {
+      title: 'Long 2-back shapes',
+      body: 'Three two-back matches: the diamond that repeats the opening diamond, then a square echoing an earlier square, then the final square — each matching the shape two steps before it.',
+    },
+    config: {
+      itemKind: 'shape',
+      stream: ['◆', '●', '◆', '▲', '●', '■', '▲', '■', '◆', '■'],
+      n: 2,
+      matchIndices: [2, 7, 9],
+      itemDurationMs: 1400,
+      interItemGapMs: 350,
+      timeLimitMs: 28000,
+    },
+  },
+];
+
 /**
  * The complete authored catalog. Order groups cards by template for
  * readability; session selection / shuffling is the engine's concern, not the
@@ -4517,6 +4947,8 @@ export const catalog: readonly LiquidCard[] = [
   ...circuitFlowCards,
   ...wordUnscrambleCards,
   ...quickMathCards,
+  ...colorWordCards,
+  ...nBackCards,
 ];
 
 /**

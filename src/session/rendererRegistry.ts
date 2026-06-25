@@ -35,6 +35,8 @@ import TinyLogicCard from '../templates/tinyLogic/TinyLogicCard';
 import WhatChangedCard from '../templates/whatChanged/WhatChangedCard';
 import WordUnscrambleCard from '../templates/wordUnscramble/WordUnscrambleCard';
 import QuickMathCard from '../templates/quickMath/QuickMathCard';
+import ColorWordCard from '../templates/colorWord/ColorWordCard';
+import NBackCard from '../templates/nBack/NBackCard';
 
 /**
  * A template renderer: a component that accepts {@link TemplateProps} for its
@@ -109,4 +111,6 @@ export const defaultRendererRegistry: RendererRegistry = {
   circuit_flow: CircuitFlowCard,
   word_unscramble: WordUnscrambleCard,
   quick_math: QuickMathCard,
+  color_word: ColorWordCard,
+  n_back: NBackCard,
 };

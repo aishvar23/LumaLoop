@@ -39,6 +39,8 @@ import PrismPathCard from './templates/PrismPathCard';
 import SignalSetCard from './templates/SignalSetCard';
 import WordUnscrambleCard from './templates/WordUnscrambleCard';
 import QuickMathCard from './templates/QuickMathCard';
+import ColorWordCard from './templates/ColorWordCard';
+import NBackCard from './templates/NBackCard';
 
 /**
  * A template renderer: a component that accepts {@link TemplateProps} for its
@@ -107,4 +109,6 @@ export const defaultRendererRegistry: RendererRegistry = {
   circuit_flow: CircuitFlowCard,
   word_unscramble: WordUnscrambleCard,
   quick_math: QuickMathCard,
+  color_word: ColorWordCard,
+  n_back: NBackCard,
 };
