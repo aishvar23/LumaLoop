@@ -16,7 +16,14 @@ import {
   screen,
   within,
 } from '@testing-library/react-native';
-import { FlatList, StyleSheet, type ViewToken } from 'react-native';
+import { useState } from 'react';
+import {
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  type ViewToken,
+} from 'react-native';
 
 import type {
   LiquidCard,
@@ -110,9 +117,9 @@ const stubRegistry: RendererRegistry = stubRendererRegistry;
 
 /**
  * A SINGLE-TAP renderer: one press ENGAGES and RESOLVES in the same tick (e.g.
- * what_changed / tiny_logic). The engaging tap flips the card's `timeLimitMs`
- * ∞→finite, re-arming a fresh timer on an already-resolved slide; the feed-level
- * dedup must keep `onCardResolved` to a single `correct` with NO phantom timeout.
+ * what_changed / tiny_logic). The timer is already armed (the countdown started
+ * on activation); resolving disarms it, and the feed-level dedup keeps
+ * `onCardResolved` to a single `correct` with NO phantom timeout from a re-arm.
  */
 function SingleTapRenderer({ card, context, onAttempt, onResolve }: TemplateProps<LiquidCard>) {
   const timer = useCardTimer({ card, context, onResolve });
@@ -142,6 +149,46 @@ function SingleTapRenderer({ card, context, onAttempt, onResolve }: TemplateProp
 // The stub reads only shared LiquidCard fields, so it slots into any template.
 const singleTapRegistry = {
   spot_it: SingleTapRenderer,
+} as unknown as RendererRegistry;
+
+/**
+ * A PRE-PHASE renderer mirroring the real ones (memory_sequence / what_changed /
+ * n_back / color_word / rule_flip): it mounts the shared {@link useCardTimer} ONLY
+ * inside an answer-phase subtree that renders AFTER the pre-phase ends (a "begin"
+ * button). So even though the feed makes `timeLimitMs` finite the moment the card
+ * activates, the inner timer does not exist — and cannot count — until the real
+ * round-start. The answer-phase timer is handed the same `card`, so it arms a
+ * fresh full-duration countdown from the answer phase.
+ */
+function PrePhaseRenderer({ card, context, onResolve }: TemplateProps<LiquidCard>) {
+  const [phase, setPhase] = useState<'pre' | 'answer'>('pre');
+  if (phase === 'pre') {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        testID={`begin-${card.cardId}`}
+        onPress={() => setPhase('answer')}
+      >
+        <Text>begin:{card.cardId}</Text>
+      </Pressable>
+    );
+  }
+  return <PrePhaseAnswer card={card} context={context} onResolve={onResolve} />;
+}
+
+function PrePhaseAnswer({
+  card,
+  context,
+  onResolve,
+}: Pick<TemplateProps<LiquidCard>, 'card' | 'context' | 'onResolve'>) {
+  // Mounted only after the pre-phase → its useCardTimer counts `timeLimitMs` from
+  // the answer phase, not from card activation (real round-start semantics).
+  useCardTimer({ card, context, onResolve });
+  return <Text testID={`answer-${card.cardId}`}>answer:{card.cardId}</Text>;
+}
+
+const prePhaseRegistry = {
+  spot_it: PrePhaseRenderer,
 } as unknown as RendererRegistry;
 
 /**
@@ -373,20 +420,69 @@ describe('FeedScreen (native)', () => {
     expect(screen.getByTestId('feed-game-0')).toBeOnTheScreen();
   });
 
-  it('does NOT arm a game timer until the player engages it (#106)', () => {
+  it("arms an immediate-play game's countdown on ACTIVATION, not on engage", () => {
     jest.useFakeTimers();
     try {
       const onCardResolved = jest.fn();
       renderFeed({ onCardResolved });
 
-      // Active but untouched: advancing past its 1000ms limit must NOT time out —
-      // the timer is gated off until engagement.
+      // Active and untouched — but the countdown now arms the moment the card
+      // APPEARS (becomes active). Advancing past its 1000ms limit with NO
+      // interaction must resolve it as a TIMEOUT (countdown ran on appear).
+      act(() => jest.advanceTimersByTime(1000));
+
+      expect(onCardResolved).toHaveBeenCalledTimes(1);
+      expect(onCardResolved).toHaveBeenCalledWith(
+        0,
+        expect.objectContaining({ cardId: 'b0-0', resolutionType: 'timeout' }),
+      );
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('does NOT run a pre-mounted NEIGHBOUR slide timer (only the active arms)', () => {
+    jest.useFakeTimers();
+    try {
+      const onCardResolved = jest.fn();
+      renderFeed({ onCardResolved });
+
+      // Index 0 is active; index 1 is windowed (pre-mounted) but NOT focused, so it
+      // carries a non-finite limit and its timer never arms. Advancing the clock
+      // must only ever resolve index 0 — never the off-screen neighbour.
+      act(() => jest.advanceTimersByTime(1000));
+      expect(onCardResolved).toHaveBeenCalledTimes(1);
+      expect(onCardResolved).toHaveBeenCalledWith(
+        0,
+        expect.objectContaining({ cardId: 'b0-0', resolutionType: 'timeout' }),
+      );
+
+      // Push far past the limit: the neighbour (index 1) must still never resolve.
+      act(() => jest.advanceTimersByTime(10_000));
+      expect(onCardResolved).toHaveBeenCalledTimes(1);
+      expect(onCardResolved.mock.calls.some(([i]) => i === 1)).toBe(false);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("does NOT start a pre-phase game's countdown during its pre-phase", () => {
+    jest.useFakeTimers();
+    try {
+      const onCardResolved = jest.fn();
+      renderFeed({ onCardResolved }, prePhaseRegistry);
+
+      // The card is active, so the feed's override makes its limit finite — but a
+      // PRE-PHASE renderer mounts its useCardTimer ONLY after the pre-phase ends
+      // (here, the "begin" button). While still in the pre-phase, advancing well
+      // past the 1000ms limit must NOT time it out.
       act(() => jest.advanceTimersByTime(5000));
       expect(onCardResolved).not.toHaveBeenCalled();
 
-      // Engaging arms a FRESH full-duration countdown from the engage instant.
+      // Ending the pre-phase mounts the answer-phase timer, arming a FRESH
+      // full-duration countdown from the real round-start.
       act(() => {
-        fireEvent.press(screen.getByTestId('engage-b0-0'));
+        fireEvent.press(screen.getByTestId('begin-b0-0'));
       });
       expect(onCardResolved).not.toHaveBeenCalled();
       act(() => jest.advanceTimersByTime(1000));
@@ -523,9 +619,12 @@ describe('FeedScreen (native)', () => {
       expect(onCardAbandoned).toHaveBeenCalledTimes(1);
       expect(onCardAbandoned).toHaveBeenCalledWith(0, 'b0-0');
 
-      // Past the time limit: the abandoned game must NOT now resolve.
+      // Past the time limit: the ABANDONED game (index 0) must NOT now resolve via
+      // its still-armed timer — the feed-level dedup drops it (already classified
+      // as abandoned on leave). (The now-active index 1's countdown also runs and
+      // may time out; that is correct and separate.)
       act(() => jest.advanceTimersByTime(5000));
-      expect(onCardResolved).not.toHaveBeenCalled();
+      expect(onCardResolved.mock.calls.some(([i]) => i === 0)).toBe(false);
       expect(onCardAbandoned).toHaveBeenCalledTimes(1);
     } finally {
       jest.useRealTimers();

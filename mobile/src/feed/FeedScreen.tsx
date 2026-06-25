@@ -23,12 +23,17 @@
  * mount their real renderer; the rest render a same-height placeholder (perf).
  *
  * Free-scroll semantics (#106 parity, docs/FEED_DIRECTION.md §3.2): each game runs
- * a local lifecycle — not-engaged → engaged → resolved — and the per-game timer
- * arms on ENGAGEMENT (first interaction), not on becoming active. Swiping past an
- * un-engaged game is a SKIP (no resolution); engaging then leaving before resolve
- * is an ABANDONED attempt; a played game resolves correct/incorrect/timeout
- * unchanged. The lifecycle callbacks are the telemetry seam for M5 — this file
- * emits the signals but does NOT post telemetry.
+ * a local lifecycle — not-engaged → engaged → resolved. The per-game COUNTDOWN now
+ * arms on ACTIVATION (the game appearing/snapping into view), not on first
+ * interaction, so an immediate-play puzzle is timed from the moment it is on screen
+ * and answerable; pre-phase games (watch/preview/Start) still start their countdown
+ * at their own answer-phase start (see `timerGatedCard`). ENGAGEMENT (first
+ * interaction) is still tracked, but only to classify leave behaviour: swiping past
+ * an un-engaged game is a SKIP (no resolution); engaging then leaving before
+ * resolve is an ABANDONED attempt; a game that resolves (correct/incorrect/timeout)
+ * is played. A game left active long enough to time out resolves as a TIMEOUT even
+ * if never engaged. The lifecycle callbacks are the telemetry seam for M5 — this
+ * file emits the signals but does NOT post telemetry.
  */
 
 import {
@@ -197,19 +202,35 @@ export type FeedScreenProps = {
 };
 
 /**
- * #106: gate the per-game timer on ENGAGEMENT. Until the player interacts with a
- * game we hand the renderer a card whose `timeLimitMs` is non-finite, so the
- * shared {@link useCardTimer} skips arming its countdown. On the first interaction
+ * Gate the per-game timer on ACTIVATION. Until a slide is the ACTIVE/focused card
+ * we hand the renderer a card whose `timeLimitMs` is non-finite, so the shared
+ * {@link useCardTimer} skips arming its countdown. Once the slide becomes active
  * the real card flows through and the timer arms a fresh, full-duration countdown
- * from the engage instant.
+ * from the activation instant — so the countdown starts the moment the game
+ * appears (snaps into view), NOT on the player's first interaction.
  *
  * Template-AGNOSTIC: `timeLimitMs` is the one timing primitive common to every
  * {@link LiquidCard} config, so a single override works for all renderers with NO
  * switch on `templateType`. The override preserves the card's discriminant and
  * every other field, so the result is the same card variant with a swapped limit.
+ *
+ * IMMEDIATE-PLAY vs PRE-PHASE — why activation-gating is correct for BOTH, with no
+ * per-template flag:
+ *  - IMMEDIATE-PLAY games pass `card` straight into {@link useCardTimer} on mount,
+ *    so flipping the limit finite on activation arms their countdown the instant
+ *    the card appears.
+ *  - PRE-PHASE games (what_changed's preview, memory_sequence's watch, n_back /
+ *    color_word / rule_flip's Start→stream) mount their `useCardTimer` ONLY inside
+ *    the answer-phase subtree, which renders AFTER the pre-phase ends, so their
+ *    inner timer arms at the real round-start, never during the pre-phase. The
+ *    pre-phase itself is independently held by each renderer's `isActive` gate (or
+ *    its Start button), so a pre-mounted neighbour never advances either.
+ *
+ * Neighbour safety: a windowed-but-not-focused slide stays non-finite, so its
+ * timer can never run — only the ACTIVE slide's timer arms.
  */
-function timerGatedCard(card: LiquidCard, engaged: boolean): LiquidCard {
-  if (engaged) return card;
+function timerGatedCard(card: LiquidCard, armed: boolean): LiquidCard {
+  if (armed) return card;
   return {
     ...card,
     config: { ...card.config, timeLimitMs: Number.POSITIVE_INFINITY },
@@ -252,9 +273,10 @@ export default function FeedScreen({
   const insets = useSafeAreaInsets();
 
   const nowFn = now ?? Date.now;
-  // A per-mount feed instance id + a single "active at" stamp: the `elapsedMs`
-  // origin for the card start context. The interaction timer no longer arms from
-  // here — each slide arms it from its own engage instant (#106).
+  // A per-mount feed instance id + a single "active at" stamp. This stamp is now
+  // only a FALLBACK origin for the card start context: each slide stamps its own
+  // per-activation instant and arms its timer from there (see FeedSlide), so the
+  // countdown starts when the game appears.
   const [activeAtMs] = useState(() => nowFn());
   const [feedId] = useState(
     () => feedIdProp ?? makeFeedId(anonymousUserId, activeAtMs),
@@ -519,7 +541,7 @@ type FeedSlideProps = {
   getCardById: (cardId: string) => LiquidCard | undefined;
   feedId: string;
   activeAtMs: number;
-  /** Wall clock for stamping this slide's engage instant (#106). */
+  /** Wall clock for stamping this slide's activation instant (timer origin). */
   now: () => number;
   /** Notify the feed that this game was engaged (first interaction). */
   onEngage: (index: number, cardId: string) => void;
@@ -558,33 +580,47 @@ const FeedSlide = memo(function FeedSlide({
   const card = windowed ? getCardById(cardId) : undefined;
   const Renderer = card ? resolveRenderer(registry, card) : undefined;
 
-  // #106: the engage instant — null until the player first interacts with this
-  // game. Local to the slide so engagement (and thus timer-arming) is per-game. A
-  // ref guards the one-time engage notification independently of render timing.
-  const [engageAtMs, setEngageAtMs] = useState<number | null>(null);
+  // The per-slide ACTIVATION instant — null until this slide first becomes the
+  // focused card. The countdown now arms on activation (the game APPEARING), so
+  // this is the timing origin for the card start context AND the gate that flips
+  // `timeLimitMs` finite. Latched once so re-activating a slide keeps its origin.
+  const [activatedAtMs, setActivatedAtMs] = useState<number | null>(null);
+  useEffect(() => {
+    if (!active || activatedAtMs !== null) return;
+    setActivatedAtMs(now());
+  }, [active, activatedAtMs, now]);
+
+  // The engage instant is still tracked, but ONLY to drive the skip-vs-abandon
+  // telemetry classification (first interaction) — it no longer gates the timer.
+  // A ref guards the one-time engage notification independently of render timing.
   const engagedOnceRef = useRef(false);
   const handleAttempt = useCallback(
     (_signals?: Record<string, number | string | boolean>) => {
       if (engagedOnceRef.current) return;
       engagedOnceRef.current = true;
-      setEngageAtMs(now());
       onEngage(index, cardId);
     },
-    [now, onEngage, index, cardId],
+    [onEngage, index, cardId],
   );
 
   // Mount the game only inside the window AND when the card + renderer resolve; a
   // missing card/renderer falls back to the placeholder (fail-safe, never a crash).
   if (card && Renderer) {
-    const engaged = engageAtMs !== null;
+    // Arm the timer once the slide has activated (countdown starts on appear).
+    // Until then the card carries a non-finite limit so a pre-mounted neighbour's
+    // timer never runs. `armed` latches on first activation.
+    const armed = activatedAtMs !== null;
+    // The timing origin is the slide's own activation instant (not the stale
+    // per-feed mount stamp), so `elapsedMs` measures from when THIS game appeared.
+    // For IMMEDIATE-PLAY games the puzzle is answerable on appear, so
+    // `interactionEnabledAtMs` is also the activation instant. PRE-PHASE renderers
+    // override `interactionEnabledAtMs` themselves with their answer-phase start.
+    const originMs = activatedAtMs ?? activeAtMs;
     const context: CardStartContext = {
       sessionId: feedId,
       cardIndex: index,
-      activeAtMs,
-      // #106: timing origin is the engage instant. Before engagement it falls back
-      // to `activeAtMs`, but the timer is gated off anyway (`timerGatedCard` hands
-      // the renderer a non-finite limit until the player interacts).
-      interactionEnabledAtMs: engageAtMs ?? activeAtMs,
+      activeAtMs: originMs,
+      interactionEnabledAtMs: originMs,
     };
     const Game = Renderer as TemplateRenderer<LiquidCard>;
     const gameTheme = categoryAccent(card.category);
@@ -648,9 +684,12 @@ const FeedSlide = memo(function FeedSlide({
               <View style={styles.gameBody}>
                 <GameThemeProvider category={card.category}>
                   <Game
-                    // #106: until engaged, the renderer's timer stays disarmed.
+                    // Until the slide activates, the renderer's timer stays
+                    // disarmed; on activation the real finite limit flows through
+                    // and the countdown starts (immediate-play arms now; pre-phase
+                    // renderers arm their inner timer at their answer-phase start).
                     key={`${feedId}:${index}`}
-                    card={timerGatedCard(card, engaged)}
+                    card={timerGatedCard(card, armed)}
                     context={context}
                     // Activation signal (#128 review fix): only the focused slide is
                     // active. Renderers with a timed PRE-phase (what_changed's preview)

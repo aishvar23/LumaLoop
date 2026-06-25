@@ -7,6 +7,7 @@
  * captures the observer callback and lets a test simulate a slide snapping into
  * view (the real on-scroll signal that drives the active index → endless growth).
  */
+import { useState } from 'react';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -130,11 +131,13 @@ const fakeGetCardById = (cardId: string): LiquidCard | undefined =>
 
 /**
  * A stub renderer wired to the SHARED {@link useCardTimer} (template-agnostic),
- * so it honours the feed's engage-gated timing exactly like the real renderers:
+ * so it honours the feed's ACTIVATION-gated timing exactly like the real
+ * IMMEDIATE-PLAY renderers (e.g. spot_it):
  *  - an "engage" button fires `onAttempt` + `markAttempt` (first interaction);
  *  - a "resolve" button drives a correct resolution through the timer.
- * Because the feed disarms the timer until engagement, advancing fake timers
- * before pressing "engage" produces NO timeout; afterwards a timeout can fire.
+ * The feed arms the timer on ACTIVATION (the slide becoming focused), so advancing
+ * fake timers past the limit on the active slide produces a timeout even with no
+ * engagement; a pre-mounted neighbour stays disarmed (non-finite limit).
  */
 function StubRenderer({
   card,
@@ -216,6 +219,48 @@ function SingleTapRenderer({
 }
 
 const singleTapRegistry: RendererRegistry = { spot_it: SingleTapRenderer };
+
+/**
+ * A PRE-PHASE renderer mirroring the real ones (memory_sequence / what_changed /
+ * n_back / color_word / rule_flip): it mounts the shared {@link useCardTimer} ONLY
+ * inside an answer-phase subtree that renders AFTER the pre-phase ends (here, a
+ * "begin" button). So even though the feed makes `timeLimitMs` finite the moment
+ * the card activates, the inner timer does not exist — and thus cannot count —
+ * until the real round-start. The answer-phase timer is handed the same `card`,
+ * so it arms a fresh full-duration countdown from the answer phase.
+ */
+function PrePhaseRenderer({
+  card,
+  context,
+  onResolve,
+}: TemplateProps<SpotItCard>) {
+  const [phase, setPhase] = useState<'pre' | 'answer'>('pre');
+  if (phase === 'pre') {
+    return (
+      <button
+        type="button"
+        data-testid={`begin-${card.cardId}`}
+        onClick={() => setPhase('answer')}
+      >
+        begin:{card.cardId}
+      </button>
+    );
+  }
+  return <PrePhaseAnswer card={card} context={context} onResolve={onResolve} />;
+}
+
+function PrePhaseAnswer({
+  card,
+  context,
+  onResolve,
+}: Pick<TemplateProps<SpotItCard>, 'card' | 'context' | 'onResolve'>) {
+  // Mounted only after the pre-phase → its useCardTimer counts `timeLimitMs` from
+  // the answer phase, not from card activation (the real round-start semantics).
+  useCardTimer({ card, context, onResolve });
+  return <span data-testid={`answer-${card.cardId}`}>answer:{card.cardId}</span>;
+}
+
+const prePhaseRegistry: RendererRegistry = { spot_it: PrePhaseRenderer };
 
 /**
  * A probe renderer that surfaces the template-agnostic `isActive` activation
@@ -470,23 +515,79 @@ describe('FeedScreen', () => {
     expect(screen.getByTestId('feed-hud-streak')).toHaveTextContent('1');
   });
 
-  it('does NOT arm a game timer until the player engages it (#106)', () => {
+  it("arms an immediate-play game's countdown on ACTIVATION, not on engage", () => {
     vi.useFakeTimers();
     try {
       const onCardResolved = vi.fn();
       renderFeed({ onCardResolved });
 
-      // The active game is mounted but untouched. Advancing well past its 1000ms
-      // time limit must NOT produce a timeout — the timer is gated off until the
-      // player engages (it arms on becoming active in the old static-context bug).
+      // The active game is mounted and untouched — but the countdown now arms the
+      // moment the card APPEARS (becomes active). Advancing past its 1000ms limit
+      // with NO interaction must resolve it as a TIMEOUT (countdown ran on appear).
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+
+      expect(onCardResolved).toHaveBeenCalledTimes(1);
+      expect(onCardResolved).toHaveBeenCalledWith(
+        0,
+        expect.objectContaining({ cardId: 'b0-0', resolutionType: 'timeout' }),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does NOT run a pre-mounted NEIGHBOUR slide timer (only the active arms)', () => {
+    vi.useFakeTimers();
+    try {
+      const onCardResolved = vi.fn();
+      renderFeed({ onCardResolved });
+
+      // Index 0 is active; index 1 is windowed (pre-mounted) but NOT focused, so it
+      // carries a non-finite limit and its timer never arms. Advancing the clock
+      // must only ever resolve index 0 — never the off-screen neighbour.
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+
+      expect(onCardResolved).toHaveBeenCalledTimes(1);
+      expect(onCardResolved).toHaveBeenCalledWith(
+        0,
+        expect.objectContaining({ cardId: 'b0-0', resolutionType: 'timeout' }),
+      );
+      // Push far past the limit: the neighbour (index 1) must still never resolve.
+      act(() => {
+        vi.advanceTimersByTime(10_000);
+      });
+      expect(onCardResolved).toHaveBeenCalledTimes(1);
+      expect(
+        onCardResolved.mock.calls.some(([i]) => i === 1),
+      ).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does NOT start a pre-phase game's countdown during its pre-phase", () => {
+    vi.useFakeTimers();
+    try {
+      const onCardResolved = vi.fn();
+      renderFeed({ onCardResolved }, prePhaseRegistry);
+
+      // The card is active, so the feed's override makes its limit finite — but a
+      // PRE-PHASE renderer mounts its useCardTimer ONLY after the pre-phase ends
+      // (here, after the "begin" button). While still in the pre-phase, advancing
+      // well past the 1000ms limit must NOT time it out.
       act(() => {
         vi.advanceTimersByTime(5000);
       });
       expect(onCardResolved).not.toHaveBeenCalled();
 
-      // Engaging arms a FRESH full-duration countdown from the engage instant.
+      // Ending the pre-phase mounts the answer-phase timer, which arms a FRESH
+      // full-duration countdown from the real round-start.
       act(() => {
-        fireEvent.click(screen.getByTestId('engage-b0-0'));
+        fireEvent.click(screen.getByTestId('begin-b0-0'));
       });
       expect(onCardResolved).not.toHaveBeenCalled();
       act(() => {
@@ -572,9 +673,9 @@ describe('FeedScreen', () => {
       const onCardResolved = vi.fn();
       renderFeed({ onCardResolved }, singleTapRegistry);
 
-      // One click engages AND resolves the slide in the same tick. Engaging flips
-      // the card's timeLimitMs ∞→1000, re-arming a fresh timer on the now-resolved
-      // slide; the feed-level dedup must drop that phantom timeout.
+      // One click engages AND resolves the slide in the same tick. The timer is
+      // already armed (countdown started on activation); resolving disarms it, and
+      // the feed-level dedup drops any phantom timeout from a later re-arm.
       act(() => {
         fireEvent.click(screen.getByTestId('tap-b0-0'));
       });
@@ -608,8 +709,9 @@ describe('FeedScreen', () => {
       const onCardResolved = vi.fn();
       renderFeed({ onCardAbandoned, onCardResolved });
 
-      // Engage game 0 (arms its 1000ms timer), then leave before it resolves. The
-      // left slide stays mounted within WINDOW_RADIUS so its timer keeps running.
+      // Engage game 0 (its 1000ms timer is already armed from activation), then
+      // leave before it resolves. The left slide stays mounted within WINDOW_RADIUS
+      // so its timer keeps running and would fire a timeout after the abandon.
       act(() => {
         fireEvent.click(screen.getByTestId('engage-b0-0'));
       });
@@ -617,11 +719,17 @@ describe('FeedScreen', () => {
       expect(onCardAbandoned).toHaveBeenCalledTimes(1);
       expect(onCardAbandoned).toHaveBeenCalledWith(0, 'b0-0');
 
-      // Push past the time limit: the abandoned game must NOT now resolve.
+      // Push past the time limit. The ABANDONED game (index 0) must NOT now
+      // resolve via its still-armed timer — the feed-level dedup drops it because
+      // index 0 was already classified as abandoned on leave. (The now-active
+      // index 1's countdown also runs and may time out; that is correct and
+      // separate — what matters here is index 0 never produces a late resolution.)
       act(() => {
         vi.advanceTimersByTime(5000);
       });
-      expect(onCardResolved).not.toHaveBeenCalled();
+      expect(
+        onCardResolved.mock.calls.some(([i]) => i === 0),
+      ).toBe(false);
       expect(onCardAbandoned).toHaveBeenCalledTimes(1);
     } finally {
       vi.useRealTimers();
