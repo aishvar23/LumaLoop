@@ -94,7 +94,12 @@ follow.**
   remaining "gate" before the feed.
 
 ## 4. Information architecture / routes
-- `/` — the **endless feed** (default: Discover; toggle to **Following**).
+- `/` — the **Home / Discover landing** (default post-login surface; accounts
+  pivot). Greeting + stats snapshot + featured games + a "Start playing" CTA into
+  the feed. (Originally `/` was the feed itself; it was repurposed so login lands
+  on Home, not a game card.)
+- `/feed` — the **endless feed** (Discover; future: toggle to **Following**),
+  reached from Home's "Start playing".
 - `/u/:handle` — a **creator profile**.
 - `/c/:cardId` — a **single game** (share/deep-link target; also finally makes
   this route a real playable surface, closing the current placeholder gap).

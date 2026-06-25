@@ -4,9 +4,10 @@
  * These are deliberately minimal stand-ins so `/c/:cardId` and unknown paths
  * resolve today. The REAL screens are other tasks and must replace these here:
  *   - Single-card (deep-link) render → #69-72 (share arrival surface)
- * The `/` route now mounts the endless feed (#107). Routing only selects which
- * element renders; it must never own feed/session progression (CLAUDE.md §4).
- * Keep that boundary when swapping these out.
+ * The `/` route mounts the Home landing and `/feed` mounts the endless feed
+ * (#107). Routing only selects which element renders; it must never own
+ * feed/session progression (CLAUDE.md §4). Keep that boundary when swapping
+ * these out.
  */
 import { Link, useParams } from 'react-router-dom';
 import Screen from '../ui/Screen';
@@ -57,7 +58,7 @@ export function NotFoundRoutePlaceholder() {
           That link doesn’t lead anywhere in LumaLoop.
         </p>
         {/* Client-side nav: `Link` keeps SPA state instead of full reload. */}
-        <Link to={ROUTES.session}>Back to the feed</Link>
+        <Link to={ROUTES.home}>Back to home</Link>
       </Stack>
     </Screen>
   );

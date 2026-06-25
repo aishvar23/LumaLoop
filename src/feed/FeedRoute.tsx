@@ -43,6 +43,7 @@ import { SocialConfigProvider } from '../social/SocialContext';
 import { useOptionalAuth } from '../auth/AuthProvider';
 import { supabase } from '../auth/supabaseClient';
 import type { AuthClient } from '../auth/authClient';
+import { ROUTES } from '../app/routes';
 import type { FeedBatchSource } from './feedDeck';
 import FeedScreen from './FeedScreen';
 import FirstRunNotice from './FirstRunNotice';
@@ -165,6 +166,11 @@ export default function FeedRoute({
 
   return (
     <>
+      {/* Minimal feed chrome to escape the immersive feed back to Home / the
+          profile (the feed itself owns no routing). Plain anchors (not react-
+          router Links) so the feed can mount standalone in tests without a Router
+          context; in the real app under BrowserRouter they navigate normally. */}
+      <FeedNav />
       {/* The gate fires Card_Explanation_Viewed through this seam (no telemetry
           coupling inside the gate/renderer — CLAUDE.md §4/§6). */}
       <ExplanationViewedProvider handler={telemetry.onExplanationViewed}>
@@ -195,5 +201,24 @@ export default function FeedRoute({
       </ExplanationViewedProvider>
       <FirstRunNotice />
     </>
+  );
+}
+
+/**
+ * Tiny overlay nav so the immersive feed isn't a dead-end: a link back to Home
+ * (`/`) and to the profile (`/you`). Plain anchors keep the feed mountable with
+ * no Router in tests; the `.feed-nav` styles ship with `FeedScreen.css` (always
+ * loaded while the feed is on screen).
+ */
+function FeedNav() {
+  return (
+    <nav className="feed-nav" aria-label="Feed navigation">
+      <a className="feed-nav__link" href={ROUTES.home} aria-label="Back to home">
+        ⌂ Home
+      </a>
+      <a className="feed-nav__link" href={ROUTES.profile} aria-label="Open your profile">
+        You
+      </a>
+    </nav>
   );
 }

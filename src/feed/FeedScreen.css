@@ -21,6 +21,39 @@
 }
 
 /*
+ * Overlay nav (top-left, clear of the top-right score HUD): escape the immersive
+ * feed back to Home / the profile. Token-driven; sits above the slides.
+ */
+.feed-nav {
+  position: absolute;
+  top: calc(var(--safe-top) + var(--space-2));
+  left: calc(var(--safe-left) + var(--space-2));
+  z-index: 5;
+  display: inline-flex;
+  gap: var(--space-1);
+}
+
+.feed-nav__link {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: rgba(12, 13, 18, 0.55);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  text-decoration: none;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  backdrop-filter: blur(6px);
+}
+
+.feed-nav__link:hover,
+.feed-nav__link:focus-visible {
+  border-color: var(--color-accent);
+  outline: none;
+}
+
+/*
  * The scroll container: the swipe surface. `100dvh` so one slide fills the
  * dynamic viewport (clear of mobile browser chrome); `scroll-snap-type: y
  * mandatory` snaps each game to the top.

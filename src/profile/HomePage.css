@@ -1,0 +1,236 @@
+/**
+ * Home / Discover landing styles (accounts pivot). Token-driven (no scattered
+ * hex), mobile-first, scrollable. Mirrors the visual language of the auth screens
+ * and feed: dark surfaces, category-accent tints, pill buttons.
+ */
+.home-page {
+  min-height: 100dvh;
+  box-sizing: border-box;
+  background: var(--color-bg);
+  color: var(--color-text);
+  padding: calc(var(--safe-top) + var(--space-3)) var(--space-3)
+    calc(var(--safe-bottom) + var(--space-5));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+/* Top bar: brand + actions (upload + profile). */
+.home-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.home-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-lg);
+  letter-spacing: 0.01em;
+}
+
+.home-brand__mark {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, var(--color-accent), #4f5dff);
+  color: var(--color-accent-contrast);
+  font-weight: var(--font-weight-bold);
+}
+
+.home-topbar__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Greyed-out "Upload puzzle" — visible but signals "coming soon". */
+.home-upload-btn {
+  appearance: none;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  border-radius: var(--radius-pill);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.home-upload-btn:hover,
+.home-upload-btn:focus-visible {
+  opacity: 0.72;
+  outline: none;
+}
+
+.home-upload-notice {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.home-profile-link {
+  display: inline-flex;
+  text-decoration: none;
+}
+
+.home-avatar {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-pill);
+  object-fit: cover;
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  font-weight: var(--font-weight-bold);
+  border: 1px solid var(--color-border);
+}
+
+/* Hero: greeting + primary CTA into the feed. */
+.home-hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(120% 140% at 0% 0%, rgba(108, 123, 255, 0.18), transparent 60%),
+    var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+.home-greeting {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.15;
+}
+
+.home-subtitle {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-md);
+}
+
+.home-start-btn {
+  align-self: flex-start;
+  text-decoration: none;
+  background: linear-gradient(135deg, var(--color-accent), #4f5dff);
+  color: var(--color-accent-contrast);
+  border-radius: var(--radius-pill);
+  padding: var(--space-3) var(--space-5);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-md);
+}
+
+.home-start-btn:hover,
+.home-start-btn:focus-visible {
+  filter: brightness(1.08);
+  outline: none;
+}
+
+/* Stats snapshot. */
+.home-section-title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-muted);
+}
+
+.home-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-2);
+}
+
+@media (min-width: 480px) {
+  .home-stats-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.home-stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-top: 2px solid var(--stat-accent, var(--color-accent));
+}
+
+.home-stat__value {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+}
+
+.home-stat__label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+/* Featured games grid. */
+.home-featured-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-2);
+}
+
+@media (min-width: 480px) {
+  .home-featured-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.home-game-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  color: var(--color-text);
+  background: linear-gradient(160deg, var(--tile-tint, transparent), var(--color-surface));
+  border: 1px solid var(--color-border);
+}
+
+.home-game-tile:hover,
+.home-game-tile:focus-visible {
+  border-color: var(--tile-accent, var(--color-accent));
+  outline: none;
+}
+
+.home-game-monogram {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: var(--tile-accent, var(--color-accent));
+  color: var(--color-accent-on, #0b0b0f);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-sm);
+}
+
+.home-game-title {
+  font-weight: var(--font-weight-semibold);
+}
+
+.home-game-meta {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}

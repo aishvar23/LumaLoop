@@ -13,6 +13,7 @@ import { useFeedTelemetry } from './src/telemetry/useFeedTelemetry';
 import { AuthProvider, useAuth, useOptionalAuth } from './src/auth/AuthProvider';
 import RequireAuth from './src/auth/RequireAuth';
 import ProfilePage from './src/profile/ProfilePage';
+import HomeScreen from './src/HomeScreen';
 import { useRecordGamePlay } from './src/feed/useRecordGamePlay';
 import { usePlayedCardIds } from './src/feed/usePlayedCardIds';
 import { SocialConfigProvider } from './src/social/SocialContext';
@@ -64,13 +65,14 @@ export default function App() {
 }
 
 /**
- * The signed-in app surface: the first-run notice + the feed, with a simple
- * router-less toggle to the profile screen (native has no React Router). A small
- * "You" button overlays the feed; tapping it shows {@link ProfilePage}, which has a
- * Back affordance to return.
+ * The signed-in app surface, with a simple router-less view toggle (native has no
+ * React Router). A signed-in user lands on the {@link HomeScreen} (accounts pivot
+ * — replaces dropping straight into a game card); "Start playing" enters the feed.
+ * A small "You" button overlays the feed → {@link ProfilePage}; a "Home" button
+ * returns to the landing. ProfilePage and Home both have Back affordances.
  */
 function FeedApp() {
-  const [view, setView] = useState<'feed' | 'profile'>('feed');
+  const [view, setView] = useState<'home' | 'feed' | 'profile'>('home');
 
   // Resolve the best-effort anonymous id once (AsyncStorage-backed, §10). The feed
   // waits for it so the deck seed and telemetry identity share one stable id.
@@ -85,6 +87,15 @@ function FeedApp() {
     };
   }, []);
 
+  if (view === 'home') {
+    return (
+      <HomeScreen
+        onStart={() => setView('feed')}
+        onOpenProfile={() => setView('profile')}
+      />
+    );
+  }
+
   if (view === 'profile') {
     return <ProfilePage onBack={() => setView('feed')} />;
   }
@@ -96,8 +107,24 @@ function FeedApp() {
           <TelemetryFeed anonymousUserId={anonymousUserId} />
         ) : null}
       </FirstRunNotice>
+      <HomeButton onPress={() => setView('home')} />
       <YouButton onPress={() => setView('profile')} />
     </View>
+  );
+}
+
+/** A small overlay entry back to the Home landing (top-left, clear of the HUD). */
+function HomeButton({ onPress }: { onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Back to home"
+      testID="open-home"
+      onPress={onPress}
+      style={styles.homeButton}
+    >
+      <Text style={styles.homeButtonText}>⌂</Text>
+    </Pressable>
   );
 }
 
@@ -234,6 +261,25 @@ const styles = StyleSheet.create({
   youButtonText: {
     color: colors.accentContrast,
     fontSize: fontSize.md,
+    fontWeight: fontWeight.bold,
+  },
+  homeButton: {
+    position: 'absolute',
+    top: 52,
+    left: 16,
+    height: 40,
+    minWidth: 40,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: 'rgba(20, 20, 28, 0.7)',
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  homeButtonText: {
+    color: colors.text,
+    fontSize: fontSize.lg,
     fontWeight: fontWeight.bold,
   },
 });

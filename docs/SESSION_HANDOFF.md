@@ -4,6 +4,30 @@ Pick-up notes for continuing the **accounts + social + games-expansion** work in
 fresh session. Read this first, then `CLAUDE.md`, `docs/DESIGN_AND_PROGRESS.md`,
 `docs/FEED_DIRECTION.md`, `docs/AUTH_SETUP.md`.
 
+## Latest changes (Home landing + reminder emails + Upload-puzzle CTA)
+Added on top of the stack below (web + mobile, gates green — web 1023 tests +
+build, mobile 760 tests):
+- **Home / Discover landing page** is now the DEFAULT post-login surface, so you
+  no longer drop straight into a game card. **Routing changed: `/` is Home, the
+  feed moved to `/feed`** (`src/app/routes.ts` — `ROUTES.home`/`ROUTES.feed`).
+  Home shows a greeting, a stats snapshot (reuses `computeStats` +
+  `fetchGamePlays`), featured-game tiles (pure `src/cards/featured.ts`), and a
+  "Start playing" CTA → feed. Web: `src/profile/HomePage.tsx`. Mobile:
+  `mobile/src/HomeScreen.tsx` (App.tsx `view` now defaults to `'home'`; a small
+  Home/You overlay nav on the feed). A tiny `.feed-nav` overlay (Home / You) was
+  added to `src/feed/FeedRoute.tsx`.
+- **"Upload puzzle" button** (greyed, "coming soon") on Home, both platforms — not
+  built; hover (web tooltip) / click both reveal a "coming soon" notice.
+- **Daily reminder emails**: Vercel Cron (`vercel.json`, 09:00 UTC) →
+  `api/daily-reminder.ts` (Edge), a thin wrapper over the pure, tested core
+  `src/email/reminderCore.ts`. Lists users via the Supabase Auth admin API
+  (service-role) and sends via **Resend**. **Sending is GATED on `RESEND_API_KEY`
+  + `REMINDER_FROM`** — unset ⇒ safe no-op (everyone "skipped", zero emails), so
+  the cron is harmless until you wire email. Caller is authed via `CRON_SECRET`
+  (`Authorization: Bearer …`). **Not yet deployed** — set the Vercel envs
+  (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`, and `RESEND_API_KEY`
+  + `REMINDER_FROM` + a verified Resend sender domain) to go live.
+
 ## ⚠️ TOP BLOCKER — GitHub account suspended
 `git push` and `gh` fail with **403 "Your account was suspended"** (owner:
 `aishvar23`). All recent work is **committed locally only** and CANNOT be pushed

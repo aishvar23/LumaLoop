@@ -11,11 +11,11 @@ import {
 } from '../auth/testFakes';
 
 /**
- * The route table now gates `/` (and `/you`) behind {@link AuthProvider} +
- * RequireAuth (accounts pivot). Tests mount AppRoutes under an AuthProvider with
- * an injected FAKE Supabase client so we can drive the gate state (signed-in WITH
- * a profile → the feed renders). Public routes (`/c/:cardId`, not-found) are
- * unaffected by auth.
+ * The route table gates `/` (Home landing), `/feed` (the feed) and `/you` behind
+ * {@link AuthProvider} + RequireAuth (accounts pivot). Tests mount AppRoutes under
+ * an AuthProvider with an injected FAKE Supabase client so we can drive the gate
+ * state (signed-in WITH a profile → the gated surface renders). Public routes
+ * (`/c/:cardId`, not-found) are unaffected by auth.
  */
 function renderAt(
   path: string,
@@ -31,9 +31,27 @@ function renderAt(
 }
 
 describe('AppRoutes', () => {
-  it('renders the endless feed at `/` for a signed-in user with a profile', async () => {
+  it('renders the Home landing at `/` for a signed-in user with a profile', async () => {
     renderAt('/');
-    // `/` is the feed surface (#107), gated behind auth, named by a hidden heading.
+    // `/` is the Home landing (accounts pivot), gated behind auth.
+    await waitFor(() =>
+      expect(
+        screen.getByRole('heading', { name: /welcome back/i }),
+      ).toBeInTheDocument(),
+    );
+    // It is NOT the feed — that lives at `/feed` now.
+    expect(
+      screen.queryByRole('heading', { name: 'Game feed' }),
+    ).not.toBeInTheDocument();
+    // Home routes into the feed via a "Start playing" link.
+    expect(
+      screen.getByRole('link', { name: /start playing/i }),
+    ).toHaveAttribute('href', '/feed');
+  });
+
+  it('renders the endless feed at `/feed` for a signed-in user with a profile', async () => {
+    renderAt('/feed');
+    // `/feed` is the feed surface (#107), gated behind auth, named by a hidden heading.
     await waitFor(() =>
       expect(
         screen.getByRole('heading', { name: 'Game feed' }),
@@ -68,15 +86,6 @@ describe('AppRoutes', () => {
     );
   });
 
-  it('no longer serves the standalone `/feed` preview route (folded into `/`)', async () => {
-    renderAt('/feed');
-    await waitFor(() =>
-      expect(
-        screen.getByRole('heading', { name: 'Page not found' }),
-      ).toBeInTheDocument(),
-    );
-  });
-
   it('renders the deep-link placeholder and exposes the decoded cardId', () => {
     renderAt('/c/card-42');
     expect(
@@ -101,9 +110,9 @@ describe('AppRoutes', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('routes "Back to the feed" through a client-side link to `/`', () => {
+  it('routes "Back to home" through a client-side link to `/`', () => {
     renderAt('/totally/unknown');
-    const back = screen.getByRole('link', { name: 'Back to the feed' });
+    const back = screen.getByRole('link', { name: 'Back to home' });
     expect(back).toHaveAttribute('href', '/');
   });
 });
