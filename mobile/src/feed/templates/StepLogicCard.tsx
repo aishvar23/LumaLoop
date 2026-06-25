@@ -37,9 +37,10 @@
  * position alone.
  */
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { orderOptions } from '../../core/cards/optionOrder';
 import type { StepLogicCard as StepLogicCardType } from '../../core/cards/types';
 import type { CardResolution, TemplateProps } from '../../core/templates/contract';
 import { useCardTimer } from '../../core/templates/useCardTimer';
@@ -180,6 +181,18 @@ export default function StepLogicCard({
   const chainComplete = chosenLabels.length >= steps.length;
   const activeStep = chainComplete ? undefined : steps[currentStep];
 
+  // Present the active step's options in a deterministic, per-step-seeded order so
+  // the correct answer is not positionally guessable (keyed by `correctOptionId`,
+  // not slot). Seeded per step (`cardId:stepIndex`) so each step shuffles
+  // independently but stably; identical on web↔mobile.
+  const orderedOptions = useMemo(
+    () =>
+      activeStep
+        ? orderOptions(`${card.cardId}:${currentStep}`, activeStep.options)
+        : [],
+    [card.cardId, currentStep, activeStep],
+  );
+
   return (
     <View style={styles.section} accessibilityLabel="Step logic">
       <Text testID="sl-prompt" style={styles.prompt}>
@@ -206,7 +219,7 @@ export default function StepLogicCard({
             {activeStep.stem}
           </Text>
           <View style={styles.options}>
-            {activeStep.options.map((option) => (
+            {orderedOptions.map((option) => (
               <Pressable
                 key={option.id}
                 testID={`sl-option-${option.id}`}

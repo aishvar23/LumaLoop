@@ -23,9 +23,10 @@
  * region — never colour alone.
  */
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { orderOptions } from '../../core/cards/optionOrder';
 import type { WordUnscrambleCard as WordUnscrambleCardType } from '../../core/cards/types';
 import type {
   CardResolution,
@@ -140,6 +141,14 @@ export default function WordUnscrambleCard({
       ? `Correct: ${selectedLabel}`
       : `Incorrect: ${selectedLabel}.`;
 
+  // Present options in a deterministic, card-seeded order so the correct answer
+  // is not positionally guessable (keyed by `correctOptionId`, not slot). Stable
+  // across renders and identical on web↔mobile.
+  const orderedOptions = useMemo(
+    () => orderOptions(card.cardId, config.options),
+    [card.cardId, config.options],
+  );
+
   const scrambledDisplay = config.scrambled.split('').join(' ');
 
   return (
@@ -158,7 +167,7 @@ export default function WordUnscrambleCard({
         accessibilityLabel="Pick the unscrambled word"
         style={styles.options}
       >
-        {config.options.map((option) => {
+        {orderedOptions.map((option) => {
           const isSelected = option.id === selectedId;
           return (
             <Pressable

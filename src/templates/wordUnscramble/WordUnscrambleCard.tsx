@@ -25,8 +25,9 @@
  * `role="status"` live region — never colour alone.
  */
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
+import { orderOptions } from '../../cards/optionOrder';
 import type { WordUnscrambleCard as WordUnscrambleCardType } from '../../cards/types';
 import type { CardResolution, TemplateProps } from '../contract';
 import { useCardTimer } from '../useCardTimer';
@@ -126,6 +127,14 @@ export default function WordUnscrambleCard({
       ? `Correct: ${selectedLabel}`
       : `Incorrect: ${selectedLabel}.`;
 
+  // Present options in a deterministic, card-seeded order so the correct answer
+  // is not positionally guessable (it is keyed by `correctOptionId`, not slot).
+  // Stable across renders and identical on web↔mobile.
+  const orderedOptions = useMemo(
+    () => orderOptions(card.cardId, config.options),
+    [card.cardId, config.options],
+  );
+
   // Display the scrambled letters spaced out so each one reads as its own tile.
   const scrambledDisplay = config.scrambled.split('').join(' ');
 
@@ -139,7 +148,7 @@ export default function WordUnscrambleCard({
         {scrambledDisplay}
       </p>
       <div role="group" aria-label="Pick the unscrambled word" style={optionsStyle}>
-        {config.options.map((option) => {
+        {orderedOptions.map((option) => {
           const isSelected = option.id === selectedId;
           return (
             <button

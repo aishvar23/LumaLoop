@@ -24,9 +24,10 @@
  * position alone (the item LABEL carries the meaning).
  */
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { orderOptions } from '../../core/cards/optionOrder';
 import type { OddOneOutCard as OddOneOutCardType } from '../../core/cards/types';
 import type { CardResolution, TemplateProps } from '../../core/templates/contract';
 import { useCardTimer } from '../../core/templates/useCardTimer';
@@ -136,6 +137,14 @@ export default function OddOneOutCard({
       ? `Correct: ${selectedLabel}`
       : `Incorrect: ${selectedLabel}.`;
 
+  // Present items in a deterministic, card-seeded order so the odd one is not
+  // positionally guessable (keyed by `oddItemId`, not slot). Stable across
+  // renders and identical on web↔mobile.
+  const orderedItems = useMemo(
+    () => orderOptions(card.cardId, config.items),
+    [card.cardId, config.items],
+  );
+
   return (
     <View style={styles.section} accessibilityLabel="Odd one out">
       <Text testID="ooo-prompt" style={styles.prompt}>
@@ -145,7 +154,7 @@ export default function OddOneOutCard({
         accessibilityLabel="Tap the item that does not belong"
         style={styles.items}
       >
-        {config.items.map((item) => {
+        {orderedItems.map((item) => {
           const isSelected = item.id === selectedId;
           return (
             <Pressable

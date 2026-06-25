@@ -145,12 +145,19 @@ function ColorWordStream({
   const [step, setStep] = useState<StreamStep>(() =>
     trials.length > 0 ? { index: 0, mode: 'show' } : 'done',
   );
-  const stepRef = useRef<StreamStep>(step);
-  stepRef.current = step;
 
   const responsesRef = useRef<ColorWordResponse[]>([]);
   const respondedIndicesRef = useRef<Set<number>>(new Set());
   const trialShownAtRef = useRef<number>(streamStartMs);
+  // The trial a swatch pick is currently attributed to. A trial stays answerable
+  // from when it is shown THROUGH its trailing gap — the swatches remain on
+  // screen and unchanged during the gap, so a player who taps the ink they just
+  // saw a beat late must still have that pick counted (else a correct answer is
+  // silently dropped to an omission). Reset when the NEXT trial shows or the
+  // stream ends.
+  const answerableIndexRef = useRef<number | null>(
+    trials.length > 0 ? 0 : null,
+  );
   const firstResponseRef = useRef(false);
   const firstResponseRtRef = useRef<number | null>(null);
   const attemptCountRef = useRef(0);
@@ -212,6 +219,9 @@ function ColorWordStream({
 
     if (step.mode === 'show') {
       trialShownAtRef.current = nowRef.current();
+      // This trial is now the one a pick is attributed to (and remains so
+      // through the following gap, until the next trial shows below).
+      answerableIndexRef.current = step.index;
       const id = setTimeout(() => {
         setStep({ index: step.index, mode: 'gap' });
       }, Math.max(0, trialDurationMs));
@@ -220,6 +230,10 @@ function ColorWordStream({
 
     const id = setTimeout(() => {
       const next = step.index + 1;
+      if (next >= trials.length) {
+        // Stream ended: no trial is answerable anymore.
+        answerableIndexRef.current = null;
+      }
       setStep(next < trials.length ? { index: next, mode: 'show' } : 'done');
     }, Math.max(0, interTrialGapMs));
     return () => clearTimeout(id);
@@ -251,9 +265,11 @@ function ColorWordStream({
   const handlePick = useCallback(
     (colorId: string) => {
       if (resolvedRef.current) return;
-      const current = stepRef.current;
-      if (current === 'done' || current.mode !== 'show') return;
-      const index = current.index;
+      // The pick belongs to the trial currently answerable — the one shown,
+      // still attributable through its trailing gap. Null only before the first
+      // trial shows or after the stream ends.
+      const index = answerableIndexRef.current;
+      if (index === null) return;
       if (respondedIndicesRef.current.has(index)) return;
 
       const respondedAtMs = nowRef.current();

@@ -11,6 +11,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { orderOptions } from '../../cards/optionOrder';
 import type { QuickMathCard as QuickMathCardType } from '../../cards/types';
 import type { CardResolution, CardStartContext } from '../contract';
 import QuickMathCard from './QuickMathCard';
@@ -136,5 +137,54 @@ describe('timeout', () => {
     const resolution = lastResolution(onResolve);
     expect(resolution.resolutionType).toBe('timeout');
     expect(resolution.signals.timedOut).toBe(true);
+  });
+});
+
+describe('option ordering (BUG 1: correct answer not positionally guessable)', () => {
+  it('renders options in a deterministic, card-seeded order — NOT authored order', () => {
+    // The authored order lists the correct option (`opt-a`) first; the seeded
+    // shuffle must move it off slot 0 so the answer is not "tap the first button".
+    renderCard({ now: () => 1_000 });
+    const group = screen.getByRole('group', { name: 'Pick the answer' });
+    const renderedIds = Array.from(
+      group.querySelectorAll('[data-testid^="qm-option-"]'),
+    ).map((el) => el.getAttribute('data-testid'));
+    expect(renderedIds).toHaveLength(3);
+    // All authored options are still present (a permutation, none dropped).
+    expect(renderedIds.sort()).toEqual([
+      'qm-option-opt-a',
+      'qm-option-opt-b',
+      'qm-option-opt-c',
+    ]);
+    // The rendered order is exactly the deterministic seeded ordering — proving
+    // the renderer routes display through `orderOptions(cardId, …)` rather than
+    // the authored array. (The shuffle's position-spreading property is covered
+    // exhaustively in `optionOrder.test.ts`.)
+    const expectedOrder = orderOptions('qm-1', quickMathCard().config.options).map(
+      (o) => `qm-option-${o.id}`,
+    );
+    const actualOrder = Array.from(
+      group.querySelectorAll('[data-testid^="qm-option-"]'),
+    ).map((el) => el.getAttribute('data-testid'));
+    expect(actualOrder).toEqual(expectedOrder);
+    // And for this card's seed that ordering is NOT the authored order (the
+    // correct option `opt-a` is no longer trivially first).
+    expect(expectedOrder).not.toEqual([
+      'qm-option-opt-a',
+      'qm-option-opt-b',
+      'qm-option-opt-c',
+    ]);
+  });
+
+  it('still scores the correct option correct even when it is not first', () => {
+    let clock = 1_000;
+    const { onResolve } = renderCard({ now: () => clock });
+    clock = 1_500;
+    // Evaluation is by id, not position: picking the correct id resolves correct
+    // regardless of where the shuffle placed it.
+    selectOption('opt-a');
+    const resolution = lastResolution(onResolve);
+    expect(resolution.isCorrect).toBe(true);
+    expect(resolution.resolutionType).toBe('correct');
   });
 });

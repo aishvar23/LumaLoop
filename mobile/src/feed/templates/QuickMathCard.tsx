@@ -21,9 +21,10 @@
  * with explicit `accessibilityState.selected` plus a polite live region.
  */
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { orderOptions } from '../../core/cards/optionOrder';
 import type { QuickMathCard as QuickMathCardType } from '../../core/cards/types';
 import type {
   CardResolution,
@@ -139,6 +140,14 @@ export default function QuickMathCard({
       ? `Correct: ${selectedLabel}`
       : `Incorrect: ${selectedLabel}.`;
 
+  // Present options in a deterministic, card-seeded order so the correct answer
+  // is not positionally guessable (keyed by `correctOptionId`, not slot). Stable
+  // across renders and identical on web↔mobile.
+  const orderedOptions = useMemo(
+    () => orderOptions(card.cardId, config.options),
+    [card.cardId, config.options],
+  );
+
   return (
     <View style={styles.section} accessibilityLabel="Quick math">
       <Text
@@ -153,7 +162,7 @@ export default function QuickMathCard({
         accessibilityLabel="Pick the answer"
         style={styles.options}
       >
-        {config.options.map((option) => {
+        {orderedOptions.map((option) => {
           const isSelected = option.id === selectedId;
           return (
             <Pressable

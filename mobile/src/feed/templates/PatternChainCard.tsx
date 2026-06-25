@@ -36,9 +36,10 @@
  * own accent surface paired with the order, never colour alone.
  */
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { orderOptions } from '../../core/cards/optionOrder';
 import type { PatternChainCard as PatternChainCardType } from '../../core/cards/types';
 import type { CardResolution, TemplateProps } from '../../core/templates/contract';
 import { useCardTimer } from '../../core/templates/useCardTimer';
@@ -185,6 +186,18 @@ export default function PatternChainCard({
   const chainComplete = chosenLabels.length >= steps.length;
   const activeStep = chainComplete ? undefined : steps[currentStep];
 
+  // Present the active step's options in a deterministic, per-step-seeded order so
+  // the correct next item is not positionally guessable (keyed by
+  // `correctOptionId`, not slot). Seeded per step (`cardId:stepIndex`) so each
+  // step shuffles independently but stably; identical on web↔mobile.
+  const orderedOptions = useMemo(
+    () =>
+      activeStep
+        ? orderOptions(`${card.cardId}:${currentStep}`, activeStep.options)
+        : [],
+    [card.cardId, currentStep, activeStep],
+  );
+
   return (
     <View style={styles.section} accessibilityLabel="Pattern chain">
       <Text testID="pc-prompt" style={styles.prompt}>
@@ -238,7 +251,7 @@ export default function PatternChainCard({
           accessibilityLabel={`Pick the next item (step ${currentStep + 1} of ${steps.length})`}
           style={styles.options}
         >
-          {activeStep.options.map((option) => (
+          {orderedOptions.map((option) => (
             <Pressable
               key={option.id}
               testID={`pc-option-${option.id}`}

@@ -39,6 +39,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { orderOptions } from '../../cards/optionOrder';
 import type { WhatChangedCard as WhatChangedCardType } from '../../cards/types';
 import type { CardResolution, CardStartContext, TemplateProps } from '../contract';
 import { useCardTimer } from '../useCardTimer';
@@ -233,6 +234,14 @@ function WhatChangedAnswer({
     ? (config.options.find((option) => option.id === selectedId)?.label ?? null)
     : null;
 
+  // Present options in a deterministic, card-seeded order so the correct answer
+  // is not positionally guessable (it is keyed by `correctOptionId`, not slot).
+  // Stable across renders and identical on web↔mobile.
+  const orderedOptions = useMemo(
+    () => orderOptions(card.cardId, config.options),
+    [card.cardId, config.options],
+  );
+
   return (
     <>
       <PatternStrip
@@ -241,7 +250,7 @@ function WhatChangedAnswer({
         testIdPrefix="wc-after"
       />
       <div role="group" aria-label="What changed? Pick one" style={optionsStyle}>
-        {config.options.map((option) => {
+        {orderedOptions.map((option) => {
           const isSelected = option.id === selectedId;
           return (
             <button

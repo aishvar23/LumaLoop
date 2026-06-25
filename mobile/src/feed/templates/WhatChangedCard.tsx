@@ -37,6 +37,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { orderOptions } from '../../core/cards/optionOrder';
 import type { WhatChangedCard as WhatChangedCardType } from '../../core/cards/types';
 import type {
   CardResolution,
@@ -243,6 +244,14 @@ function WhatChangedAnswer({
     ? (config.options.find((option) => option.id === selectedId)?.label ?? null)
     : null;
 
+  // Present options in a deterministic, card-seeded order so the correct answer
+  // is not positionally guessable (keyed by `correctOptionId`, not slot). Stable
+  // across renders and identical on web↔mobile.
+  const orderedOptions = useMemo(
+    () => orderOptions(card.cardId, config.options),
+    [card.cardId, config.options],
+  );
+
   return (
     <>
       <PatternStrip
@@ -256,7 +265,7 @@ function WhatChangedAnswer({
         accessibilityLabel="What changed? Pick one"
         style={styles.options}
       >
-        {config.options.map((option) => {
+        {orderedOptions.map((option) => {
           const isSelected = option.id === selectedId;
           return (
             <Pressable

@@ -25,8 +25,9 @@
  * region — never by colour or position alone (the item LABEL carries the meaning).
  */
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
+import { orderOptions } from '../../cards/optionOrder';
 import type { OddOneOutCard as OddOneOutCardType } from '../../cards/types';
 import type { CardResolution, TemplateProps } from '../contract';
 import { useCardTimer } from '../useCardTimer';
@@ -124,6 +125,14 @@ export default function OddOneOutCard({
       ? `Correct: ${selectedLabel}`
       : `Incorrect: ${selectedLabel}.`;
 
+  // Present items in a deterministic, card-seeded order so the odd one is not
+  // positionally guessable (it is keyed by `oddItemId`, not slot). Stable across
+  // renders and identical on web↔mobile.
+  const orderedItems = useMemo(
+    () => orderOptions(card.cardId, config.items),
+    [card.cardId, config.items],
+  );
+
   return (
     <section aria-label="Odd one out" style={sectionStyle}>
       <p data-testid="ooo-prompt" style={promptStyle}>
@@ -134,7 +143,7 @@ export default function OddOneOutCard({
         aria-label="Tap the item that does not belong"
         style={itemsStyle}
       >
-        {config.items.map((item) => {
+        {orderedItems.map((item) => {
           const isSelected = item.id === selectedId;
           return (
             <button
