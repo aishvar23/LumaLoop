@@ -1034,6 +1034,29 @@ function validateWordUnscrambleAnswer(
     );
   }
 
+  // Uniqueness of the valid unscramble: every NON-correct option's label must
+  // NOT itself be a valid anagram of `scrambled`. The mechanic scores purely by
+  // `correctOptionId`, so a distractor that is also a genuine unscramble of the
+  // letters would be a second "right" answer — a player picking it would be
+  // wrongly marked incorrect. Reject such ambiguous cards at startup. Guarded on
+  // a non-empty `scrambled` so a malformed card (already reported above) does not
+  // produce noise here.
+  if (typeof scrambled === 'string' && scrambled.length > 0) {
+    for (const option of options) {
+      if (option.id === correctOptionId) {
+        continue;
+      }
+      if (isValidUnscramble(scrambled, option.label)) {
+        errors.push(
+          answerError(
+            card.cardId,
+            `word_unscramble distractor "${option.label}" is itself a valid unscramble of the letters (ambiguous)`,
+          ),
+        );
+      }
+    }
+  }
+
   return errors;
 }
 

@@ -1502,6 +1502,35 @@ describe('word_unscramble answer validation', () => {
     card.config = { ...card.config, correctOptionId: 'missing' };
     expect(validateCatalog([card]).valid).toBe(false);
   });
+
+  it('rejects a distractor that is itself a valid anagram of the letters', () => {
+    const card = validWordUnscramble();
+    // "tears" is a genuine unscramble of "tsrae" — a second valid answer.
+    card.config = {
+      ...card.config,
+      options: [
+        { id: 'a', label: 'stare' },
+        { id: 'b', label: 'tears' },
+        { id: 'c', label: 'scare' },
+      ],
+    };
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+    expect(
+      result.errors.some((error) =>
+        error.message.includes('is itself a valid unscramble'),
+      ),
+    ).toBe(true);
+  });
+
+  it('accepts a card whose distractors are near-words but not anagrams', () => {
+    // The default fixture distractors ("store", "scare") differ from the
+    // letters of "tsrae", so the clean card passes the uniqueness rule.
+    expect(validateCatalog([validWordUnscramble()]).valid).toBe(true);
+  });
 });
 
 describe('quick_math answer validation', () => {

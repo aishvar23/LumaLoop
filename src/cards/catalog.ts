@@ -4640,15 +4640,15 @@ const wordUnscrambleCards: WordUnscrambleCard[] = [
     },
     explanation: {
       title: 'It spells GARDEN',
-      body: 'The letters E, N, G, D, A, R rearrange to spell GARDEN. DANGER uses the same six letters, so it is a tempting trap.',
+      body: 'The letters E, N, G, D, A, R rearrange to spell GARDEN. The other choices look close but cannot be built from exactly these letters.',
     },
     config: {
       scrambled: 'engdar',
       answer: 'garden',
       options: [
         { id: 'opt-garden', label: 'garden' },
-        { id: 'opt-danger', label: 'danger' },
-        { id: 'opt-ranged', label: 'ranged' },
+        { id: 'opt-grander', label: 'grander' },
+        { id: 'opt-graded', label: 'graded' },
         { id: 'opt-grader', label: 'grader' },
       ],
       correctOptionId: 'opt-garden',
@@ -4679,7 +4679,7 @@ const wordUnscrambleCards: WordUnscrambleCard[] = [
       answer: 'picture',
       options: [
         { id: 'opt-picture', label: 'picture' },
-        { id: 'opt-cuprite', label: 'cuprite' },
+        { id: 'opt-puncture', label: 'puncture' },
         { id: 'opt-capture', label: 'capture' },
         { id: 'opt-curtail', label: 'curtail' },
       ],
@@ -4743,9 +4743,9 @@ const wordUnscrambleCards: WordUnscrambleCard[] = [
       answer: 'algorithm',
       options: [
         { id: 'opt-algorithm', label: 'algorithm' },
-        { id: 'opt-logarithm', label: 'logarithm' },
+        { id: 'opt-logarithms', label: 'logarithms' },
         { id: 'opt-algoriths', label: 'algoriths' },
-        { id: 'opt-marigolht', label: 'marigolht' },
+        { id: 'opt-alligator', label: 'alligator' },
       ],
       correctOptionId: 'opt-algorithm',
       timeLimitMs: 28000,
@@ -4768,15 +4768,15 @@ const wordUnscrambleCards: WordUnscrambleCard[] = [
     },
     explanation: {
       title: 'It spells INSECT',
-      body: 'The letters T, C, N, E, S, I rearrange to spell INSECT. NICEST and INCEST use the same six letters, so both are tempting traps.',
+      body: 'The letters T, C, N, E, S, I rearrange to spell INSECT. The other choices look close but cannot be built from exactly these letters.',
     },
     config: {
       scrambled: 'tcnesi',
       answer: 'insect',
       options: [
         { id: 'opt-insect', label: 'insect' },
-        { id: 'opt-nicest', label: 'nicest' },
-        { id: 'opt-incest', label: 'incest' },
+        { id: 'opt-insects', label: 'insects' },
+        { id: 'opt-incites', label: 'incites' },
         { id: 'opt-client', label: 'client' },
       ],
       correctOptionId: 'opt-insect',
