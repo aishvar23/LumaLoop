@@ -37,6 +37,8 @@ import CodeBreakCard from './templates/CodeBreakCard';
 import CircuitFlowCard from './templates/CircuitFlowCard';
 import PrismPathCard from './templates/PrismPathCard';
 import SignalSetCard from './templates/SignalSetCard';
+import WordUnscrambleCard from './templates/WordUnscrambleCard';
+import QuickMathCard from './templates/QuickMathCard';
 
 /**
  * A template renderer: a component that accepts {@link TemplateProps} for its
@@ -103,4 +105,6 @@ export const defaultRendererRegistry: RendererRegistry = {
   prism_path: PrismPathCard,
   signal_set: SignalSetCard,
   circuit_flow: CircuitFlowCard,
+  word_unscramble: WordUnscrambleCard,
+  quick_math: QuickMathCard,
 };

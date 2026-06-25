@@ -62,7 +62,9 @@ export type TemplateType =
   | 'code_break'
   | 'prism_path'
   | 'signal_set'
-  | 'circuit_flow';
+  | 'circuit_flow'
+  | 'word_unscramble'
+  | 'quick_math';
 
 export type Difficulty =
   | 'extremely_easy'
@@ -396,6 +398,7 @@ export type PrismPathCard = LiquidCardBase & {
   };
 };
 
+/** Visual attributes used by the original signal_set triad puzzle. */
 export type SignalShape = 'circle' | 'triangle' | 'diamond';
 export type SignalFill = 'solid' | 'striped' | 'outline';
 export type SignalCount = 1 | 2 | 3;
@@ -407,6 +410,11 @@ export type SignalTile = {
   count: SignalCount;
 };
 
+/**
+ * Select three tiles whose shape, fill, and count are each either all identical
+ * or all different. The canonical solution keeps catalog authoring testable,
+ * while the evaluator accepts every mathematically valid trio on the board.
+ */
 export type SignalSetCard = LiquidCardBase & {
   templateType: 'signal_set';
   config: {
@@ -420,6 +428,7 @@ export type CircuitRotation = 0 | 1 | 2 | 3;
 
 export type CircuitTile = GridCoordinate & {
   id: string;
+  /** Connections when the tile rotation is zero. */
   connections: ReadonlyArray<GridDirection>;
   initialRotation: CircuitRotation;
 };
@@ -429,6 +438,10 @@ export type CircuitSolution = {
   rotation: CircuitRotation;
 };
 
+/**
+ * Rotate every tile into one leak-free network connected to the source. The
+ * renderer owns rotations; the pure evaluator owns graph connectivity.
+ */
 export type CircuitFlowCard = LiquidCardBase & {
   templateType: 'circuit_flow';
   config: {
@@ -437,6 +450,85 @@ export type CircuitFlowCard = LiquidCardBase & {
     sourceTileId: string;
     tiles: ReadonlyArray<CircuitTile>;
     solution: ReadonlyArray<CircuitSolution>;
+    timeLimitMs: number;
+  };
+};
+
+/**
+ * Unscramble a hidden word: the player sees its letters in a scrambled order and
+ * picks the correctly-unscrambled word from a multiple-choice list (verbal
+ * pattern matching → pattern_recognition).
+ *
+ * MCQ shape (mirrors tiny_logic): `options` are candidate words and exactly one
+ * (`correctOptionId`) is the real unscrambling. `scrambled` is the shuffled
+ * letters shown to the player and `answer` is the word those letters spell. The
+ * pure {@link evaluateWordUnscramble} is the single source of truth: it confirms
+ * a selection is correct ONLY when its option both (a) equals the configured
+ * `correctOptionId` and (b) is a genuine letter-for-letter rearrangement of
+ * `scrambled` — so a mis-authored answer key cannot pass validation/scoring.
+ */
+export type WordUnscrambleCard = LiquidCardBase & {
+  templateType: 'word_unscramble';
+  config: {
+    /** The hidden word's letters in a scrambled display order (what the player sees). */
+    scrambled: string;
+    /** The real word `scrambled` spells — the answer key the evaluator verifies against. */
+    answer: string;
+    /**
+     * Candidate words; exactly one (`correctOptionId`) is `answer`. Distractors
+     * are plausible near-words / partial anagrams. Authored ids are stable,
+     * unique-within-a-card slugs.
+     */
+    options: Array<{ id: string; label: string }>;
+    /** The id of the option whose label equals `answer`. */
+    correctOptionId: string;
+    timeLimitMs: number;
+  };
+};
+
+/** A single arithmetic operator supported by quick_math. */
+export type QuickMathOperator = '+' | '-' | '*' | '/';
+
+/**
+ * A structured, left-to-right-with-precedence arithmetic expression for
+ * quick_math. `operands[0]` is the first number; each later `operand[i]` is
+ * combined with the running value via `operators[i-1]`. Standard precedence
+ * applies (`*`/`/` before `+`/`-`), so the pure evaluator computes the canonical
+ * value rather than the renderer trusting an authored number.
+ */
+export type QuickMathExpression = {
+  /** The numeric operands, in order; length === operators.length + 1, length ≥ 2. */
+  operands: ReadonlyArray<number>;
+  /** The operators between consecutive operands; length === operands.length - 1. */
+  operators: ReadonlyArray<QuickMathOperator>;
+};
+
+/**
+ * Solve a quick arithmetic problem, answered via multiple choice (numeric
+ * options) — a numerical-reasoning mechanic (logical_reasoning).
+ *
+ * The `expression` is stored STRUCTURALLY (operands + operators), so the pure
+ * {@link evaluateQuickMath} computes the canonical value with standard operator
+ * precedence and decides correctness — it never trusts an authored answer
+ * number. Each option carries a numeric `value`; a selection is correct iff its
+ * `value` equals the computed result (and matches `correctOptionId`). `display`
+ * is the human-readable equation shown to the player (e.g. `7 × 8 − 4`).
+ */
+export type QuickMathCard = LiquidCardBase & {
+  templateType: 'quick_math';
+  config: {
+    /** Human-readable equation shown to the player (display only; never parsed). */
+    display: string;
+    /** The structured expression the evaluator computes. */
+    expression: QuickMathExpression;
+    /**
+     * Numeric answer choices; exactly one (`correctOptionId`) has the `value`
+     * equal to the computed result. Distractors are strong near-misses
+     * (off-by-one, wrong-precedence). Authored ids are unique-within-a-card slugs.
+     */
+    options: Array<{ id: string; label: string; value: number }>;
+    /** The id of the option whose `value` equals the computed result. */
+    correctOptionId: string;
     timeLimitMs: number;
   };
 };
@@ -456,7 +548,9 @@ export type LiquidCard =
   | CodeBreakCard
   | PrismPathCard
   | SignalSetCard
-  | CircuitFlowCard;
+  | CircuitFlowCard
+  | WordUnscrambleCard
+  | QuickMathCard;
 
 /**
  * The categories each template is allowed to map to (Technical Design §11).
@@ -506,4 +600,13 @@ export const templateCategoryMap: Readonly<
     'logical_reasoning',
     'pattern_recognition',
   ] as const),
+  // word_unscramble is verbal pattern matching: the player recognises which
+  // word a scrambled letter-set forms. That is squarely pattern_recognition (no
+  // new ChallengeCategory is warranted — Design §7 keeps "verbal reasoning"
+  // framing out of user-facing copy).
+  word_unscramble: Object.freeze(['pattern_recognition'] as const),
+  // quick_math is numerical reasoning: evaluate/complete an arithmetic
+  // expression. That maps to logical_reasoning (the same category as the other
+  // deductive mechanics) — no new ChallengeCategory is warranted.
+  quick_math: Object.freeze(['logical_reasoning'] as const),
 }) satisfies Readonly<Record<TemplateType, readonly ChallengeCategory[]>>;

@@ -20,6 +20,8 @@ const ALL_TEMPLATE_TYPES: TemplateType[] = [
   'prism_path',
   'signal_set',
   'circuit_flow',
+  'word_unscramble',
+  'quick_math',
 ];
 
 const ALL_CATEGORIES: ChallengeCategory[] = [
@@ -98,6 +100,8 @@ describe('templateCategoryMap', () => {
       ],
       signal_set: ['pattern_recognition', 'logical_reasoning'],
       circuit_flow: ['logical_reasoning', 'pattern_recognition'],
+      word_unscramble: ['pattern_recognition'],
+      quick_math: ['logical_reasoning'],
     });
   });
 });
@@ -143,6 +147,12 @@ function categoriesForCard(card: LiquidCard): ChallengeCategory {
       return 'pattern_recognition';
     case 'circuit_flow':
       void card.config.sourceTileId;
+      return 'logical_reasoning';
+    case 'word_unscramble':
+      void card.config.scrambled;
+      return 'pattern_recognition';
+    case 'quick_math':
+      void card.config.expression;
       return 'logical_reasoning';
     default: {
       // If a new TemplateType is added without a case above, `card` is no

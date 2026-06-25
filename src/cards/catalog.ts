@@ -32,12 +32,14 @@ import type {
   MemorySequenceCard,
   PatternChainCard,
   PrismPathCard,
+  QuickMathCard,
   RuleFlipCard,
   SignalSetCard,
   SpotItCard,
   StepLogicCard,
   TinyLogicCard,
   WhatChangedCard,
+  WordUnscrambleCard,
 } from './types';
 
 // ---------------------------------------------------------------------------
@@ -4087,6 +4089,414 @@ const circuitFlowCards: CircuitFlowCard[] = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// word_unscramble — pick the word the scrambled letters spell.
+// Category allowed: pattern_recognition. The scrambled letters are a genuine
+// rearrangement of the answer (validated), and the correct option's label IS
+// the answer. Verbal-reasoning framing is kept OUT of user-facing copy (Design
+// §7); copy speaks of "letters" and "words" only.
+// ---------------------------------------------------------------------------
+
+const wordUnscrambleCards: WordUnscrambleCard[] = [
+  {
+    cardId: 'wordunscramble-001',
+    creatorHandle: '@wordsmithy',
+    templateType: 'word_unscramble',
+    category: 'pattern_recognition',
+    difficulty: 'easy',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 12,
+    prompt: 'Rearrange the letters to find the hidden word.',
+    puzzleDna: {
+      mechanic: 'word-unscramble',
+      inputMode: 'choice',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'It spells APPLE',
+      body: 'The letters L, P, A, E, P rearrange to spell APPLE.',
+    },
+    shareText: 'Unscrambled the word in seconds.',
+    config: {
+      scrambled: 'lpaep',
+      answer: 'apple',
+      options: [
+        { id: 'opt-apple', label: 'apple' },
+        { id: 'opt-ample', label: 'ample' },
+        { id: 'opt-pearl', label: 'pearl' },
+        { id: 'opt-lapel', label: 'lapel' },
+      ],
+      correctOptionId: 'opt-apple',
+      timeLimitMs: 12000,
+    },
+  },
+  {
+    cardId: 'wordunscramble-002',
+    creatorHandle: '@anagrammar',
+    templateType: 'word_unscramble',
+    category: 'pattern_recognition',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 15,
+    prompt: 'Rearrange the letters to find the hidden word.',
+    puzzleDna: {
+      mechanic: 'word-unscramble',
+      inputMode: 'choice',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'It spells STARE',
+      body: 'The same five letters spell STARE, TEARS, and RATES — only STARE was offered.',
+    },
+    config: {
+      scrambled: 'tsrae',
+      answer: 'stare',
+      options: [
+        { id: 'opt-stare', label: 'stare' },
+        { id: 'opt-stair', label: 'stair' },
+        { id: 'opt-store', label: 'store' },
+        { id: 'opt-scare', label: 'scare' },
+      ],
+      correctOptionId: 'opt-stare',
+      timeLimitMs: 15000,
+    },
+  },
+  {
+    cardId: 'wordunscramble-003',
+    creatorHandle: '@wordsmithy',
+    templateType: 'word_unscramble',
+    category: 'pattern_recognition',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 16,
+    prompt: 'Rearrange the letters to find the hidden word.',
+    puzzleDna: {
+      mechanic: 'word-unscramble',
+      inputMode: 'choice',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'It spells GARDEN',
+      body: 'The letters E, N, G, D, A, R rearrange to spell GARDEN. DANGER uses the same six letters, so it is a tempting trap.',
+    },
+    config: {
+      scrambled: 'engdar',
+      answer: 'garden',
+      options: [
+        { id: 'opt-garden', label: 'garden' },
+        { id: 'opt-danger', label: 'danger' },
+        { id: 'opt-ranged', label: 'ranged' },
+        { id: 'opt-grader', label: 'grader' },
+      ],
+      correctOptionId: 'opt-garden',
+      timeLimitMs: 16000,
+    },
+  },
+  {
+    cardId: 'wordunscramble-004',
+    creatorHandle: '@anagrammar',
+    templateType: 'word_unscramble',
+    category: 'pattern_recognition',
+    difficulty: 'hard',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 20,
+    prompt: 'Rearrange the letters to find the hidden word.',
+    puzzleDna: {
+      mechanic: 'word-unscramble',
+      inputMode: 'choice',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'It spells PICTURE',
+      body: 'The seven letters T, C, U, R, P, I, E rearrange to spell PICTURE.',
+    },
+    config: {
+      scrambled: 'tcurpie',
+      answer: 'picture',
+      options: [
+        { id: 'opt-picture', label: 'picture' },
+        { id: 'opt-cuprite', label: 'cuprite' },
+        { id: 'opt-capture', label: 'capture' },
+        { id: 'opt-curtail', label: 'curtail' },
+      ],
+      correctOptionId: 'opt-picture',
+      timeLimitMs: 20000,
+    },
+  },
+  {
+    cardId: 'wordunscramble-005',
+    creatorHandle: '@lexiloop',
+    templateType: 'word_unscramble',
+    category: 'pattern_recognition',
+    difficulty: 'hard',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 22,
+    prompt: 'Rearrange the letters to find the hidden word.',
+    puzzleDna: {
+      mechanic: 'word-unscramble',
+      inputMode: 'choice',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'It spells BALANCED',
+      body: 'The eight letters L, A, B, A, N, C, D, E rearrange to spell BALANCED.',
+    },
+    config: {
+      scrambled: 'labancde',
+      answer: 'balanced',
+      options: [
+        { id: 'opt-balanced', label: 'balanced' },
+        { id: 'opt-cabbaged', label: 'cabbaged' },
+        { id: 'opt-balsamic', label: 'balsamic' },
+        { id: 'opt-bankable', label: 'bankable' },
+      ],
+      correctOptionId: 'opt-balanced',
+      timeLimitMs: 22000,
+    },
+  },
+  {
+    cardId: 'wordunscramble-006',
+    creatorHandle: '@lexiloop',
+    templateType: 'word_unscramble',
+    category: 'pattern_recognition',
+    difficulty: 'extremely_hard',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 28,
+    prompt: 'Rearrange the letters to find the hidden word.',
+    puzzleDna: {
+      mechanic: 'word-unscramble',
+      inputMode: 'choice',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'It spells ALGORITHM',
+      body: 'The nine letters R, T, I, M, G, H, L, O, A rearrange to spell ALGORITHM.',
+    },
+    config: {
+      scrambled: 'rtimghloa',
+      answer: 'algorithm',
+      options: [
+        { id: 'opt-algorithm', label: 'algorithm' },
+        { id: 'opt-logarithm', label: 'logarithm' },
+        { id: 'opt-algoriths', label: 'algoriths' },
+        { id: 'opt-marigolht', label: 'marigolht' },
+      ],
+      correctOptionId: 'opt-algorithm',
+      timeLimitMs: 28000,
+    },
+  },
+];
+
+// ---------------------------------------------------------------------------
+// quick_math — solve a quick arithmetic problem (numeric MCQ).
+// Category allowed: logical_reasoning. The expression is stored structurally;
+// the evaluator COMPUTES the value (standard precedence) and validation proves
+// the correct option matches. Distractors are strong near-misses (off-by-one,
+// wrong-precedence). "Numerical reasoning" framing is kept OUT of copy (Design §7).
+// ---------------------------------------------------------------------------
+
+const quickMathCards: QuickMathCard[] = [
+  {
+    cardId: 'quickmath-001',
+    creatorHandle: '@numbercrunch',
+    templateType: 'quick_math',
+    category: 'logical_reasoning',
+    difficulty: 'easy',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 10,
+    prompt: 'Solve the equation and pick the answer.',
+    puzzleDna: {
+      mechanic: 'quick-math',
+      inputMode: 'choice',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'Simple sum',
+      body: '6 + 7 = 13.',
+    },
+    shareText: 'Quick-fire arithmetic, solved.',
+    config: {
+      display: '6 + 7',
+      expression: { operands: [6, 7], operators: ['+'] },
+      options: [
+        { id: 'opt-13', label: '13', value: 13 },
+        { id: 'opt-12', label: '12', value: 12 },
+        { id: 'opt-14', label: '14', value: 14 },
+        { id: 'opt-42', label: '42', value: 42 },
+      ],
+      correctOptionId: 'opt-13',
+      timeLimitMs: 10000,
+    },
+  },
+  {
+    cardId: 'quickmath-002',
+    creatorHandle: '@numbercrunch',
+    templateType: 'quick_math',
+    category: 'logical_reasoning',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 14,
+    prompt: 'Solve the equation and pick the answer.',
+    puzzleDna: {
+      mechanic: 'quick-math',
+      inputMode: 'choice',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'Multiply before subtracting',
+      body: '9 × 4 = 36, then 36 − 5 = 31.',
+    },
+    config: {
+      display: '9 × 4 − 5',
+      expression: { operands: [9, 4, 5], operators: ['*', '-'] },
+      options: [
+        { id: 'opt-31', label: '31', value: 31 },
+        { id: 'opt-41', label: '41', value: 41 },
+        { id: 'opt-30', label: '30', value: 30 },
+        { id: 'opt-32', label: '32', value: 32 },
+      ],
+      correctOptionId: 'opt-31',
+      timeLimitMs: 14000,
+    },
+  },
+  {
+    cardId: 'quickmath-003',
+    creatorHandle: '@mathstreak',
+    templateType: 'quick_math',
+    category: 'logical_reasoning',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 15,
+    prompt: 'Solve the equation and pick the answer.',
+    puzzleDna: {
+      mechanic: 'quick-math',
+      inputMode: 'choice',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'Multiply before adding',
+      body: '3 × 6 = 18, then 8 + 18 = 26. Adding left-to-right (8 + 3 = 11, × 6) would wrongly give 66.',
+    },
+    config: {
+      display: '8 + 3 × 6',
+      expression: { operands: [8, 3, 6], operators: ['+', '*'] },
+      options: [
+        { id: 'opt-26', label: '26', value: 26 },
+        { id: 'opt-66', label: '66', value: 66 },
+        { id: 'opt-25', label: '25', value: 25 },
+        { id: 'opt-24', label: '24', value: 24 },
+      ],
+      correctOptionId: 'opt-26',
+      timeLimitMs: 15000,
+    },
+  },
+  {
+    cardId: 'quickmath-004',
+    creatorHandle: '@mathstreak',
+    templateType: 'quick_math',
+    category: 'logical_reasoning',
+    difficulty: 'hard',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 20,
+    prompt: 'Solve the equation and pick the answer.',
+    puzzleDna: {
+      mechanic: 'quick-math',
+      inputMode: 'choice',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'Order of operations',
+      body: '48 ÷ 6 = 8 and 7 × 2 = 14, then 8 + 14 = 22.',
+    },
+    config: {
+      display: '48 ÷ 6 + 7 × 2',
+      expression: { operands: [48, 6, 7, 2], operators: ['/', '+', '*'] },
+      options: [
+        { id: 'opt-22', label: '22', value: 22 },
+        { id: 'opt-30', label: '30', value: 30 },
+        { id: 'opt-21', label: '21', value: 21 },
+        { id: 'opt-23', label: '23', value: 23 },
+      ],
+      correctOptionId: 'opt-22',
+      timeLimitMs: 20000,
+    },
+  },
+  {
+    cardId: 'quickmath-005',
+    creatorHandle: '@quotient',
+    templateType: 'quick_math',
+    category: 'logical_reasoning',
+    difficulty: 'hard',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 22,
+    prompt: 'Solve the equation and pick the answer.',
+    puzzleDna: {
+      mechanic: 'quick-math',
+      inputMode: 'choice',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'Multiply and divide first',
+      body: '12 × 3 = 36 and 18 ÷ 2 = 9, then 36 − 9 = 27.',
+    },
+    config: {
+      display: '12 × 3 − 18 ÷ 2',
+      expression: { operands: [12, 3, 18, 2], operators: ['*', '-', '/'] },
+      options: [
+        { id: 'opt-27', label: '27', value: 27 },
+        { id: 'opt-9', label: '9', value: 9 },
+        { id: 'opt-28', label: '28', value: 28 },
+        { id: 'opt-26', label: '26', value: 26 },
+      ],
+      correctOptionId: 'opt-27',
+      timeLimitMs: 22000,
+    },
+  },
+  {
+    cardId: 'quickmath-006',
+    creatorHandle: '@quotient',
+    templateType: 'quick_math',
+    category: 'logical_reasoning',
+    difficulty: 'extremely_hard',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 28,
+    prompt: 'Solve the equation and pick the answer.',
+    puzzleDna: {
+      mechanic: 'quick-math',
+      inputMode: 'choice',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'Four operations, one order',
+      body: '7 × 9 = 63 and 56 ÷ 8 = 7, then 63 − 7 + 4 = 60.',
+    },
+    config: {
+      display: '7 × 9 − 56 ÷ 8 + 4',
+      expression: { operands: [7, 9, 56, 8, 4], operators: ['*', '-', '/', '+'] },
+      options: [
+        { id: 'opt-60', label: '60', value: 60 },
+        { id: 'opt-56', label: '56', value: 56 },
+        { id: 'opt-59', label: '59', value: 59 },
+        { id: 'opt-61', label: '61', value: 61 },
+      ],
+      correctOptionId: 'opt-60',
+      timeLimitMs: 28000,
+    },
+  },
+];
+
 /**
  * The complete authored catalog. Order groups cards by template for
  * readability; session selection / shuffling is the engine's concern, not the
@@ -4105,6 +4515,8 @@ export const catalog: readonly LiquidCard[] = [
   ...prismPathCards,
   ...signalSetCards,
   ...circuitFlowCards,
+  ...wordUnscrambleCards,
+  ...quickMathCards,
 ];
 
 /**

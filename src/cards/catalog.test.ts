@@ -66,6 +66,8 @@ describe('authored card catalog', () => {
       'prism_path',
       'signal_set',
       'circuit_flow',
+      'word_unscramble',
+      'quick_math',
     ];
     for (const template of templates) {
       const count = catalog.filter(
@@ -93,6 +95,8 @@ describe('authored card catalog', () => {
       'prism_path',
       'signal_set',
       'circuit_flow',
+      'word_unscramble',
+      'quick_math',
     ];
     const hardCount = catalog.filter(
       (card) => card.difficulty === 'hard',
@@ -142,6 +146,8 @@ describe('authored card catalog', () => {
       'prism_path',
       'signal_set',
       'circuit_flow',
+      'word_unscramble',
+      'quick_math',
     ];
     for (const template of templates) {
       const perTemplate = new Set(

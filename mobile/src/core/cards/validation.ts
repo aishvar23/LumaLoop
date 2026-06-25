@@ -1,5 +1,5 @@
-// Ported from web `src/cards/validation.ts`; source of truth is the web app —
-// keep in sync (Phase M, M2). See `mobile/src/core/README.md`.
+// Ported from web `src/cards/validation.ts`; source of truth is the web app — keep in
+// sync (Phase M, M2). See `mobile/src/core/README.md`.
 /**
  * Startup card-catalog validation (Technical Design §11).
  *
@@ -33,9 +33,11 @@ import {
   type SignalSetCard,
   type SpotItCard,
   type StepLogicCard,
+  type QuickMathCard,
   type TemplateType,
   type TinyLogicCard,
   type WhatChangedCard,
+  type WordUnscrambleCard,
 } from './types';
 import {
   orientationMapFromSolution,
@@ -46,6 +48,8 @@ import {
   evaluateCircuitFlow,
 } from '../templates/circuitFlow/circuitFlowEvaluator';
 import { isValidSignalTrio } from '../templates/signalSet/signalSetEvaluator';
+import { isValidUnscramble } from '../templates/wordUnscramble/wordUnscrambleEvaluator';
+import { computeQuickMath } from '../templates/quickMath/quickMathEvaluator';
 
 /** Inclusive lower bound for any template's `config.timeLimitMs` (5 seconds). */
 export const MIN_TIME_LIMIT_MS = 5000;
@@ -127,6 +131,8 @@ const templateAnswerValidators: {
   prism_path: validatePrismPathAnswer,
   signal_set: validateSignalSetAnswer,
   circuit_flow: validateCircuitFlowAnswer,
+  word_unscramble: validateWordUnscrambleAnswer,
+  quick_math: validateQuickMathAnswer,
 };
 
 /**
@@ -924,6 +930,223 @@ function validateCircuitFlowAnswer(card: CircuitFlowCard): ValidationError[] {
       );
     }
   }
+  return errors;
+}
+
+/** Inclusive bounds for a word_unscramble's answer length, in letters. */
+export const MIN_UNSCRAMBLE_LENGTH = 3;
+export const MAX_UNSCRAMBLE_LENGTH = 10;
+/** Inclusive lower bound for a word_unscramble's option count. */
+export const MIN_UNSCRAMBLE_OPTIONS = 2;
+
+function validateWordUnscrambleAnswer(
+  card: WordUnscrambleCard,
+): ValidationError[] {
+  const { scrambled, answer, options, correctOptionId } = card.config;
+  const errors: ValidationError[] = [];
+
+  if (typeof answer !== 'string' || answer.trim().length === 0) {
+    errors.push(answerError(card.cardId, 'word_unscramble has an empty answer'));
+  } else if (
+    answer.length < MIN_UNSCRAMBLE_LENGTH ||
+    answer.length > MAX_UNSCRAMBLE_LENGTH
+  ) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `word_unscramble answer length ${answer.length} is outside [${MIN_UNSCRAMBLE_LENGTH}, ${MAX_UNSCRAMBLE_LENGTH}]`,
+      ),
+    );
+  }
+
+  if (typeof scrambled !== 'string' || scrambled.trim().length === 0) {
+    errors.push(
+      answerError(card.cardId, 'word_unscramble has empty scrambled letters'),
+    );
+  }
+
+  // The scrambled letters must really be a rearrangement of the answer (so the
+  // puzzle is solvable), and ideally not already spell the answer.
+  if (
+    typeof scrambled === 'string' &&
+    typeof answer === 'string' &&
+    scrambled.length > 0 &&
+    answer.length > 0
+  ) {
+    if (!isValidUnscramble(scrambled, answer)) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `word_unscramble scrambled "${scrambled}" is not an anagram of answer "${answer}"`,
+        ),
+      );
+    }
+    if (scrambled.toLowerCase() === answer.toLowerCase()) {
+      errors.push(
+        answerError(
+          card.cardId,
+          'word_unscramble scrambled letters already spell the answer',
+        ),
+      );
+    }
+  }
+
+  if (options.length < MIN_UNSCRAMBLE_OPTIONS) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `word_unscramble must have at least ${MIN_UNSCRAMBLE_OPTIONS} options, got ${options.length}`,
+      ),
+    );
+    return errors;
+  }
+
+  const ids = options.map((option) => option.id);
+  if (new Set(ids).size !== ids.length) {
+    errors.push(
+      answerError(card.cardId, 'word_unscramble has duplicate option ids'),
+    );
+  }
+
+  const correct = options.find((option) => option.id === correctOptionId);
+  if (!correct) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `word_unscramble correctOptionId "${correctOptionId}" is not among options`,
+      ),
+    );
+  } else if (typeof answer === 'string' && correct.label !== answer) {
+    // The correct option's label must be exactly the answer word, so the
+    // answer key the renderer/evaluator trusts is consistent with the puzzle.
+    errors.push(
+      answerError(
+        card.cardId,
+        `word_unscramble correct option label "${correct.label}" does not equal answer "${answer}"`,
+      ),
+    );
+  }
+
+  return errors;
+}
+
+/** Inclusive bounds for a quick_math expression's operand count. */
+export const MIN_QUICK_MATH_OPERANDS = 2;
+export const MAX_QUICK_MATH_OPERANDS = 5;
+/** Inclusive lower bound for a quick_math's option count. */
+export const MIN_QUICK_MATH_OPTIONS = 2;
+
+const QUICK_MATH_OPERATORS = new Set(['+', '-', '*', '/']);
+
+function validateQuickMathAnswer(card: QuickMathCard): ValidationError[] {
+  const { display, expression, options, correctOptionId } = card.config;
+  const errors: ValidationError[] = [];
+
+  if (typeof display !== 'string' || display.trim().length === 0) {
+    errors.push(answerError(card.cardId, 'quick_math has an empty display'));
+  }
+
+  const { operands, operators } = expression;
+  if (
+    operands.length < MIN_QUICK_MATH_OPERANDS ||
+    operands.length > MAX_QUICK_MATH_OPERANDS
+  ) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `quick_math operand count ${operands.length} is outside [${MIN_QUICK_MATH_OPERANDS}, ${MAX_QUICK_MATH_OPERANDS}]`,
+      ),
+    );
+  }
+  if (operators.length !== operands.length - 1) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `quick_math operator count ${operators.length} must be one less than operand count ${operands.length}`,
+      ),
+    );
+  }
+  if (!operands.every((operand) => Number.isFinite(operand))) {
+    errors.push(
+      answerError(card.cardId, 'quick_math operands must all be finite numbers'),
+    );
+  }
+  if (!operators.every((operator) => QUICK_MATH_OPERATORS.has(operator))) {
+    errors.push(
+      answerError(card.cardId, 'quick_math has an unsupported operator'),
+    );
+  }
+
+  if (options.length < MIN_QUICK_MATH_OPTIONS) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `quick_math must have at least ${MIN_QUICK_MATH_OPTIONS} options, got ${options.length}`,
+      ),
+    );
+  }
+  const ids = options.map((option) => option.id);
+  if (new Set(ids).size !== ids.length) {
+    errors.push(answerError(card.cardId, 'quick_math has duplicate option ids'));
+  }
+
+  // Only attempt to compute + cross-check the answer once the structure is sound
+  // (otherwise computeQuickMath would throw on a malformed expression).
+  if (errors.length > 0) {
+    return errors;
+  }
+
+  let computed: number;
+  try {
+    computed = computeQuickMath(expression);
+  } catch (error) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `quick_math expression could not be computed: ${(error as Error).message}`,
+      ),
+    );
+    return errors;
+  }
+
+  if (!Number.isFinite(computed)) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `quick_math expression computes to a non-finite value ${computed}`,
+      ),
+    );
+  }
+
+  const correct = options.find((option) => option.id === correctOptionId);
+  if (!correct) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `quick_math correctOptionId "${correctOptionId}" is not among options`,
+      ),
+    );
+  } else if (correct.value !== computed) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `quick_math correct option value ${correct.value} does not equal computed result ${computed}`,
+      ),
+    );
+  }
+
+  // Exactly one option may carry the computed value, otherwise the answer is
+  // ambiguous (two correct choices).
+  const matching = options.filter((option) => option.value === computed);
+  if (matching.length > 1) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `quick_math has ${matching.length} options equal to the computed result (must be exactly one)`,
+      ),
+    );
+  }
+
   return errors;
 }
 

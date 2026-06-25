@@ -33,6 +33,8 @@ import SpotItCard from '../templates/spotIt/SpotItCard';
 import StepLogicCard from '../templates/stepLogic/StepLogicCard';
 import TinyLogicCard from '../templates/tinyLogic/TinyLogicCard';
 import WhatChangedCard from '../templates/whatChanged/WhatChangedCard';
+import WordUnscrambleCard from '../templates/wordUnscramble/WordUnscrambleCard';
+import QuickMathCard from '../templates/quickMath/QuickMathCard';
 
 /**
  * A template renderer: a component that accepts {@link TemplateProps} for its
@@ -105,4 +107,6 @@ export const defaultRendererRegistry: RendererRegistry = {
   prism_path: PrismPathCard,
   signal_set: SignalSetCard,
   circuit_flow: CircuitFlowCard,
+  word_unscramble: WordUnscrambleCard,
+  quick_math: QuickMathCard,
 };

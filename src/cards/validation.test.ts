@@ -30,9 +30,11 @@ import {
   type SignalSetCard,
   type SpotItCard,
   type StepLogicCard,
+  type QuickMathCard,
   type TemplateType,
   type TinyLogicCard,
   type WhatChangedCard,
+  type WordUnscrambleCard,
 } from './types';
 
 // ---------------------------------------------------------------------------
@@ -422,6 +424,60 @@ function validCircuitFlow(): CircuitFlowCard {
         { tileId: 'd', rotation: 0 },
       ],
       timeLimitMs: 20000,
+    },
+  };
+}
+
+function validWordUnscramble(): WordUnscrambleCard {
+  return {
+    cardId: 'unscramble-1',
+    creatorHandle: '@test',
+    templateType: 'word_unscramble',
+    category: 'pattern_recognition',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 15,
+    prompt: 'Unscramble the word.',
+    puzzleDna: dna('word-unscramble'),
+    explanation: { title: 'It spells STARE', body: 'The letters spell STARE.' },
+    config: {
+      scrambled: 'tsrae',
+      answer: 'stare',
+      options: [
+        { id: 'a', label: 'stare' },
+        { id: 'b', label: 'store' },
+        { id: 'c', label: 'scare' },
+      ],
+      correctOptionId: 'a',
+      timeLimitMs: 15000,
+    },
+  };
+}
+
+function validQuickMath(): QuickMathCard {
+  return {
+    cardId: 'quickmath-1',
+    creatorHandle: '@test',
+    templateType: 'quick_math',
+    category: 'logical_reasoning',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 14,
+    prompt: 'Solve the equation.',
+    puzzleDna: dna('quick-math'),
+    explanation: { title: 'Multiply first', body: '9 × 4 = 36, − 5 = 31.' },
+    config: {
+      display: '9 × 4 − 5',
+      expression: { operands: [9, 4, 5], operators: ['*', '-'] },
+      options: [
+        { id: 'a', label: '31', value: 31 },
+        { id: 'b', label: '41', value: 41 },
+        { id: 'c', label: '30', value: 30 },
+      ],
+      correctOptionId: 'a',
+      timeLimitMs: 14000,
     },
   };
 }
@@ -1196,6 +1252,8 @@ const ALL_TEMPLATE_TYPES: TemplateType[] = [
   'prism_path',
   'signal_set',
   'circuit_flow',
+  'word_unscramble',
+  'quick_math',
 ];
 
 const ALL_CATEGORIES: ChallengeCategory[] = [
@@ -1220,6 +1278,8 @@ const validCardFor: Record<TemplateType, () => LiquidCard> = {
   prism_path: validPrismPath,
   signal_set: validSignalSet,
   circuit_flow: validCircuitFlow,
+  word_unscramble: validWordUnscramble,
+  quick_math: validQuickMath,
 };
 
 describe('templateCategoryMap <-> validation consistency', () => {
@@ -1281,5 +1341,76 @@ describe('assertValidCatalog', () => {
       expect(message).toContain(ValidationRule.NON_EMPTY_PROMPT);
       expect(message).toContain(ValidationRule.EVIDENCE_TIER);
     }
+  });
+});
+
+describe('word_unscramble answer validation', () => {
+  it('accepts a well-formed card', () => {
+    expect(validateCatalog([validWordUnscramble()]).valid).toBe(true);
+  });
+
+  it('rejects scrambled letters that are not an anagram of the answer', () => {
+    const card = validWordUnscramble();
+    card.config = { ...card.config, scrambled: 'xxxxx' };
+    const result = validateCatalog([card]);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('rejects scrambled letters that already spell the answer', () => {
+    const card = validWordUnscramble();
+    card.config = { ...card.config, scrambled: 'stare' };
+    expect(validateCatalog([card]).valid).toBe(false);
+  });
+
+  it('rejects a correct option whose label is not the answer', () => {
+    const card = validWordUnscramble();
+    card.config = { ...card.config, correctOptionId: 'b' }; // label "store" != answer
+    expect(validateCatalog([card]).valid).toBe(false);
+  });
+
+  it('rejects a correctOptionId that is not among options', () => {
+    const card = validWordUnscramble();
+    card.config = { ...card.config, correctOptionId: 'missing' };
+    expect(validateCatalog([card]).valid).toBe(false);
+  });
+});
+
+describe('quick_math answer validation', () => {
+  it('accepts a well-formed card', () => {
+    expect(validateCatalog([validQuickMath()]).valid).toBe(true);
+  });
+
+  it('rejects a correct option whose value does not equal the computed result', () => {
+    const card = validQuickMath();
+    // Computed = 31; point correct at the wrong value.
+    card.config = { ...card.config, correctOptionId: 'b' };
+    const result = validateCatalog([card]);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('rejects an operator/operand length mismatch', () => {
+    const card = validQuickMath();
+    card.config = {
+      ...card.config,
+      expression: { operands: [9, 4, 5], operators: ['*'] },
+    };
+    expect(validateCatalog([card]).valid).toBe(false);
+  });
+
+  it('rejects two options sharing the computed value (ambiguous answer)', () => {
+    const card = validQuickMath();
+    card.config = {
+      ...card.config,
+      options: [
+        { id: 'a', label: '31', value: 31 },
+        { id: 'b', label: '31', value: 31 },
+        { id: 'c', label: '30', value: 30 },
+      ],
+    };
+    expect(validateCatalog([card]).valid).toBe(false);
   });
 });
