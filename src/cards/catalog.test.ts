@@ -44,14 +44,16 @@ describe('authored card catalog', () => {
     expect(result.valid).toBe(true);
   });
 
-  it('contains 20-150 cards total', () => {
+  it('contains 20-200 cards total', () => {
     // The upper bound grows as the endless feed needs a deeper pool; it stays a
     // guardrail against an unbounded prototype catalog. Raised to 100 in Phase 2
     // (content blast) as every mechanic roughly doubled its card set to feed the
     // progressive difficulty ramp, then to 150 as new timed mechanics
-    // (word_unscramble, quick_math, color_word, n_back) each added a starter set.
+    // (word_unscramble, quick_math, color_word, n_back) each added a starter set,
+    // then to 200 as the ~50-game initiative topped up the medium/hard tiers
+    // across the seventeen mechanics.
     expect(catalog.length).toBeGreaterThanOrEqual(20);
-    expect(catalog.length).toBeLessThanOrEqual(150);
+    expect(catalog.length).toBeLessThanOrEqual(200);
   });
 
   it('has at least 5 cards for every template', () => {
