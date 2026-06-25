@@ -5863,10 +5863,10 @@ const schulteOrderCards: SchulteOrderCard[] = [
     creatorHandle: '@gridrunner',
     templateType: 'schulte_order',
     category: 'processing_speed',
-    difficulty: 'hard',
+    difficulty: 'extremely_easy',
     evidenceTier: 'mechanic_mapped',
     reviewStatus: 'manual_reviewed',
-    estimatedSeconds: 24,
+    estimatedSeconds: 8,
     prompt: 'Tap the values in order: 1, A, 2, B, 3, C…',
     puzzleDna: {
       mechanic: 'schulte-scan',
@@ -5894,7 +5894,7 @@ const schulteOrderCards: SchulteOrderCard[] = [
         { id: 'n6', label: '6', row: 1, column: 0 },
         { id: 'f', label: 'F', row: 2, column: 0 },
       ],
-      timeLimitMs: 22000,
+      timeLimitMs: 8000,
     },
   },
   {
