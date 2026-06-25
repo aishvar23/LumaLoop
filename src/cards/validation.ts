@@ -1373,9 +1373,14 @@ function validateOddOneOutAnswer(card: OddOneOutCard): ValidationError[] {
   return errors;
 }
 
-/** Inclusive bounds for a schulte_order's target count. */
+/**
+ * Inclusive bounds for a schulte_order's target count. The upper bound is a
+ * full 5×5 board (25): now that the renderer gives NO next-target hint, harder
+ * cards rely on bigger grids to stay challenging, and a 5×5 scan is the largest
+ * that still fits comfortably on a phone screen.
+ */
 export const MIN_SCHULTE_TARGETS = 4;
-export const MAX_SCHULTE_TARGETS = 16;
+export const MAX_SCHULTE_TARGETS = 25;
 /**
  * schulte_order is a timed visual scan; its time limit lives in the tighter
  * [5s, 30s] window (the same band the other timed-stream mechanics use), not the

@@ -105,11 +105,40 @@ describe('initial render', () => {
     }
   });
 
-  it('marks the first target as the next to tap', () => {
+  it('does NOT telegraph the next target (no "tap this next" hint)', () => {
     renderCard({ now: () => 1_000 });
+    // Every untapped target is labelled by its value alone — the renderer must
+    // never reveal which cell is expected next (that would defeat the search).
+    for (const [id, label] of [
+      ['t1', '1'],
+      ['t2', '2'],
+      ['t3', '3'],
+      ['t4', '4'],
+    ] as const) {
+      expect(screen.getByTestId(`schulte-target-${id}`)).toHaveAttribute(
+        'aria-label',
+        label,
+      );
+    }
+    // No "▸" marker is rendered anywhere.
+    expect(screen.queryByText(/▸/)).not.toBeInTheDocument();
+  });
+
+  it('marks a correctly-tapped target as done (fair feedback, not a hint)', () => {
+    renderCard({ now: () => 1_000 });
+    tapTarget('t1');
     expect(screen.getByTestId('schulte-target-t1')).toHaveAttribute(
       'aria-label',
-      '1: tap this next',
+      '1: tapped',
+    );
+    expect(screen.getByTestId('schulte-target-t1')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    // The next target is still NOT telegraphed after a correct tap.
+    expect(screen.getByTestId('schulte-target-t2')).toHaveAttribute(
+      'aria-label',
+      '2',
     );
   });
 });

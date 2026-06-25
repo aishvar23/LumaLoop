@@ -27,11 +27,17 @@
  *    only via timeout. The renderer collects the raw tap log and routes it through
  *    the evaluator (single source of truth) — it never re-derives progress inline.
  *
+ * NO next-target hint (the challenge IS the visual search): the renderer NEVER
+ * reveals which cell is expected next — that would telegraph the answer and make
+ * even "hard" cards trivial. Cells are only ever `done` (already correctly
+ * tapped) or plain; the player must search the grid for the next value. The
+ * `done` state is fair post-action feedback, not a hint.
+ *
  * Accessibility (Technical Design §14): targets are real `<button>`s, large
- * (≥ `--tap-target-min`), labeled by their value + position + done/next state, and
- * keyboard-focusable. The "next target" cue and progress are conveyed by the
- * LABEL/value and a polite `role="status"` live region — never colour or position
- * alone.
+ * (≥ `--tap-target-min`), labeled by their value + tapped/untapped state, and
+ * keyboard-focusable. Progress is conveyed by a polite `role="status"` live
+ * region. The `done` state is announced via the label + `aria-pressed`, never
+ * colour alone — and no label or marker ever reveals the next target.
  */
 
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -72,7 +78,8 @@ export default function SchulteOrderCard({
   }, [targets]);
 
   // Interaction bookkeeping in refs (independent of render timing); `taps` is
-  // mirrored into state to drive the live "next target" highlight + progress.
+  // mirrored into state to drive the `done` feedback + progress text (it does
+  // NOT drive any next-target hint — that would telegraph the answer).
   const firstTapElapsedRef = useRef<number | null>(null);
   const attemptCountRef = useRef(0);
   const resolvedRef = useRef(false);
@@ -159,10 +166,11 @@ export default function SchulteOrderCard({
     ],
   );
 
-  // Derive the current progress for the "next target" highlight from the SAME
-  // replay logic the scoring uses (display and scoring never drift).
+  // Derive the current progress (and thus the set of already-tapped targets)
+  // from the SAME replay logic the scoring uses (display and scoring never
+  // drift). We deliberately do NOT compute the next-expected target: revealing
+  // it would telegraph the answer and defeat the visual search.
   const { progress } = replaySchulteTaps(orderedIds, taps);
-  const nextTargetId = progress < orderedIds.length ? orderedIds[progress] : null;
   const completedIds = new Set(orderedIds.slice(0, progress));
 
   return (
@@ -190,8 +198,6 @@ export default function SchulteOrderCard({
               );
             }
             const isDone = completedIds.has(target.id);
-            const isNext = target.id === nextTargetId;
-            const state = isDone ? 'done' : isNext ? 'next' : 'pending';
             return (
               <button
                 key={`${row}-${column}`}
@@ -199,26 +205,12 @@ export default function SchulteOrderCard({
                 data-testid={`schulte-target-${target.id}`}
                 aria-pressed={isDone}
                 aria-label={
-                  isDone
-                    ? `${target.label}: tapped`
-                    : isNext
-                      ? `${target.label}: tap this next`
-                      : target.label
+                  isDone ? `${target.label}: tapped` : target.label
                 }
                 onClick={() => handleTargetTap(target.id)}
-                style={
-                  isDone
-                    ? doneCellStyle
-                    : isNext
-                      ? nextCellStyle
-                      : cellStyle
-                }
+                style={isDone ? doneCellStyle : cellStyle}
               >
-                <span aria-hidden="true">
-                  {/* Non-colour cue for the next target: a leading ▸ marker. */}
-                  {state === 'next' ? '▸ ' : ''}
-                  {target.label}
-                </span>
+                <span aria-hidden="true">{target.label}</span>
               </button>
             );
           }),
@@ -272,16 +264,6 @@ const cellStyle = {
   fontSize: 'var(--font-size-lg)',
   fontFamily: 'var(--font-sans)',
   cursor: 'pointer',
-} as const;
-
-// The next target: an accent border + faint scale so it stands out. The leading
-// ▸ marker + the "tap this next" label carry the same cue without colour alone.
-const nextCellStyle = {
-  ...cellStyle,
-  border: '1px solid var(--accent, var(--color-accent))',
-  background:
-    'var(--accent-tint, var(--game-surface-raised, var(--color-surface-raised)))',
-  fontWeight: 'var(--font-weight-bold)',
 } as const;
 
 // A completed target: muted fill, conveyed by the "tapped" label + aria-pressed.

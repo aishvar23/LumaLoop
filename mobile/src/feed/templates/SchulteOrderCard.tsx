@@ -24,10 +24,17 @@
  * tapped; INCORRECT only via timeout. The renderer collects the raw tap log and
  * routes it through the evaluator (single source of truth).
  *
+ * NO next-target hint (the challenge IS the visual search): the renderer NEVER
+ * reveals which cell is expected next — that would telegraph the answer and make
+ * even "hard" cards trivial. Cells are only ever `done` (already correctly
+ * tapped) or plain; the player must search the grid for the next value. The
+ * `done` state is fair post-action feedback, not a hint.
+ *
  * Accessibility (Technical Design §14): targets are real buttons, large (≥
- * {@link TAP_TARGET_MIN}), labelled by their value + done/next state. The "next"
- * cue and progress are carried by the LABEL/value + a leading ▸ marker + a polite
- * live region — never colour or position alone.
+ * {@link TAP_TARGET_MIN}), labelled by their value + tapped/untapped state.
+ * Progress is carried by a polite live region; the `done` state is announced via
+ * the label + selected state, never colour alone — and nothing reveals the next
+ * target.
  */
 
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -158,8 +165,10 @@ export default function SchulteOrderCard({
     ],
   );
 
+  // Derive progress (and thus already-tapped targets) from the SAME replay logic
+  // the scoring uses. We deliberately do NOT compute the next-expected target:
+  // revealing it would telegraph the answer and defeat the visual search.
   const { progress } = replaySchulteTaps(orderedIds, taps);
-  const nextTargetId = progress < orderedIds.length ? orderedIds[progress] : null;
   const completedIds = new Set(orderedIds.slice(0, progress));
 
   return (
@@ -187,7 +196,6 @@ export default function SchulteOrderCard({
                 );
               }
               const isDone = completedIds.has(target.id);
-              const isNext = target.id === nextTargetId;
               return (
                 <Pressable
                   key={`${row}-${column}`}
@@ -195,11 +203,7 @@ export default function SchulteOrderCard({
                   accessibilityRole="button"
                   accessibilityState={{ selected: isDone }}
                   accessibilityLabel={
-                    isDone
-                      ? `${target.label}: tapped`
-                      : isNext
-                        ? `${target.label}: tap this next`
-                        : target.label
+                    isDone ? `${target.label}: tapped` : target.label
                   }
                   onPress={() => handleTargetTap(target.id)}
                   style={({ pressed }) => [
@@ -207,10 +211,6 @@ export default function SchulteOrderCard({
                     {
                       backgroundColor: theme.surfaceRaised,
                       borderColor: theme.border,
-                    },
-                    isNext && {
-                      backgroundColor: theme.surfaceStrong,
-                      borderColor: theme.accent,
                     },
                     isDone && styles.cellDone,
                     pressed &&
@@ -224,12 +224,8 @@ export default function SchulteOrderCard({
                     numberOfLines={1}
                     adjustsFontSizeToFit
                     minimumFontScale={0.6}
-                    style={[
-                      styles.cellText,
-                      isNext && { color: theme.accent, fontWeight: fontWeight.bold },
-                    ]}
+                    style={styles.cellText}
                   >
-                    {isNext ? '▸ ' : ''}
                     {target.label}
                   </Text>
                 </Pressable>
