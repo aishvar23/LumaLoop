@@ -36,8 +36,9 @@ import {
   formatAccuracy,
   type ProfileStats,
 } from './core/profile/computeStats';
-import { fetchRecentActivity } from './social/activityApi';
-import { activityCaption, type ActivityItem } from './social/activityFeed';
+import { fetchRecentShares } from './social/gameShareApi';
+import { groupSharesByUser, type UserStatus } from './social/statusFeed';
+import StatusViewer from './social/StatusViewer';
 import { authStyles as a } from './auth/authStyles';
 import {
   categoryAccent,
@@ -58,9 +59,9 @@ export interface HomeScreenProps {
   client?: AuthClient;
   /** Test seam: the featured games to show. Defaults to the catalog selection. */
   featuredGames?: readonly FeaturedGame[];
-  /** Test seam: preset activity items (skips the network read when provided). */
-  activityItems?: readonly ActivityItem[];
-  /** Test seam: cardId → card resolver for activity game titles. */
+  /** Test seam: preset status rail (skips the network read when provided). */
+  statuses?: readonly UserStatus[];
+  /** Test seam: cardId → card resolver for status game titles + accents. */
   getCardById?: (cardId: string) => LiquidCard | undefined;
 }
 
@@ -100,7 +101,7 @@ export default function HomeScreen({
   onOpenProfile,
   client: clientProp,
   featuredGames,
-  activityItems,
+  statuses: statusesProp,
   getCardById = defaultGetCardById,
 }: HomeScreenProps) {
   const auth = useAuth();
@@ -111,7 +112,8 @@ export default function HomeScreen({
 
   const [stats, setStats] = useState<ProfileStats>(EMPTY_PROFILE_STATS);
   const [loading, setLoading] = useState(true);
-  const [activity, setActivity] = useState<readonly ActivityItem[]>(activityItems ?? []);
+  const [statuses, setStatuses] = useState<readonly UserStatus[]>(statusesProp ?? []);
+  const [openStatus, setOpenStatus] = useState<UserStatus | null>(null);
   const [uploadNotice, setUploadNotice] = useState(false);
 
   useEffect(() => {
@@ -132,28 +134,28 @@ export default function HomeScreen({
     };
   }, [client, user]);
 
-  // Recent COMMUNITY activity for the stories rail (skipped when a test injects it).
+  // Recent ephemeral SHARES (statuses), grouped per user for the rail (skipped
+  // when a test injects them). RLS bounds the read to the last 24h.
   useEffect(() => {
-    if (activityItems !== undefined) return;
+    if (statusesProp !== undefined) return;
     let active = true;
     void (async () => {
-      const items = await fetchRecentActivity(client, {
-        // Prototype: there's no follow graph yet and often a single account, so
-        // INCLUDE the viewer's own recent activity (like IG showing "your story")
-        // — otherwise the rail is empty until other users exist. Pass the viewer
-        // id here to switch to "others only" once there's a real community.
-        excludeUserId: null,
-        resolveTitle: (cardId) => {
-          const card = getCardById(cardId);
-          return card ? templateLabel(card.templateType) : cardId;
-        },
-      });
-      if (active) setActivity(items);
+      const rows = await fetchRecentShares(client, { limit: 60 });
+      if (!active) return;
+      setStatuses(
+        groupSharesByUser(rows, {
+          viewerId: user?.id ?? null,
+          resolveTitle: (cardId) => {
+            const card = getCardById(cardId);
+            return card ? templateLabel(card.templateType) : cardId;
+          },
+        }),
+      );
     })();
     return () => {
       active = false;
     };
-  }, [client, user, activityItems, getCardById]);
+  }, [client, user, statusesProp, getCardById]);
 
   if (!profile) {
     return (
@@ -215,7 +217,7 @@ export default function HomeScreen({
         </Text>
       )}
 
-      {activity.length > 0 && (
+      {statuses.length > 0 && (
         <View accessibilityLabel="Recent activity">
           <Text style={styles.sectionTitle}>Recent activity</Text>
           <ScrollView
@@ -223,35 +225,37 @@ export default function HomeScreen({
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.stories}
           >
-            {activity.map((item, index) => {
+            {statuses.map((status, index) => {
               const ring = categoryAccent(RING_TONES[index % RING_TONES.length]).accent;
+              const who = status.handle
+                ? `@${status.handle}`
+                : status.displayName ?? 'Someone';
+              const count = status.items.length;
               return (
                 <Pressable
-                  key={`${item.kind}:${item.id}`}
+                  key={status.userId}
                   accessibilityRole="button"
-                  accessibilityLabel={`${activityCaption(item)} — open the feed`}
-                  testID={`home-story-${item.id}`}
-                  onPress={onStart}
+                  accessibilityLabel={`${status.isOwn ? 'Your' : `${who}’s`} status — ${count} shared ${count === 1 ? 'game' : 'games'}`}
+                  testID={`home-status-${status.userId}`}
+                  onPress={() => setOpenStatus(status)}
                   style={styles.story}
                 >
                   <View style={[styles.storyRing, { borderColor: ring }]}>
-                    {item.avatarUrl ? (
+                    {status.avatarUrl ? (
                       <Image
                         style={styles.storyAvatar}
-                        source={{ uri: item.avatarUrl }}
+                        source={{ uri: status.avatarUrl }}
                         accessibilityIgnoresInvertColors
                       />
                     ) : (
                       <View style={styles.storyAvatar}>
-                        <Text style={styles.storyAvatarText}>{item.monogram}</Text>
+                        <Text style={styles.storyAvatarText}>{status.monogram}</Text>
                       </View>
                     )}
-                    <Text style={styles.storyBadge}>
-                      {item.kind === 'like' ? '♥' : '💬'}
-                    </Text>
+                    {count > 1 && <Text style={styles.storyBadge}>{count}</Text>}
                   </View>
                   <Text style={styles.storyName} numberOfLines={1}>
-                    {item.handle ? `@${item.handle}` : item.displayName ?? 'Someone'}
+                    {status.isOwn ? 'Your status' : who}
                   </Text>
                 </Pressable>
               );
@@ -318,6 +322,18 @@ export default function HomeScreen({
           })}
         </View>
       </View>
+
+      {openStatus && (
+        <StatusViewer
+          status={openStatus}
+          categoryForCard={(cardId) => getCardById(cardId)?.category}
+          onClose={() => setOpenStatus(null)}
+          onPlay={() => {
+            setOpenStatus(null);
+            onStart();
+          }}
+        />
+      )}
     </ScrollView>
   );
 }

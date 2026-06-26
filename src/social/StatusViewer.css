@@ -1,0 +1,201 @@
+/**
+ * Status story viewer overlay (WhatsApp/IG-style). Token-driven, full-screen,
+ * above everything. Segmented progress bars + a centered share card.
+ */
+.status-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: calc(var(--safe-top) + var(--space-4)) var(--space-4)
+    calc(var(--safe-bottom) + var(--space-5));
+  background: rgba(6, 7, 11, 0.96);
+  color: var(--color-text);
+}
+
+/* Tap zones cover the screen; content/buttons sit above via z-index. */
+.status-viewer__zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.status-viewer__zone--prev {
+  left: 0;
+}
+
+.status-viewer__zone--next {
+  right: 0;
+}
+
+.status-viewer__top {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.status-viewer__segments {
+  display: flex;
+  gap: 4px;
+}
+
+.status-viewer__segment {
+  flex: 1;
+  height: 3px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.25);
+  overflow: hidden;
+}
+
+.status-viewer__segment-fill {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--color-text);
+  border-radius: var(--radius-pill);
+}
+
+.status-viewer__segment-fill[data-fill='full'] {
+  width: 100%;
+}
+
+.status-viewer__segment-fill[data-fill='active'] {
+  width: 100%;
+  animation: status-segment-grow linear forwards;
+}
+
+@keyframes status-segment-grow {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-viewer__segment-fill[data-fill='active'] {
+    animation: none;
+    width: 100%;
+  }
+}
+
+.status-viewer__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.status-viewer__avatar {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  color: var(--color-accent-on, #0b0b0f);
+  font-weight: var(--font-weight-bold);
+}
+
+.status-viewer__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.status-viewer__id {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.status-viewer__who {
+  font-weight: var(--font-weight-semibold);
+}
+
+.status-viewer__time {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.status-viewer__close {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--font-size-lg);
+  cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+}
+
+.status-viewer__card {
+  position: relative;
+  z-index: 2;
+  margin: auto 0;
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-4);
+  border-radius: var(--radius-lg);
+  border: 2px solid var(--color-border);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.04), var(--color-surface));
+}
+
+.status-viewer__kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.status-viewer__game {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  text-align: center;
+}
+
+.status-viewer__result {
+  font-size: var(--font-size-md);
+  color: var(--color-text-muted);
+}
+
+.status-viewer__play {
+  margin-top: var(--space-3);
+  appearance: none;
+  border: 0;
+  border-radius: var(--radius-pill);
+  padding: var(--space-3) var(--space-5);
+  color: var(--color-accent-on, #0b0b0f);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-md);
+  cursor: pointer;
+}
+
+.status-viewer__play:hover,
+.status-viewer__play:focus-visible {
+  filter: brightness(1.08);
+  outline: none;
+}
+
+.status-viewer__visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}

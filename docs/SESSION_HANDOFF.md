@@ -18,6 +18,18 @@ build, mobile 760 tests):
   added to `src/feed/FeedRoute.tsx`.
 - **"Upload puzzle" button** (greyed, "coming soon") on Home, both platforms — not
   built; hover (web tooltip) / click both reveal a "coming soon" notice.
+- **Ephemeral "status" shares (Recent activity rail)**: the rail is now a
+  WhatsApp/IG-style status feed. A **Share button** in the in-feed result step
+  (`CardShareButton`, injected into `CardFeedback` via the feedback gate) posts a
+  share of the game + result (outcome + points) to **`public.game_shares`**
+  (migration **0005**, applied to Supabase; RLS makes shares **expire after 24h**
+  on read). Home groups recent shares **per user** (`statusFeed.groupSharesByUser`,
+  own status first) into bubbles; tapping one opens a **full story viewer**
+  (`StatusViewer` — segmented progress bars, auto-advance, tap left/right, Play →
+  feed). Web `src/social/{gameShareApi,statusFeed,CardShareButton,StatusViewer}`,
+  mirrored under `mobile/src/social/`. The old likes/comments activity rail
+  (`activityFeed`/`activityApi`) was **removed** (superseded). Likes/comments on
+  each card are unchanged.
 - **Daily reminder emails**: Vercel Cron (`vercel.json`, 09:00 UTC) →
   `api/daily-reminder.ts` (Edge), a thin wrapper over the pure, tested core
   `src/email/reminderCore.ts`. Lists users via the Supabase Auth admin API

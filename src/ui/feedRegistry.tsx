@@ -40,6 +40,7 @@ import type {
 import { defaultRendererRegistry } from '../session/rendererRegistry';
 import { useCardScoreLookup } from '../feed/cardScoreContext';
 import type { CardResolution, TemplateProps } from '../templates/contract';
+import CardShareButton from '../social/CardShareButton';
 import CardFeedback from './CardFeedback';
 
 /**
@@ -127,6 +128,16 @@ export function withFeedbackGate(
           resolution={resolution}
           explanation={card.explanation}
           cardScore={cardScore}
+          // Inject the social Share-to-status action (a feed-layer concern keyed
+          // by cardId; renders nothing without a social provider, so the engine
+          // stays auth-free). It captures the game + result (outcome + points).
+          footer={
+            <CardShareButton
+              cardId={card.cardId}
+              outcome={resolution.resolutionType}
+              points={cardScore?.points ?? 0}
+            />
+          }
           // Advancing is the controller's job: only now do we fire its real
           // `onResolve`, which records the result and auto-advances the feed.
           onContinue={() => onResolve(resolution)}

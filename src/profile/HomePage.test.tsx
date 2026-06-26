@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 
@@ -10,7 +10,7 @@ import {
   makeSession,
 } from '../auth/testFakes';
 import type { FeaturedGame } from '../cards/featured';
-import type { ActivityItem } from '../social/activityFeed';
+import type { UserStatus } from '../social/statusFeed';
 import type { GamePlay } from '../auth/types';
 
 const FEATURED: FeaturedGame[] = [
@@ -34,22 +34,30 @@ const FEATURED: FeaturedGame[] = [
   },
 ];
 
-const ACTIVITY: ActivityItem[] = [
+const STATUSES: UserStatus[] = [
   {
-    kind: 'comment',
-    id: 'c1',
     userId: 'u9',
     handle: 'gridwise',
     displayName: 'Grid Wise',
     avatarUrl: null,
-    cardId: 'spot_it-1',
-    createdAt: '2026-06-03T00:00:00Z',
-    gameTitle: 'Spot it',
     monogram: 'G',
+    isOwn: false,
+    latestAt: '2026-06-03T00:00:00Z',
+    items: [
+      {
+        id: 's1',
+        cardId: 'spot_it-1',
+        gameTitle: 'Spot it',
+        outcome: 'correct',
+        outcomeLabel: 'solved',
+        points: 120,
+        createdAt: '2026-06-03T00:00:00Z',
+      },
+    ],
   },
 ];
 
-function renderHome(plays: GamePlay[] = [], activityItems?: ActivityItem[]) {
+function renderHome(plays: GamePlay[] = [], statuses?: UserStatus[]) {
   const auth = createFakeAuthClient({
     session: makeSession(),
     profile: makeProfile(),
@@ -58,7 +66,7 @@ function renderHome(plays: GamePlay[] = [], activityItems?: ActivityItem[]) {
   render(
     <AuthProvider client={auth.client}>
       <MemoryRouter>
-        <HomePage featuredGames={FEATURED} activityItems={activityItems} />
+        <HomePage featuredGames={FEATURED} statuses={statuses} />
       </MemoryRouter>
     </AuthProvider>,
   );
@@ -103,18 +111,21 @@ describe('HomePage', () => {
     );
   });
 
-  it('shows a Recent activity rail of community updates, each entering the feed', async () => {
-    renderHome([], ACTIVITY);
+  it('shows a Recent activity rail of per-user status bubbles and opens the viewer', async () => {
+    renderHome([], STATUSES);
     await screen.findByRole('heading', { name: /welcome back/i });
     expect(screen.getByRole('heading', { name: /recent activity/i })).toBeInTheDocument();
-    const story = screen.getByRole('link', {
-      name: /@gridwise commented on spot it/i,
-    });
-    expect(story).toHaveAttribute('href', '/feed');
-    expect(screen.getByText('@gridwise')).toBeInTheDocument();
+    const bubble = screen.getByTestId('home-status-u9');
+    expect(bubble).toHaveTextContent('@gridwise');
+    // Tapping a bubble opens the WhatsApp-style status viewer.
+    expect(screen.queryByTestId('status-viewer')).not.toBeInTheDocument();
+    fireEvent.click(bubble);
+    const viewer = screen.getByTestId('status-viewer');
+    expect(viewer).toBeInTheDocument();
+    expect(within(viewer).getByText('Spot it')).toBeInTheDocument();
   });
 
-  it('omits the Recent activity rail when there is no activity', async () => {
+  it('omits the Recent activity rail when there are no shares', async () => {
     renderHome([], []);
     await screen.findByRole('heading', { name: /welcome back/i });
     expect(

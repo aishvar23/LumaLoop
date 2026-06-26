@@ -20,7 +20,7 @@
  * GAME activity — no IQ / brain-training / ability / clinical framing.
  */
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 import { ROUTES } from '../app/routes';
 import { useAuth } from '../auth/AuthProvider';
@@ -31,8 +31,9 @@ import type { GamePlay } from '../auth/types';
 import { getCardById as defaultGetCardById } from '../cards/catalog';
 import { selectFeaturedGames, templateLabel, type FeaturedGame } from '../cards/featured';
 import type { LiquidCard } from '../cards/types';
-import { fetchRecentActivity } from '../social/activityApi';
-import { activityCaption, type ActivityItem } from '../social/activityFeed';
+import { fetchRecentShares } from '../social/gameShareApi';
+import { groupSharesByUser, type UserStatus } from '../social/statusFeed';
+import StatusViewer from '../social/StatusViewer';
 import { resolveCategoryTheme } from '../ui/categoryTheme';
 import {
   computeStats,
@@ -51,9 +52,9 @@ export interface HomePageProps {
   client?: AuthClient;
   /** Test seam: the featured games to show. Defaults to the catalog selection. */
   featuredGames?: readonly FeaturedGame[];
-  /** Test seam: preset activity items (skips the network read when provided). */
-  activityItems?: readonly ActivityItem[];
-  /** Test seam: cardId → card resolver for activity game titles. */
+  /** Test seam: preset status rail (skips the network read when provided). */
+  statuses?: readonly UserStatus[];
+  /** Test seam: cardId → card resolver for status game titles + accents. */
   getCardById?: (cardId: string) => LiquidCard | undefined;
 }
 
@@ -72,17 +73,20 @@ function monogram(displayName: string, handle: string): string {
 export default function HomePage({
   client: clientProp,
   featuredGames,
-  activityItems,
+  statuses: statusesProp,
   getCardById = defaultGetCardById,
 }: HomePageProps = {}) {
   const auth = useAuth();
   const { user, profile } = auth;
+  const navigate = useNavigate();
   const client = clientProp ?? auth.client ?? supabase;
   const featured = featuredGames ?? selectFeaturedGames();
 
   const [stats, setStats] = useState<ProfileStats>(EMPTY_PROFILE_STATS);
   const [loading, setLoading] = useState(true);
-  const [activity, setActivity] = useState<readonly ActivityItem[]>(activityItems ?? []);
+  const [statuses, setStatuses] = useState<readonly UserStatus[]>(statusesProp ?? []);
+  // The open status story (null when the viewer is closed).
+  const [openStatus, setOpenStatus] = useState<UserStatus | null>(null);
   // The "Upload puzzle" creator feature isn't built yet — clicking the greyed
   // affordance reveals this notice (hover shows it via the native tooltip).
   const [uploadNotice, setUploadNotice] = useState(false);
@@ -105,28 +109,28 @@ export default function HomePage({
     };
   }, [client, user]);
 
-  // Recent COMMUNITY activity for the stories rail (skipped when a test injects it).
+  // Recent ephemeral SHARES (statuses), grouped per user for the rail (skipped
+  // when a test injects them). RLS bounds the read to the last 24h.
   useEffect(() => {
-    if (activityItems !== undefined) return;
+    if (statusesProp !== undefined) return;
     let active = true;
     void (async () => {
-      const items = await fetchRecentActivity(client, {
-        // Prototype: there's no follow graph yet and often a single account, so
-        // INCLUDE the viewer's own recent activity (like IG showing "your story")
-        // — otherwise the rail is empty until other users exist. Pass the viewer
-        // id here to switch to "others only" once there's a real community.
-        excludeUserId: null,
-        resolveTitle: (cardId) => {
-          const card = getCardById(cardId);
-          return card ? templateLabel(card.templateType) : cardId;
-        },
-      });
-      if (active) setActivity(items);
+      const rows = await fetchRecentShares(client, { limit: 60 });
+      if (!active) return;
+      setStatuses(
+        groupSharesByUser(rows, {
+          viewerId: user?.id ?? null,
+          resolveTitle: (cardId) => {
+            const card = getCardById(cardId);
+            return card ? templateLabel(card.templateType) : cardId;
+          },
+        }),
+      );
     })();
     return () => {
       active = false;
     };
-  }, [client, user, activityItems, getCardById]);
+  }, [client, user, statusesProp, getCardById]);
 
   if (!profile) {
     return (
@@ -182,37 +186,46 @@ export default function HomePage({
         </p>
       )}
 
-      {activity.length > 0 && (
+      {statuses.length > 0 && (
         <section aria-label="Recent activity" className="home-activity">
           <h2 className="home-section-title">Recent activity</h2>
           <div className="home-stories">
-            {activity.map((item) => (
-              <Link
-                key={`${item.kind}:${item.id}`}
-                to={ROUTES.feed}
-                className="home-story"
-                aria-label={`${activityCaption(item)} — open the feed`}
-                title={activityCaption(item)}
-              >
-                <span className="home-story__ring" aria-hidden="true">
-                  {item.avatarUrl ? (
-                    <img className="home-story__avatar" src={item.avatarUrl} alt="" />
-                  ) : (
-                    <span className="home-story__avatar">{item.monogram}</span>
-                  )}
+            {statuses.map((status) => {
+              const who = status.handle
+                ? `@${status.handle}`
+                : status.displayName ?? 'Someone';
+              const count = status.items.length;
+              return (
+                <button
+                  key={status.userId}
+                  type="button"
+                  className="home-story"
+                  data-testid={`home-status-${status.userId}`}
+                  aria-label={`${status.isOwn ? 'Your' : `${who}’s`} status — ${count} shared ${count === 1 ? 'game' : 'games'}`}
+                  onClick={() => setOpenStatus(status)}
+                >
                   <span
-                    className="home-story__badge"
-                    data-kind={item.kind}
+                    className="home-story__ring"
+                    data-multi={count > 1 ? 'true' : 'false'}
                     aria-hidden="true"
                   >
-                    {item.kind === 'like' ? '♥' : '💬'}
+                    {status.avatarUrl ? (
+                      <img className="home-story__avatar" src={status.avatarUrl} alt="" />
+                    ) : (
+                      <span className="home-story__avatar">{status.monogram}</span>
+                    )}
+                    {count > 1 && (
+                      <span className="home-story__badge" aria-hidden="true">
+                        {count}
+                      </span>
+                    )}
                   </span>
-                </span>
-                <span className="home-story__name">
-                  {item.handle ? `@${item.handle}` : item.displayName ?? 'Someone'}
-                </span>
-              </Link>
-            ))}
+                  <span className="home-story__name">
+                    {status.isOwn ? 'Your status' : who}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </section>
       )}
@@ -272,6 +285,18 @@ export default function HomePage({
           ))}
         </div>
       </section>
+
+      {openStatus && (
+        <StatusViewer
+          status={openStatus}
+          categoryForCard={(cardId) => getCardById(cardId)?.category}
+          onClose={() => setOpenStatus(null)}
+          onPlay={() => {
+            setOpenStatus(null);
+            navigate(ROUTES.feed);
+          }}
+        />
+      )}
     </div>
   );
 }

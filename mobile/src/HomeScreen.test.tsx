@@ -9,7 +9,7 @@ import HomeScreen from './HomeScreen';
 import { AuthProvider } from './auth/AuthProvider';
 import { createFakeAuthClient, makeProfile, makeSession } from './auth/testFakes';
 import type { FeaturedGame } from './core/cards/featured';
-import type { ActivityItem } from './social/activityFeed';
+import type { UserStatus } from './social/statusFeed';
 
 const FEATURED: FeaturedGame[] = [
   {
@@ -32,22 +32,30 @@ const FEATURED: FeaturedGame[] = [
   },
 ];
 
-const ACTIVITY: ActivityItem[] = [
+const STATUSES: UserStatus[] = [
   {
-    kind: 'comment',
-    id: 'c1',
     userId: 'u9',
     handle: 'gridwise',
     displayName: 'Grid Wise',
     avatarUrl: null,
-    cardId: 'spot_it-1',
-    createdAt: '2026-06-03T00:00:00Z',
-    gameTitle: 'Spot it',
     monogram: 'G',
+    isOwn: false,
+    latestAt: '2026-06-03T00:00:00Z',
+    items: [
+      {
+        id: 's1',
+        cardId: 'spot_it-1',
+        gameTitle: 'Spot it',
+        outcome: 'correct',
+        outcomeLabel: 'solved',
+        points: 120,
+        createdAt: '2026-06-03T00:00:00Z',
+      },
+    ],
   },
 ];
 
-function renderHome(activityItems?: ActivityItem[]) {
+function renderHome(statuses?: UserStatus[]) {
   const onStart = jest.fn();
   const onOpenProfile = jest.fn();
   const auth = createFakeAuthClient({
@@ -61,7 +69,7 @@ function renderHome(activityItems?: ActivityItem[]) {
         onStart={onStart}
         onOpenProfile={onOpenProfile}
         featuredGames={FEATURED}
-        activityItems={activityItems}
+        statuses={statuses}
       />
     </AuthProvider>,
   );
@@ -92,10 +100,14 @@ describe('HomeScreen', () => {
     expect(onStart).toHaveBeenCalledTimes(1);
   });
 
-  it('shows a Recent activity rail and enters the feed from a story', async () => {
-    const { onStart } = renderHome(ACTIVITY);
-    const story = await screen.findByTestId('home-story-c1');
-    fireEvent.press(story);
+  it('shows a Recent activity rail of status bubbles and opens the viewer', async () => {
+    const { onStart } = renderHome(STATUSES);
+    const bubble = await screen.findByTestId('home-status-u9');
+    expect(screen.queryByTestId('status-viewer')).toBeNull();
+    fireEvent.press(bubble);
+    expect(screen.getByTestId('status-viewer')).toBeTruthy();
+    // Play from the viewer enters the feed.
+    fireEvent.press(screen.getByTestId('status-play'));
     expect(onStart).toHaveBeenCalledTimes(1);
   });
 

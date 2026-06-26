@@ -22,7 +22,7 @@
  * outcome is announced exactly once; the explanation is plain headed copy too.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 import type { CardScore } from '../feed/scoring';
 import type { CardResolution, ResolutionType } from '../templates/contract';
@@ -40,6 +40,12 @@ export type CardFeedbackProps = {
    * renders, tests) → the chip is not shown. GAME language only (Design §7/§21.8).
    */
   cardScore?: CardScore | null;
+  /**
+   * Optional presentational slot rendered just above "Next" — used by the feed to
+   * inject the social Share action (kept OUT of this component so it stays pure /
+   * Supabase-free; CLAUDE.md §4). Omitted in standalone renders/tests.
+   */
+  footer?: ReactNode;
   /** Advance the feed to the next card. The ONLY way out of this state. */
   onContinue: () => void;
 };
@@ -73,6 +79,7 @@ export default function CardFeedback({
   resolution,
   explanation,
   cardScore,
+  footer,
   onContinue,
 }: CardFeedbackProps) {
   const { resolutionType } = resolution;
@@ -169,6 +176,10 @@ export default function CardFeedback({
           </p>
           <p style={explanationBodyStyle}>{explanation.body}</p>
         </section>
+
+        {/* Optional injected actions (the feed's Share button). Above "Next" so
+            the player can share before advancing. */}
+        {footer}
 
         {/* Land focus here on mount so a keyboard / screen-reader user moves
             straight from the announced outcome to the only forward affordance. */}

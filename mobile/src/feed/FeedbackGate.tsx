@@ -39,6 +39,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { LiquidCard, TemplateType } from '../core/cards/types';
 import type { CardResolution, TemplateProps } from '../core/templates/contract';
 import { useCardScoreLookup } from './cardScoreContext';
+import CardShareButton from '../social/CardShareButton';
 import CardFeedback from './CardFeedback';
 import { defaultRendererRegistry } from './rendererRegistry';
 import type { RendererRegistry, TemplateRenderer } from './rendererRegistry';
@@ -121,6 +122,16 @@ export function withFeedbackGate(
           resolution={resolution}
           explanation={card.explanation}
           cardScore={cardScore}
+          // Inject the social Share-to-status action (a feed-layer concern keyed
+          // by cardId; renders nothing without a social provider, so the engine
+          // stays auth-free). Captures the game + result (outcome + points).
+          footer={
+            <CardShareButton
+              cardId={card.cardId}
+              outcome={resolution.resolutionType}
+              points={cardScore?.points ?? 0}
+            />
+          }
         />
       );
     }

@@ -28,7 +28,7 @@
  * renders in-flow as a `View`, never as an overlay/dialog.
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 
 import type { CardScore } from '../core/feed/scoring';
@@ -55,6 +55,12 @@ export type CardFeedbackProps = {
    * chip. GAME language only (Design §7/§21.8).
    */
   cardScore?: CardScore | null;
+  /**
+   * Optional presentational slot rendered below the explanation — used by the feed
+   * to inject the social Share action (kept OUT of this component so it stays pure /
+   * Supabase-free; CLAUDE.md §4). Omitted in standalone renders/tests.
+   */
+  footer?: ReactNode;
 };
 
 /** Per-outcome heading copy. Modest + performance-based, no trait language (Design §7). */
@@ -82,6 +88,7 @@ export default function CardFeedback({
   resolution,
   explanation,
   cardScore,
+  footer,
 }: CardFeedbackProps) {
   const { resolutionType } = resolution;
   const heading = OUTCOME_HEADING[resolutionType];
@@ -205,6 +212,9 @@ export default function CardFeedback({
           {explanation.body}
         </Text>
       </View>
+
+      {/* Optional injected actions (the feed's Share button). */}
+      {footer}
 
       {/* Advancing is a swipe, not a button — a subtle cue with a chevron. */}
       <Text
