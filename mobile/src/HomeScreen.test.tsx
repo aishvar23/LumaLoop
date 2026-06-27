@@ -121,7 +121,7 @@ describe('HomeScreen', () => {
     expect(onStart).toHaveBeenCalledTimes(1);
   });
 
-  it('shows a "coming soon" notice on Upload tap that auto-dismisses after 5s', async () => {
+  it('shows a "coming soon" notice on Upload tap that auto-dismisses after 2s', async () => {
     renderHome();
     const upload = await screen.findByTestId('home-upload');
     expect(screen.queryByText(/coming soon/i)).toBeNull();
@@ -130,7 +130,7 @@ describe('HomeScreen', () => {
       fireEvent.press(upload);
       expect(screen.getByText(/coming soon/i)).toBeTruthy();
       act(() => {
-        jest.advanceTimersByTime(5000);
+        jest.advanceTimersByTime(2000);
       });
       expect(screen.queryByText(/coming soon/i)).toBeNull();
     } finally {

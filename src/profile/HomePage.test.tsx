@@ -133,7 +133,7 @@ describe('HomePage', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('shows a "coming soon" notice on Upload click that auto-dismisses after 5s', async () => {
+  it('shows a "coming soon" notice on Upload click that auto-dismisses after 2s', async () => {
     renderHome();
     await screen.findByRole('heading', { name: /hi player one/i });
     const upload = screen.getByRole('button', { name: /upload puzzle/i });
@@ -141,13 +141,13 @@ describe('HomePage', () => {
     expect(upload).not.toHaveAttribute('aria-disabled');
     expect(screen.queryByText(/coming soon/i)).not.toBeInTheDocument();
 
-    // Fake timers from here so we can fast-forward the 5s auto-dismiss.
+    // Fake timers from here so we can fast-forward the 2s auto-dismiss.
     vi.useFakeTimers();
     try {
       fireEvent.click(upload);
       expect(screen.getByText(/coming soon/i)).toBeInTheDocument();
       act(() => {
-        vi.advanceTimersByTime(5000);
+        vi.advanceTimersByTime(2000);
       });
       expect(screen.queryByText(/coming soon/i)).not.toBeInTheDocument();
     } finally {

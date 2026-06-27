@@ -120,13 +120,13 @@ export default function HomeScreen({
   const [statuses, setStatuses] = useState<readonly UserStatus[]>(statusesProp ?? []);
   const [openStatus, setOpenStatus] = useState<UserStatus | null>(null);
   // "Upload puzzle" isn't built yet — pressing it shows a "coming soon" notice
-  // that auto-dismisses after 5s.
+  // that auto-dismisses after 2s.
   const [uploadNotice, setUploadNotice] = useState(false);
   const uploadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showComingSoon = () => {
     setUploadNotice(true);
     if (uploadTimer.current) clearTimeout(uploadTimer.current);
-    uploadTimer.current = setTimeout(() => setUploadNotice(false), 5000);
+    uploadTimer.current = setTimeout(() => setUploadNotice(false), 2000);
   };
   useEffect(
     () => () => {
