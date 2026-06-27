@@ -88,33 +88,43 @@
   outline: none;
 }
 
-/* Greyed-out "Upload puzzle" — visible but signals "coming soon". */
+/* "Play now" + "Upload puzzle" sit side by side under the greeting. */
+.home-hero__cta {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* "Upload puzzle" — a hero secondary button (the creator feature is coming). */
 .home-upload-btn {
   appearance: none;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text-muted);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
   border-radius: var(--radius-pill);
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  cursor: not-allowed;
-  opacity: 0.55;
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
 }
 
 .home-upload-btn:hover,
 .home-upload-btn:focus-visible {
-  opacity: 0.72;
+  background: rgba(255, 255, 255, 0.28);
   outline: none;
 }
 
+/* "Coming soon" notice (on the purple hero) — auto-dismisses after 5s. */
 .home-upload-notice {
+  position: relative;
   margin: 0;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-md);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  color: var(--color-text-muted);
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #fff;
   font-size: var(--font-size-sm);
 }
 

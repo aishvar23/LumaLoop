@@ -19,7 +19,7 @@
  * POSITIONING GUARDRAIL (Design §7 / §21.8): copy stays about playing games and
  * GAME activity — no IQ / brain-training / ability / clinical framing.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 import { ROUTES } from '../app/routes';
@@ -93,9 +93,21 @@ export default function HomePage({
   const [statuses, setStatuses] = useState<readonly UserStatus[]>(statusesProp ?? []);
   // The open status story (null when the viewer is closed).
   const [openStatus, setOpenStatus] = useState<UserStatus | null>(null);
-  // The "Upload puzzle" creator feature isn't built yet — clicking the greyed
-  // affordance reveals this notice (hover shows it via the native tooltip).
+  // The "Upload puzzle" creator feature isn't built yet — clicking it reveals a
+  // "coming soon" notice that auto-dismisses after 5s.
   const [uploadNotice, setUploadNotice] = useState(false);
+  const uploadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function showComingSoon() {
+    setUploadNotice(true);
+    if (uploadTimer.current) clearTimeout(uploadTimer.current);
+    uploadTimer.current = setTimeout(() => setUploadNotice(false), 5000);
+  }
+  useEffect(
+    () => () => {
+      if (uploadTimer.current) clearTimeout(uploadTimer.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     let active = true;
@@ -174,20 +186,6 @@ export default function HomePage({
           >
             <span aria-hidden="true">🔍</span>
           </Link>
-          {/* "Upload puzzle" — greyed out (the creator feature is coming). It is
-              intentionally NOT `disabled` so it still fires hover/click: the
-              native tooltip covers hover, and clicking reveals the inline notice
-              below. aria-disabled tells assistive tech it isn't actionable yet. */}
-          <button
-            type="button"
-            className="home-upload-btn"
-            aria-disabled="true"
-            title="Coming soon"
-            aria-label="Upload puzzle (coming soon)"
-            onClick={() => setUploadNotice(true)}
-          >
-            <span aria-hidden="true">＋</span> Upload puzzle
-          </button>
           <Link
             to={ROUTES.profile}
             className="home-profile-link"
@@ -203,12 +201,6 @@ export default function HomePage({
           </Link>
         </div>
       </header>
-
-      {uploadNotice && (
-        <p className="home-upload-notice" role="status">
-          Uploading your own puzzles is coming soon.
-        </p>
-      )}
 
       {statuses.length > 0 && (
         <section aria-label="Recent activity" className="home-activity">
@@ -262,9 +254,24 @@ export default function HomePage({
           Hi {profile.display_name}! <span aria-hidden="true">🎮</span>
         </h1>
         <p className="home-subtitle">Ready for today’s puzzles?</p>
-        <Link to={ROUTES.feed} className="home-start-btn">
-          ▶ Play now
-        </Link>
+        <div className="home-hero__cta">
+          <Link to={ROUTES.feed} className="home-start-btn">
+            ▶ Play now
+          </Link>
+          <button
+            type="button"
+            className="home-upload-btn"
+            aria-label="Upload puzzle"
+            onClick={showComingSoon}
+          >
+            <span aria-hidden="true">＋</span> Upload puzzle
+          </button>
+        </div>
+        {uploadNotice && (
+          <p className="home-upload-notice" role="status">
+            Uploading your own puzzles is coming soon.
+          </p>
+        )}
         {!loading && (
           <div className="home-stat-strip" aria-label="Your game activity">
             <StatChip icon="🎮" value={String(stats.gamesPlayed)} label="Games" tone="visual_attention" />

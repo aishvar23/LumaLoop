@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import HomePage from './HomePage';
 import { AuthProvider } from '../auth/AuthProvider';
@@ -133,16 +133,27 @@ describe('HomePage', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('reveals a "coming soon" notice when the greyed Upload puzzle button is clicked', async () => {
+  it('shows a "coming soon" notice on Upload click that auto-dismisses after 5s', async () => {
     renderHome();
     await screen.findByRole('heading', { name: /hi player one/i });
     const upload = screen.getByRole('button', { name: /upload puzzle/i });
-    // It is a button (not a link) and marked unavailable to assistive tech.
-    expect(upload).toHaveAttribute('aria-disabled', 'true');
+    // It's a real (not greyed/disabled) button now.
+    expect(upload).not.toHaveAttribute('aria-disabled');
     expect(screen.queryByText(/coming soon/i)).not.toBeInTheDocument();
-    fireEvent.click(upload);
-    expect(
-      screen.getByText(/uploading your own puzzles is coming soon/i),
-    ).toBeInTheDocument();
+
+    // Fake timers from here so we can fast-forward the 5s auto-dismiss.
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(upload);
+      expect(
+        screen.getByText(/uploading your own puzzles is coming soon/i),
+      ).toBeInTheDocument();
+      act(() => {
+        vi.advanceTimersByTime(5000);
+      });
+      expect(screen.queryByText(/coming soon/i)).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

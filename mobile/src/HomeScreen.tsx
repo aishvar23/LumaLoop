@@ -18,7 +18,7 @@
  * POSITIONING GUARDRAIL (Design §7 / §21.8): copy stays about playing games and
  * GAME activity — no IQ / brain-training / ability / clinical framing.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -118,7 +118,21 @@ export default function HomeScreen({
   const [loading, setLoading] = useState(true);
   const [statuses, setStatuses] = useState<readonly UserStatus[]>(statusesProp ?? []);
   const [openStatus, setOpenStatus] = useState<UserStatus | null>(null);
+  // "Upload puzzle" isn't built yet — pressing it shows a "coming soon" notice
+  // that auto-dismisses after 5s.
   const [uploadNotice, setUploadNotice] = useState(false);
+  const uploadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showComingSoon = () => {
+    setUploadNotice(true);
+    if (uploadTimer.current) clearTimeout(uploadTimer.current);
+    uploadTimer.current = setTimeout(() => setUploadNotice(false), 5000);
+  };
+  useEffect(
+    () => () => {
+      if (uploadTimer.current) clearTimeout(uploadTimer.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     let active = true;
@@ -202,18 +216,6 @@ export default function HomeScreen({
           >
             <Text style={styles.searchIcon}>🔍</Text>
           </Pressable>
-          {/* "Upload puzzle" — greyed out (the creator feature is coming). Native
-              has no hover, so tapping reveals the inline "coming soon" notice. */}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Upload puzzle (coming soon)"
-            accessibilityState={{ disabled: true }}
-            testID="home-upload"
-            onPress={() => setUploadNotice(true)}
-            style={[styles.uploadBtn, a.primaryBtnDisabled]}
-          >
-            <Text style={styles.uploadBtnText}>＋ Upload puzzle</Text>
-          </Pressable>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Open your profile"
@@ -236,12 +238,6 @@ export default function HomeScreen({
           </Pressable>
         </View>
       </View>
-
-      {uploadNotice && (
-        <Text style={styles.uploadNotice} accessibilityRole="alert">
-          Uploading your own puzzles is coming soon.
-        </Text>
-      )}
 
       {statuses.length > 0 && (
         <View accessibilityLabel="Recent activity">
@@ -293,19 +289,35 @@ export default function HomeScreen({
       <View style={styles.hero}>
         <Text style={styles.greeting}>Hi {profile.display_name}! 🎮</Text>
         <Text style={styles.subtitle}>Ready for today’s puzzles?</Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Play now"
-          testID="home-start"
-          onPress={() => onStart()}
-          style={({ pressed }) => [
-            a.primaryBtn,
-            styles.startBtn,
-            pressed && a.primaryBtnPressed,
-          ]}
-        >
-          <Text style={styles.startText}>▶ Play now</Text>
-        </Pressable>
+        <View style={styles.heroCta}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Play now"
+            testID="home-start"
+            onPress={() => onStart()}
+            style={({ pressed }) => [
+              a.primaryBtn,
+              styles.startBtn,
+              pressed && a.primaryBtnPressed,
+            ]}
+          >
+            <Text style={styles.startText}>▶ Play now</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Upload puzzle"
+            testID="home-upload"
+            onPress={showComingSoon}
+            style={({ pressed }) => [styles.uploadBtn, pressed && styles.uploadBtnPressed]}
+          >
+            <Text style={styles.uploadBtnText}>＋ Upload puzzle</Text>
+          </Pressable>
+        </View>
+        {uploadNotice && (
+          <Text style={styles.uploadNotice} accessibilityRole="alert">
+            Uploading your own puzzles is coming soon.
+          </Text>
+        )}
         {!loading && (
           <View style={styles.statStrip} accessibilityLabel="Your game activity">
             <StatChip icon="🎮" value={String(stats.gamesPlayed)} label="Games played" />
@@ -437,25 +449,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: space.md,
   },
+  // Hero CTA row: "Play now" + "Upload puzzle" side by side.
+  heroCta: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: space.sm,
+  },
+  // "Upload puzzle" — a hero secondary button (translucent on the purple hero).
   uploadBtn: {
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    paddingHorizontal: space.md,
-    paddingVertical: space.sm,
+    borderColor: 'rgba(255,255,255,0.4)',
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    paddingHorizontal: space.lg,
+  },
+  uploadBtnPressed: {
+    backgroundColor: 'rgba(255,255,255,0.28)',
   },
   uploadBtnText: {
-    color: colors.textMuted,
-    fontSize: fontSize.sm,
-    fontWeight: fontWeight.semibold,
+    color: '#fff',
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.bold,
   },
   uploadNotice: {
-    color: colors.textMuted,
+    color: '#fff',
     fontSize: fontSize.sm,
-    backgroundColor: colors.surface,
+    backgroundColor: 'rgba(255,255,255,0.16)',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: 'rgba(255,255,255,0.28)',
     borderRadius: radius.md,
     paddingHorizontal: space.md,
     paddingVertical: space.sm,

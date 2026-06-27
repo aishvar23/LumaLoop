@@ -3,7 +3,7 @@
  * counterpart of web `src/profile/HomePage.test.tsx`). The Supabase client is an
  * injected fake; navigation callbacks are spies. No native modules / real backend.
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import HomeScreen from './HomeScreen';
 import { AuthProvider } from './auth/AuthProvider';
@@ -121,11 +121,20 @@ describe('HomeScreen', () => {
     expect(onStart).toHaveBeenCalledTimes(1);
   });
 
-  it('reveals a "coming soon" notice when the greyed Upload puzzle button is tapped', async () => {
+  it('shows a "coming soon" notice on Upload tap that auto-dismisses after 5s', async () => {
     renderHome();
     const upload = await screen.findByTestId('home-upload');
     expect(screen.queryByText(/coming soon/i)).toBeNull();
-    fireEvent.press(upload);
-    expect(screen.getByText(/uploading your own puzzles is coming soon/i)).toBeTruthy();
+    jest.useFakeTimers();
+    try {
+      fireEvent.press(upload);
+      expect(screen.getByText(/uploading your own puzzles is coming soon/i)).toBeTruthy();
+      act(() => {
+        jest.advanceTimersByTime(5000);
+      });
+      expect(screen.queryByText(/coming soon/i)).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
