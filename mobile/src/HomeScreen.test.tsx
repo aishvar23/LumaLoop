@@ -58,6 +58,7 @@ const STATUSES: UserStatus[] = [
 function renderHome(statuses?: UserStatus[]) {
   const onStart = jest.fn();
   const onOpenProfile = jest.fn();
+  const onOpenSearch = jest.fn();
   const auth = createFakeAuthClient({
     session: makeSession(),
     profile: makeProfile(),
@@ -68,15 +69,22 @@ function renderHome(statuses?: UserStatus[]) {
       <HomeScreen
         onStart={onStart}
         onOpenProfile={onOpenProfile}
+        onOpenSearch={onOpenSearch}
         featuredGames={FEATURED}
         statuses={statuses}
       />
     </AuthProvider>,
   );
-  return { onStart, onOpenProfile };
+  return { onStart, onOpenProfile, onOpenSearch };
 }
 
 describe('HomeScreen', () => {
+  it('opens people search from the topbar search button', async () => {
+    const { onOpenSearch } = renderHome();
+    fireEvent.press(await screen.findByTestId('home-search'));
+    expect(onOpenSearch).toHaveBeenCalledTimes(1);
+  });
+
   it('greets the signed-in user and starts the feed from the CTA', async () => {
     const { onStart } = renderHome();
     await waitFor(() =>

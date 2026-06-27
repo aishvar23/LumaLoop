@@ -82,20 +82,28 @@ export async function shareGame(
 export interface FetchSharesOptions {
   /** Max raw rows to read (the rail groups these per user). */
   limit?: number;
+  /**
+   * Restrict to these sharer ids (e.g. the people you follow + yourself). When
+   * omitted/empty the read is unfiltered (the community fallback).
+   */
+  userIds?: readonly string[];
 }
 
 /**
  * Load recent shares (newest-first, sharer profile embedded). RLS already bounds
- * the result to the last 24h. Never throws — any failure resolves to `[]`.
+ * the result to the last 24h. Optionally restricted to `userIds` (the following
+ * feed). Never throws — any failure resolves to `[]`.
  */
 export async function fetchRecentShares(
   client: AuthClient,
-  { limit = 50 }: FetchSharesOptions = {},
+  { limit = 50, userIds }: FetchSharesOptions = {},
 ): Promise<RawShareRow[]> {
   try {
-    const { data, error } = await client
-      .from('game_shares')
-      .select(SHARE_SELECT)
+    let builder = client.from('game_shares').select(SHARE_SELECT);
+    if (userIds && userIds.length > 0) {
+      builder = builder.in('user_id', userIds);
+    }
+    const { data, error } = await builder
       .order('created_at', { ascending: false })
       .limit(limit);
     if (error) return [];

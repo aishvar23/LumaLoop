@@ -14,6 +14,8 @@ import { AuthProvider, useAuth, useOptionalAuth } from './src/auth/AuthProvider'
 import RequireAuth from './src/auth/RequireAuth';
 import ProfilePage from './src/profile/ProfilePage';
 import HomeScreen from './src/HomeScreen';
+import PeopleSearchScreen from './src/PeopleSearchScreen';
+import UserProfileScreen from './src/UserProfileScreen';
 import { useRecordGamePlay } from './src/feed/useRecordGamePlay';
 import { usePlayedCardIds } from './src/feed/usePlayedCardIds';
 import { SocialConfigProvider } from './src/social/SocialContext';
@@ -72,10 +74,14 @@ export default function App() {
  * returns to the landing. ProfilePage and Home both have Back affordances.
  */
 function FeedApp() {
-  const [view, setView] = useState<'home' | 'feed' | 'profile'>('home');
+  const [view, setView] = useState<'home' | 'feed' | 'profile' | 'search' | 'user'>(
+    'home',
+  );
   // A featured-game deep link: the card to open FIRST when entering the feed
   // (undefined ⇒ the generic feed). Cleared when entering the feed generically.
   const [startCardId, setStartCardId] = useState<string | undefined>(undefined);
+  // The other user whose profile is open (when view === 'user').
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
   // Resolve the best-effort anonymous id once (AsyncStorage-backed, §10). The feed
   // waits for it so the deck seed and telemetry identity share one stable id.
@@ -98,12 +104,38 @@ function FeedApp() {
 
   if (view === 'home') {
     return (
-      <HomeScreen onStart={openFeed} onOpenProfile={() => setView('profile')} />
+      <HomeScreen
+        onStart={openFeed}
+        onOpenProfile={() => setView('profile')}
+        onOpenSearch={() => setView('search')}
+      />
     );
   }
 
   if (view === 'profile') {
     return <ProfilePage onBack={() => setView('feed')} />;
+  }
+
+  if (view === 'search') {
+    return (
+      <PeopleSearchScreen
+        onBack={() => setView('home')}
+        onOpenUser={(id) => {
+          setSelectedUserId(id);
+          setView('user');
+        }}
+      />
+    );
+  }
+
+  if (view === 'user' && selectedUserId) {
+    return (
+      <UserProfileScreen
+        userId={selectedUserId}
+        onBack={() => setView('search')}
+        onStart={openFeed}
+      />
+    );
   }
 
   return (

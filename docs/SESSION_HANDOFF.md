@@ -18,6 +18,17 @@ build, mobile 760 tests):
   added to `src/feed/FeedRoute.tsx`.
 - **"Upload puzzle" button** (greyed, "coming soon") on Home, both platforms — not
   built; hover (web tooltip) / click both reveal a "coming soon" notice.
+- **Follow graph + user search + following feed**: users can **search** other
+  users (`/people`, web; `'search'` view, mobile) and **follow/unfollow** them
+  (`FollowButton`). Another user's public profile (`/u/:userId`, web;
+  `UserProfileScreen`, mobile) shows avatar/handle/bio, follower+following counts,
+  **public game stats**, and their live statuses. The Home status rail now shows
+  statuses **from people you follow + your own**, with a **community fallback**
+  when you follow nobody. New table **`public.follows`** + the public-aggregate
+  view **`public.user_public_stats`** (migration **0006**, applied). Data:
+  `src/social/{followApi,userDiscoveryApi}.ts` + `fetchRecentShares({userIds})`,
+  mirrored to mobile. (Note: `user_public_stats` is a definer view exposing only
+  aggregates — trips the "security-definer view" advisor by design.)
 - **Ephemeral "status" shares (Recent activity rail)**: the rail is now a
   WhatsApp/IG-style status feed. A **Share button** in the in-feed result step
   (`CardShareButton`, injected into `CardFeedback` via the feedback gate) posts a

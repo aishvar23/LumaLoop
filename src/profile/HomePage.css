@@ -38,15 +38,15 @@
 .home-logo {
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
   background: linear-gradient(135deg, #6c7bff 0%, #9d7bff 45%, #ff7eb6 100%);
   box-shadow: 0 6px 18px rgba(124, 110, 255, 0.45);
 }
 
 .home-logo__loop {
-  font-size: 22px;
+  font-size: 25px;
   font-weight: var(--font-weight-bold);
   color: #fff;
   line-height: 1;
@@ -55,9 +55,10 @@
 
 .home-wordmark {
   font-weight: var(--font-weight-bold);
-  font-size: var(--font-size-lg);
-  letter-spacing: 0.01em;
-  background: linear-gradient(90deg, #fff, #c9c4ff);
+  /* Match the greeting's prominence (xl) so the brand reads as the brand. */
+  font-size: var(--font-size-xl);
+  letter-spacing: -0.01em;
+  background: linear-gradient(90deg, #ffffff, #b9b3ff);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -67,6 +68,24 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
+}
+
+.home-search-link {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  text-decoration: none;
+  font-size: var(--font-size-md);
+}
+
+.home-search-link:hover,
+.home-search-link:focus-visible {
+  border-color: var(--color-accent);
+  outline: none;
 }
 
 /* Greyed-out "Upload puzzle" — visible but signals "coming soon". */

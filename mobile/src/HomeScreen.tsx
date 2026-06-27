@@ -37,6 +37,7 @@ import {
   type ProfileStats,
 } from './core/profile/computeStats';
 import { fetchRecentShares } from './social/gameShareApi';
+import { fetchFollowing } from './social/followApi';
 import { groupSharesByUser, type UserStatus } from './social/statusFeed';
 import StatusViewer from './social/StatusViewer';
 import { authStyles as a } from './auth/authStyles';
@@ -55,6 +56,8 @@ export interface HomeScreenProps {
   onStart: (cardId?: string) => void;
   /** Open the profile (/you equivalent). */
   onOpenProfile: () => void;
+  /** Open the people-search screen. */
+  onOpenSearch: () => void;
   /** Test seam: the Supabase client. Defaults to the auth provider's client. */
   client?: AuthClient;
   /** Test seam: the featured games to show. Defaults to the catalog selection. */
@@ -99,6 +102,7 @@ function tileMonogram(label: string): string {
 export default function HomeScreen({
   onStart,
   onOpenProfile,
+  onOpenSearch,
   client: clientProp,
   featuredGames,
   statuses: statusesProp,
@@ -140,7 +144,14 @@ export default function HomeScreen({
     if (statusesProp !== undefined) return;
     let active = true;
     void (async () => {
-      const rows = await fetchRecentShares(client, { limit: 60 });
+      // Following feed: if you follow anyone, show THEIR statuses + your own;
+      // otherwise fall back to the whole community so the rail isn't empty.
+      const following = user ? await fetchFollowing(client, user.id) : new Set<string>();
+      if (!active) return;
+      const rows =
+        user && following.size > 0
+          ? await fetchRecentShares(client, { userIds: [...following, user.id], limit: 60 })
+          : await fetchRecentShares(client, { limit: 60 });
       if (!active) return;
       setStatuses(
         groupSharesByUser(rows, {
@@ -181,6 +192,16 @@ export default function HomeScreen({
           <Text style={styles.brand}>LumaLoop</Text>
         </View>
         <View style={styles.topbarActions}>
+          {/* Find other users to follow. */}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Find people"
+            testID="home-search"
+            onPress={onOpenSearch}
+            style={styles.searchBtn}
+          >
+            <Text style={styles.searchIcon}>🔍</Text>
+          </Pressable>
           {/* "Upload puzzle" — greyed out (the creator feature is coming). Native
               has no hover, so tapping reveals the inline "coming soon" notice. */}
           <Pressable
@@ -379,23 +400,37 @@ const styles = StyleSheet.create({
     gap: space.sm,
   },
   logo: {
-    width: 34,
-    height: 34,
-    borderRadius: 11,
+    width: 40,
+    height: 40,
+    borderRadius: 13,
     backgroundColor: '#7b54d6',
     alignItems: 'center',
     justifyContent: 'center',
   },
   logoLoop: {
     color: '#fff',
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: fontWeight.bold,
     marginTop: -2,
   },
   brand: {
     color: colors.text,
-    fontSize: fontSize.lg,
+    fontSize: fontSize.xl,
     fontWeight: fontWeight.heavy,
+    letterSpacing: -0.3,
+  },
+  searchBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchIcon: {
+    fontSize: fontSize.md,
   },
   topbarActions: {
     flexDirection: 'row',

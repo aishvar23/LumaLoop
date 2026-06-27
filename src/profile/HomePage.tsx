@@ -32,6 +32,7 @@ import { getCardById as defaultGetCardById } from '../cards/catalog';
 import { selectFeaturedGames, templateLabel, type FeaturedGame } from '../cards/featured';
 import type { LiquidCard } from '../cards/types';
 import { fetchRecentShares } from '../social/gameShareApi';
+import { fetchFollowing } from '../social/followApi';
 import { groupSharesByUser, type UserStatus } from '../social/statusFeed';
 import StatusViewer from '../social/StatusViewer';
 import { resolveCategoryTheme } from '../ui/categoryTheme';
@@ -120,7 +121,17 @@ export default function HomePage({
     if (statusesProp !== undefined) return;
     let active = true;
     void (async () => {
-      const rows = await fetchRecentShares(client, { limit: 60 });
+      // Following feed: if you follow anyone, show THEIR statuses + your own;
+      // otherwise fall back to the whole community so the rail isn't empty.
+      const following = user ? await fetchFollowing(client, user.id) : new Set<string>();
+      if (!active) return;
+      const rows =
+        user && following.size > 0
+          ? await fetchRecentShares(client, {
+              userIds: [...following, user.id],
+              limit: 60,
+            })
+          : await fetchRecentShares(client, { limit: 60 });
       if (!active) return;
       setStatuses(
         groupSharesByUser(rows, {
@@ -155,6 +166,14 @@ export default function HomePage({
           <span className="home-wordmark">LumaLoop</span>
         </span>
         <div className="home-topbar__actions">
+          {/* Find other users to follow. */}
+          <Link
+            to={ROUTES.people}
+            className="home-search-link"
+            aria-label="Find people"
+          >
+            <span aria-hidden="true">🔍</span>
+          </Link>
           {/* "Upload puzzle" — greyed out (the creator feature is coming). It is
               intentionally NOT `disabled` so it still fires hover/click: the
               native tooltip covers hover, and clicking reveals the inline notice

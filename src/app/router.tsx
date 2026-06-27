@@ -17,6 +17,8 @@ import HomePage from '../profile/HomePage';
 import AuthCallback from '../auth/AuthCallback';
 import RequireAuth from '../auth/RequireAuth';
 import ProfilePage from '../profile/ProfilePage';
+import PeopleSearchPage from '../social/PeopleSearchPage';
+import UserProfilePage from '../social/UserProfilePage';
 import {
   CardDeepLinkRoutePlaceholder,
   NotFoundRoutePlaceholder,
@@ -60,6 +62,24 @@ export function AppRoutes() {
         element={
           <RequireAuth>
             <ProfilePage />
+          </RequireAuth>
+        }
+      />
+      {/* Search other users to follow (accounts pivot, Phase 2/3). */}
+      <Route
+        path={ROUTES.people}
+        element={
+          <RequireAuth>
+            <PeopleSearchPage />
+          </RequireAuth>
+        }
+      />
+      {/* Another user's public profile + follow toggle. */}
+      <Route
+        path={ROUTES.userProfile}
+        element={
+          <RequireAuth>
+            <UserProfilePage />
           </RequireAuth>
         }
       />

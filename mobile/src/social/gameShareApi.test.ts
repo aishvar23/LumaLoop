@@ -5,6 +5,7 @@ import { fetchRecentShares, shareGame } from './gameShareApi';
 /** A fake client capturing inserts and scripting `.select().order().limit()`. */
 function fakeClient(scripted: { data: unknown[] | null; error: unknown }) {
   const inserts: unknown[] = [];
+  const ins: unknown[][] = [];
   const client = {
     from() {
       const builder = {
@@ -13,13 +14,17 @@ function fakeClient(scripted: { data: unknown[] | null; error: unknown }) {
           return Promise.resolve({ error: null });
         },
         select: () => builder,
+        in: (...a: unknown[]) => {
+          ins.push(a);
+          return builder;
+        },
         order: () => builder,
         limit: () => Promise.resolve(scripted),
       };
       return builder;
     },
   } as unknown as AuthClient;
-  return { client, inserts };
+  return { client, inserts, ins };
 }
 
 const shareRow = (over: Record<string, unknown> = {}) => ({
@@ -92,6 +97,18 @@ describe('fetchRecentShares', () => {
   it('degrades to an empty list on error', async () => {
     const { client } = fakeClient({ data: null, error: { message: 'boom' } });
     expect(await fetchRecentShares(client)).toEqual([]);
+  });
+
+  it('filters to the given userIds (the following feed)', async () => {
+    const { client, ins } = fakeClient({ data: [shareRow()], error: null });
+    await fetchRecentShares(client, { userIds: ['me', 'them'] });
+    expect(ins[0]).toEqual(['user_id', ['me', 'them']]);
+  });
+
+  it('does NOT filter when userIds is empty (community fallback)', async () => {
+    const { client, ins } = fakeClient({ data: [shareRow()], error: null });
+    await fetchRecentShares(client, { userIds: [] });
+    expect(ins).toHaveLength(0);
   });
 });
 

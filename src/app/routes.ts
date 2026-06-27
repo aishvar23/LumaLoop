@@ -28,7 +28,16 @@ export const ROUTES = {
   authCallback: '/auth/callback',
   /** `/you` — the signed-in user's profile + game-activity stats. */
   profile: '/you',
+  /** `/people` — search other users to follow (accounts pivot, Phase 2/3). */
+  people: '/people',
+  /** `/u/:userId` — another user's public profile + follow toggle. */
+  userProfile: '/u/:userId',
 } as const;
+
+/** Build the path to a user's public profile: `/u/<userId>`. */
+export function buildUserProfilePath(userId: string): string {
+  return `/u/${encodeURIComponent(userId)}`;
+}
 
 export type RouteKey = keyof typeof ROUTES;
 
@@ -52,6 +61,8 @@ export const routeKindFor: Record<RouteKey, RouteKind> = {
   cardDeepLink: 'card_deep_link',
   authCallback: 'account',
   profile: 'account',
+  people: 'account',
+  userProfile: 'account',
 } as const;
 
 /**
