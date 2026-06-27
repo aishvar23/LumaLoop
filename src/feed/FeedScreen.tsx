@@ -86,6 +86,12 @@ export type FeedScreenProps = {
    */
   excludeCardIds?: ReadonlySet<string> | readonly string[];
   /**
+   * Pin this card as the FIRST slide — a featured-game deep link (so tapping a
+   * specific game opens THAT game). Threaded into the controller; ignored when an
+   * explicit `source` is supplied (tests).
+   */
+  startCardId?: string;
+  /**
    * Test seam: a fixed anonymous id for deterministic composition. When omitted
    * (real usage) it resolves to the real persisted id (Technical Design §10).
    */
@@ -193,6 +199,7 @@ export default function FeedScreen({
   registry = feedRegistry,
   source,
   excludeCardIds,
+  startCardId,
   anonymousUserId,
   getCardById = getCatalogCardById,
   now,
@@ -227,6 +234,7 @@ export default function FeedScreen({
     anonymousUserId: resolvedAnonymousUserId,
     source,
     excludeCardIds,
+    startCardId,
   });
 
   // Phase 4: the GAME-POINTS accumulator. It folds each resolution through the

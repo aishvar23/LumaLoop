@@ -80,10 +80,11 @@ describe('HomeScreen', () => {
   it('greets the signed-in user and starts the feed from the CTA', async () => {
     const { onStart } = renderHome();
     await waitFor(() =>
-      expect(screen.getByText(/welcome back, player one/i)).toBeTruthy(),
+      expect(screen.getByText(/hi player one/i)).toBeTruthy(),
     );
     fireEvent.press(screen.getByTestId('home-start'));
-    expect(onStart).toHaveBeenCalledTimes(1);
+    // Generic "Play now" enters the feed with no pinned game.
+    expect(onStart).toHaveBeenCalledWith();
   });
 
   it('opens the profile from the avatar button', async () => {
@@ -93,11 +94,12 @@ describe('HomeScreen', () => {
     expect(onOpenProfile).toHaveBeenCalledTimes(1);
   });
 
-  it('enters the feed when a featured tile is tapped', async () => {
+  it('deep-links a featured tile to its specific game', async () => {
     const { onStart } = renderHome();
     await waitFor(() => expect(screen.getByTestId('home-tile-spot_it')).toBeTruthy());
     fireEvent.press(screen.getByTestId('home-tile-spot_it'));
-    expect(onStart).toHaveBeenCalledTimes(1);
+    // The tile opens THAT game (its cardId is pinned), not the generic feed.
+    expect(onStart).toHaveBeenCalledWith('spot_it-1');
   });
 
   it('shows a Recent activity rail of status bubbles and opens the viewer', async () => {

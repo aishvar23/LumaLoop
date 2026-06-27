@@ -47,7 +47,7 @@ describe('CardShareButton', () => {
       </SocialConfigProvider>,
     );
     const btn = screen.getByTestId('card-share');
-    expect(btn).toHaveTextContent(/share this game/i);
+    expect(btn).toHaveTextContent(/share to your status/i);
     fireEvent.click(btn);
     await waitFor(() => expect(btn).toHaveAttribute('data-state', 'shared'));
     expect(btn).toHaveTextContent(/shared/i);

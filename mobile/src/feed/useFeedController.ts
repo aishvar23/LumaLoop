@@ -18,7 +18,9 @@ import {
   FEED_PREFETCH_THRESHOLD,
   defaultFeedBatchSource,
   ensureDeckLength,
+  excludeWithStart,
   makeFeedBatchSource,
+  withPinnedFirst,
   type FeedBatchSource,
   type FeedDeckState,
 } from '../core/feed/feedDeck';
@@ -52,6 +54,13 @@ export interface FeedControllerOptions {
    * not re-seed an in-flight deck. Ignored when `source` is supplied (tests).
    */
   excludeCardIds?: ReadonlySet<string> | readonly string[];
+  /**
+   * Pin this card as the FIRST slide — a featured-game deep link, so tapping a
+   * specific game opens THAT game (not the generic deck head). It is also excluded
+   * from the seeded batches so it doesn't immediately repeat. Captured once at
+   * mount. Ignored when an explicit `source` is supplied.
+   */
+  startCardId?: string;
   /** How many cards to materialise up front. */
   initialLength?: number;
 }
@@ -72,14 +81,13 @@ function grownFor(
 }
 
 export function useFeedController(options: FeedControllerOptions): FeedController {
-  const { anonymousUserId } = options;
+  const { anonymousUserId, startCardId } = options;
   // An explicit `source` (tests) wins; otherwise build the default catalog source,
-  // skipping already-played cards when an exclusion set was supplied (D2).
+  // skipping already-played cards (D2) AND the pinned start card so it shows once.
+  const exclude = excludeWithStart(options.excludeCardIds, startCardId);
   const source =
     options.source ??
-    (options.excludeCardIds
-      ? makeFeedBatchSource(options.excludeCardIds)
-      : defaultFeedBatchSource);
+    (exclude ? makeFeedBatchSource(exclude) : defaultFeedBatchSource);
   const initialLength = options.initialLength ?? 8;
 
   // Source + anon id are fixed for the controller's lifetime; capture via refs so
@@ -88,7 +96,10 @@ export function useFeedController(options: FeedControllerOptions): FeedControlle
   const anonRef = useRef(anonymousUserId);
 
   const [deck, setDeck] = useState<FeedDeckState>(() =>
-    ensureDeckLength(EMPTY_FEED_DECK, initialLength, anonymousUserId, source),
+    withPinnedFirst(
+      ensureDeckLength(EMPTY_FEED_DECK, initialLength, anonymousUserId, source),
+      startCardId,
+    ),
   );
   const [activeIndex, setActiveIndexState] = useState(0);
 

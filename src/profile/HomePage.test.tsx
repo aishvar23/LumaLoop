@@ -74,12 +74,12 @@ function renderHome(plays: GamePlay[] = [], statuses?: UserStatus[]) {
 }
 
 describe('HomePage', () => {
-  it('greets the signed-in user and routes "Start playing" into the feed', async () => {
+  it('greets the signed-in user and routes "Play now" into the feed', async () => {
     renderHome();
     expect(
-      await screen.findByRole('heading', { name: /welcome back, player one/i }),
+      await screen.findByRole('heading', { name: /hi player one/i }),
     ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /start playing/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /play now/i })).toHaveAttribute(
       'href',
       '/feed',
     );
@@ -92,28 +92,28 @@ describe('HomePage', () => {
 
   it('renders the stats snapshot from game plays', async () => {
     renderHome();
-    // Empty history → 0 games played, shown once stats resolve.
-    await waitFor(() =>
-      expect(screen.getByText('Games played')).toBeInTheDocument(),
-    );
-    expect(screen.getByText('Accuracy')).toBeInTheDocument();
-    expect(screen.getByText('Best streak')).toBeInTheDocument();
-    expect(screen.getByText('Total points')).toBeInTheDocument();
+    // Empty history → 0 games played, shown once stats resolve (async; findBy
+    // retries so the assertions are robust to load-dependent render timing).
+    expect(await screen.findByText('Games')).toBeInTheDocument();
+    expect(await screen.findByText('Accuracy')).toBeInTheDocument();
+    expect(await screen.findByText('Streak')).toBeInTheDocument();
+    expect(await screen.findByText('Points')).toBeInTheDocument();
   });
 
-  it('shows the featured game tiles, each entering the feed', async () => {
+  it('deep-links each featured tile to its specific game', async () => {
     renderHome();
     const spotIt = await screen.findByRole('link', { name: /spot it/i });
-    expect(spotIt).toHaveAttribute('href', '/feed');
+    // The tile opens THAT game (not the generic feed head).
+    expect(spotIt).toHaveAttribute('href', '/feed?card=spot_it-1');
     expect(screen.getByRole('link', { name: /tiny logic/i })).toHaveAttribute(
       'href',
-      '/feed',
+      '/feed?card=tiny_logic-1',
     );
   });
 
   it('shows a Recent activity rail of per-user status bubbles and opens the viewer', async () => {
     renderHome([], STATUSES);
-    await screen.findByRole('heading', { name: /welcome back/i });
+    await screen.findByRole('heading', { name: /hi player one/i });
     expect(screen.getByRole('heading', { name: /recent activity/i })).toBeInTheDocument();
     const bubble = screen.getByTestId('home-status-u9');
     expect(bubble).toHaveTextContent('@gridwise');
@@ -127,7 +127,7 @@ describe('HomePage', () => {
 
   it('omits the Recent activity rail when there are no shares', async () => {
     renderHome([], []);
-    await screen.findByRole('heading', { name: /welcome back/i });
+    await screen.findByRole('heading', { name: /hi player one/i });
     expect(
       screen.queryByRole('heading', { name: /recent activity/i }),
     ).not.toBeInTheDocument();
@@ -135,7 +135,7 @@ describe('HomePage', () => {
 
   it('reveals a "coming soon" notice when the greyed Upload puzzle button is clicked', async () => {
     renderHome();
-    await screen.findByRole('heading', { name: /welcome back/i });
+    await screen.findByRole('heading', { name: /hi player one/i });
     const upload = screen.getByRole('button', { name: /upload puzzle/i });
     // It is a button (not a link) and marked unavailable to assistive tech.
     expect(upload).toHaveAttribute('aria-disabled', 'true');

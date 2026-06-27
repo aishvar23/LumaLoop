@@ -63,6 +63,8 @@ export interface FeedRouteProps {
   feedId?: string;
   /** Test seam: deterministic feed batch source. Defaults to seeded catalog. */
   feedSource?: FeedBatchSource;
+  /** Pin a featured game first. Defaults to the `?card=` URL param (deep link). */
+  startCardId?: string;
   /** Test seam: renderer registry. Defaults to the shipped feed registry. */
   registry?: RendererRegistry;
   /**
@@ -87,6 +89,15 @@ function currentSearch(): string {
   }
 }
 
+/** Parse the `?card=<id>` featured-game deep link from a query string, if any. */
+function parseStartCardId(search: string): string | undefined {
+  try {
+    return new URLSearchParams(search).get('card') ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export default function FeedRoute({
   telemetryClient,
   anonymousUserId,
@@ -94,10 +105,15 @@ export default function FeedRoute({
   now,
   feedId: feedIdProp,
   feedSource,
+  startCardId: startCardIdProp,
   registry,
   getCardById = defaultGetCardById,
   authClient,
 }: FeedRouteProps = {}) {
+  // Featured-game deep link: pin `?card=<id>` (or the injected prop) as slide 0.
+  const [startCardId] = useState(
+    () => startCardIdProp ?? parseStartCardId(currentSearch()),
+  );
   // Resolve identity + attribution ONCE per mount (Technical Design §10): the
   // persisted anon id, the parsed `?source=` (headline return uses 'direct'),
   // and a single feed-instance id shared with the feed below.
@@ -185,6 +201,7 @@ export default function FeedRoute({
             registry={registry}
             source={feedSource}
             excludeCardIds={played.cardIds}
+            startCardId={startCardId}
             anonymousUserId={resolvedAnonymousUserId}
             getCardById={getCardById}
             now={now}

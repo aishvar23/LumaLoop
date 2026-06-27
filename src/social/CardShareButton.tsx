@@ -52,7 +52,7 @@ export default function CardShareButton({ cardId, outcome, points }: CardShareBu
         ? 'Sharing…'
         : state === 'error'
           ? '↗ Tap to retry'
-          : '↗ Share this game';
+          : '↗ Share to your status';
 
   return (
     <button

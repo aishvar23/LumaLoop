@@ -36,16 +36,16 @@ describe('AppRoutes', () => {
     // `/` is the Home landing (accounts pivot), gated behind auth.
     await waitFor(() =>
       expect(
-        screen.getByRole('heading', { name: /welcome back/i }),
+        screen.getByRole('heading', { name: /hi player one/i }),
       ).toBeInTheDocument(),
     );
     // It is NOT the feed — that lives at `/feed` now.
     expect(
       screen.queryByRole('heading', { name: 'Game feed' }),
     ).not.toBeInTheDocument();
-    // Home routes into the feed via a "Start playing" link.
+    // Home routes into the feed via a "Play now" link.
     expect(
-      screen.getByRole('link', { name: /start playing/i }),
+      screen.getByRole('link', { name: /play now/i }),
     ).toHaveAttribute('href', '/feed');
   });
 

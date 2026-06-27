@@ -46,7 +46,7 @@ export default function CardShareButton({ cardId, outcome, points }: CardShareBu
         ? 'Sharing…'
         : state === 'error'
           ? '↗ Tap to retry'
-          : '↗ Share this game';
+          : '↗ Share to your status';
 
   const done = state === 'shared';
 
@@ -71,26 +71,28 @@ export default function CardShareButton({ cardId, outcome, points }: CardShareBu
 
 const styles = StyleSheet.create({
   btn: {
-    minHeight: 40,
-    alignSelf: 'center',
+    minHeight: 44,
+    alignSelf: 'stretch',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: space.lg,
     borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: colors.accent,
-    backgroundColor: colors.surface,
+    borderColor: 'transparent',
+    // Filled accent so it reads as a clear call-to-action after playing.
+    backgroundColor: colors.accent,
   },
   btnPressed: {
-    backgroundColor: colors.surfacePressed,
+    backgroundColor: colors.accentDeep,
   },
   btnDone: {
+    backgroundColor: 'transparent',
     borderColor: colors.success,
   },
   text: {
-    color: colors.text,
-    fontSize: fontSize.sm,
-    fontWeight: fontWeight.semibold,
+    color: colors.accentContrast,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.bold,
   },
   textDone: {
     color: colors.success,

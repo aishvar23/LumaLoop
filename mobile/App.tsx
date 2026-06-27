@@ -73,6 +73,9 @@ export default function App() {
  */
 function FeedApp() {
   const [view, setView] = useState<'home' | 'feed' | 'profile'>('home');
+  // A featured-game deep link: the card to open FIRST when entering the feed
+  // (undefined ⇒ the generic feed). Cleared when entering the feed generically.
+  const [startCardId, setStartCardId] = useState<string | undefined>(undefined);
 
   // Resolve the best-effort anonymous id once (AsyncStorage-backed, §10). The feed
   // waits for it so the deck seed and telemetry identity share one stable id.
@@ -87,12 +90,15 @@ function FeedApp() {
     };
   }, []);
 
+  // Enter the feed, optionally pinned to a specific game (featured tile / status).
+  const openFeed = (cardId?: string) => {
+    setStartCardId(cardId);
+    setView('feed');
+  };
+
   if (view === 'home') {
     return (
-      <HomeScreen
-        onStart={() => setView('feed')}
-        onOpenProfile={() => setView('profile')}
-      />
+      <HomeScreen onStart={openFeed} onOpenProfile={() => setView('profile')} />
     );
   }
 
@@ -104,7 +110,10 @@ function FeedApp() {
     <View style={styles.root}>
       <FirstRunNotice>
         {anonymousUserId !== null ? (
-          <TelemetryFeed anonymousUserId={anonymousUserId} />
+          <TelemetryFeed
+            anonymousUserId={anonymousUserId}
+            startCardId={startCardId}
+          />
         ) : null}
       </FirstRunNotice>
       <HomeButton onPress={() => setView('home')} />
@@ -155,7 +164,13 @@ function YouButton({ onPress }: { onPress: () => void }) {
  * shared by the feed's per-card start context and the telemetry `sessionId`
  * envelope, then forwards the M3 FeedScreen seam callbacks to the instrumentation.
  */
-function TelemetryFeed({ anonymousUserId }: { anonymousUserId: string }) {
+function TelemetryFeed({
+  anonymousUserId,
+  startCardId,
+}: {
+  anonymousUserId: string;
+  startCardId?: string;
+}) {
   const [client] = useState(() => createTelemetryClient());
   const [feedId] = useState(() => uuidV4());
 
@@ -224,6 +239,7 @@ function TelemetryFeed({ anonymousUserId }: { anonymousUserId: string }) {
         key={userId ?? 'anon'}
         anonymousUserId={anonymousUserId}
         excludeCardIds={played.cardIds}
+        startCardId={startCardId}
         feedId={feedId}
         onCardActive={handlers.onCardActive}
         onCardEngaged={handlers.onCardEngaged}

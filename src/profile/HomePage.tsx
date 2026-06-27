@@ -64,6 +64,11 @@ function categoryLabel(category: string): string {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
+/** Feed path that opens a SPECIFIC game first (featured-game deep link). */
+function feedPathFor(cardId: string): string {
+  return `${ROUTES.feed}?card=${encodeURIComponent(cardId)}`;
+}
+
 /** The monogram for the avatar fallback (first letter of name/handle). */
 function monogram(displayName: string, handle: string): string {
   const source = displayName.trim() || handle.trim();
@@ -144,10 +149,10 @@ export default function HomePage({
     <div className="home-page">
       <header className="home-topbar">
         <span className="home-brand">
-          <span className="home-brand__mark" aria-hidden="true">
-            L
+          <span className="home-logo" aria-hidden="true">
+            <span className="home-logo__loop">∞</span>
           </span>
-          LumaLoop
+          <span className="home-wordmark">LumaLoop</span>
         </span>
         <div className="home-topbar__actions">
           {/* "Upload puzzle" — greyed out (the creator feature is coming). It is
@@ -232,22 +237,21 @@ export default function HomePage({
 
       <section className="home-hero">
         <div className="home-hero__glow" aria-hidden="true" />
-        <p className="home-hero__eyebrow">Today’s loop</p>
+        <div className="home-hero__blob home-hero__blob--a" aria-hidden="true" />
+        <div className="home-hero__blob home-hero__blob--b" aria-hidden="true" />
         <h1 className="home-greeting">
-          Welcome back, {profile.display_name}
+          Hi {profile.display_name}! <span aria-hidden="true">🎮</span>
         </h1>
-        <p className="home-subtitle">
-          Pick up where you left off, or jump into something new.
-        </p>
+        <p className="home-subtitle">Ready for today’s puzzles?</p>
         <Link to={ROUTES.feed} className="home-start-btn">
-          ▶ Start playing
+          ▶ Play now
         </Link>
         {!loading && (
           <div className="home-stat-strip" aria-label="Your game activity">
-            <StatChip icon="🎮" value={String(stats.gamesPlayed)} label="Games played" />
-            <StatChip icon="🎯" value={formatAccuracy(stats.accuracy)} label="Accuracy" />
-            <StatChip icon="🔥" value={String(stats.bestStreak)} label="Best streak" />
-            <StatChip icon="⭐" value={String(stats.totalPoints)} label="Total points" />
+            <StatChip icon="🎮" value={String(stats.gamesPlayed)} label="Games" tone="visual_attention" />
+            <StatChip icon="🎯" value={formatAccuracy(stats.accuracy)} label="Accuracy" tone="logical_reasoning" />
+            <StatChip icon="🔥" value={String(stats.bestStreak)} label="Streak" tone="cognitive_flexibility" />
+            <StatChip icon="⭐" value={String(stats.totalPoints)} label="Points" tone="processing_speed" />
           </div>
         )}
       </section>
@@ -258,7 +262,7 @@ export default function HomePage({
           {featured.map((game) => (
             <Link
               key={game.templateType}
-              to={ROUTES.feed}
+              to={feedPathFor(game.cardId)}
               className="home-game-tile"
               style={{
                 ['--tile-accent' as string]: resolveCategoryTheme(game.category).accent,
@@ -291,9 +295,9 @@ export default function HomePage({
           status={openStatus}
           categoryForCard={(cardId) => getCardById(cardId)?.category}
           onClose={() => setOpenStatus(null)}
-          onPlay={() => {
+          onPlay={(item) => {
             setOpenStatus(null);
-            navigate(ROUTES.feed);
+            navigate(feedPathFor(item.cardId));
           }}
         />
       )}
@@ -301,18 +305,28 @@ export default function HomePage({
   );
 }
 
-/** A compact inline stat chip (slim strip, distinct from the profile's card grid). */
+/** A compact, color-tinted stat chip (playful strip, distinct from the profile grid). */
 function StatChip({
   icon,
   value,
   label,
+  tone,
 }: {
   icon: string;
   value: string;
   label: string;
+  /** Category id whose accent tints the chip; cosmetic only. */
+  tone: string;
 }) {
+  const theme = resolveCategoryTheme(tone);
   return (
-    <span className="home-stat-chip">
+    <span
+      className="home-stat-chip"
+      style={{
+        ['--chip-accent' as string]: theme.accent,
+        ['--chip-tint' as string]: theme.accentTint,
+      }}
+    >
       <span className="home-stat-chip__icon" aria-hidden="true">
         {icon}
       </span>

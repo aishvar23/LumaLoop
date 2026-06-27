@@ -52,7 +52,7 @@ import {
 
 export interface HomeScreenProps {
   /** Enter the feed ("Start playing"). */
-  onStart: () => void;
+  onStart: (cardId?: string) => void;
   /** Open the profile (/you equivalent). */
   onOpenProfile: () => void;
   /** Test seam: the Supabase client. Defaults to the auth provider's client. */
@@ -174,7 +174,12 @@ export default function HomeScreen({
       ]}
     >
       <View style={styles.topbar}>
-        <Text style={styles.brand}>LumaLoop</Text>
+        <View style={styles.brandRow}>
+          <View style={styles.logo}>
+            <Text style={styles.logoLoop}>∞</Text>
+          </View>
+          <Text style={styles.brand}>LumaLoop</Text>
+        </View>
         <View style={styles.topbarActions}>
           {/* "Upload puzzle" — greyed out (the creator feature is coming). Native
               has no hover, so tapping reveals the inline "coming soon" notice. */}
@@ -265,23 +270,20 @@ export default function HomeScreen({
       )}
 
       <View style={styles.hero}>
-        <Text style={styles.heroEyebrow}>TODAY’S LOOP</Text>
-        <Text style={styles.greeting}>Welcome back, {profile.display_name}</Text>
-        <Text style={styles.subtitle}>
-          Pick up where you left off, or jump into something new.
-        </Text>
+        <Text style={styles.greeting}>Hi {profile.display_name}! 🎮</Text>
+        <Text style={styles.subtitle}>Ready for today’s puzzles?</Text>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Start playing"
+          accessibilityLabel="Play now"
           testID="home-start"
-          onPress={onStart}
+          onPress={() => onStart()}
           style={({ pressed }) => [
             a.primaryBtn,
             styles.startBtn,
             pressed && a.primaryBtnPressed,
           ]}
         >
-          <Text style={a.primaryBtnText}>▶ Start playing</Text>
+          <Text style={styles.startText}>▶ Play now</Text>
         </Pressable>
         {!loading && (
           <View style={styles.statStrip} accessibilityLabel="Your game activity">
@@ -304,10 +306,10 @@ export default function HomeScreen({
                 accessibilityRole="button"
                 accessibilityLabel={`${game.label} — play`}
                 testID={`home-tile-${game.templateType}`}
-                onPress={onStart}
-                style={styles.tile}
+                onPress={() => onStart(game.cardId)}
+                style={[styles.tile, { backgroundColor: accent }]}
               >
-                <View style={[styles.tileMonogram, { backgroundColor: accent }]}>
+                <View style={styles.tileMonogram}>
                   <Text style={styles.tileMonogramText}>{tileMonogram(game.label)}</Text>
                 </View>
                 <Text style={styles.tileTitle} numberOfLines={1}>
@@ -316,7 +318,7 @@ export default function HomeScreen({
                 <Text style={styles.tileMeta} numberOfLines={1}>
                   {categoryLabel(game.category)} · ~{game.estimatedSeconds}s
                 </Text>
-                <Text style={[styles.tilePlay, { color: accent }]}>Play ▸</Text>
+                <Text style={styles.tilePlay}>Play ▸</Text>
               </Pressable>
             );
           })}
@@ -328,9 +330,9 @@ export default function HomeScreen({
           status={openStatus}
           categoryForCard={(cardId) => getCardById(cardId)?.category}
           onClose={() => setOpenStatus(null)}
-          onPlay={() => {
+          onPlay={(item) => {
             setOpenStatus(null);
-            onStart();
+            onStart(item.cardId);
           }}
         />
       )}
@@ -370,6 +372,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: space.md,
+  },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+  },
+  logo: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    backgroundColor: '#7b54d6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoLoop: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: fontWeight.bold,
+    marginTop: -2,
   },
   brand: {
     color: colors.text,
@@ -454,46 +475,50 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: -2,
     bottom: -2,
-    fontSize: 12,
-    backgroundColor: colors.surface,
+    minWidth: 20,
+    height: 20,
+    textAlign: 'center',
+    fontSize: 11,
+    lineHeight: 18,
+    color: '#fff',
+    fontWeight: fontWeight.bold,
+    backgroundColor: '#ff5d8f',
     borderRadius: 10,
     overflow: 'hidden',
-    paddingHorizontal: 3,
+    paddingHorizontal: 4,
   },
   storyName: {
     maxWidth: '100%',
     color: colors.textMuted,
     fontSize: fontSize.sm,
   },
-  // Hero.
+  // Hero — vivid playful panel.
   hero: {
     gap: space.md,
     padding: space.xl,
-    borderRadius: radius.lg,
-    backgroundColor: '#1a1e30',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  heroEyebrow: {
-    color: colors.accent,
-    fontSize: fontSize.xs,
-    fontWeight: fontWeight.semibold,
-    letterSpacing: 1.5,
+    borderRadius: 28,
+    backgroundColor: '#5a52e0',
   },
   greeting: {
-    color: colors.text,
+    color: '#fff',
     fontSize: fontSize.xl,
     fontWeight: fontWeight.heavy,
   },
   subtitle: {
-    color: colors.textMuted,
+    color: 'rgba(255,255,255,0.85)',
     fontSize: fontSize.md,
   },
   startBtn: {
     alignSelf: 'flex-start',
     paddingHorizontal: space.xl,
+    backgroundColor: '#fff',
   },
-  // Slim stat strip.
+  startText: {
+    color: '#5a52e0',
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.bold,
+  },
+  // Slim stat strip (on the colored hero).
   statStrip: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -507,20 +532,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.md,
     paddingVertical: space.xs,
     borderRadius: radius.pill,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: 'rgba(255,255,255,0.16)',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: 'rgba(255,255,255,0.22)',
   },
   statChipIcon: {
     fontSize: fontSize.sm,
   },
   statChipValue: {
-    color: colors.text,
+    color: '#fff',
     fontSize: fontSize.md,
     fontWeight: fontWeight.bold,
   },
   statChipLabel: {
-    color: colors.textMuted,
+    color: 'rgba(255,255,255,0.8)',
     fontSize: fontSize.sm,
   },
   // Featured games.
@@ -541,38 +566,38 @@ const styles = StyleSheet.create({
   tile: {
     flexGrow: 1,
     flexBasis: '45%',
-    minHeight: 120,
+    minHeight: 132,
     gap: space.sm,
     padding: space.lg,
-    borderRadius: radius.md,
+    borderRadius: 22,
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
   tileMonogram: {
-    width: 38,
-    height: 38,
-    borderRadius: radius.sm,
+    width: 40,
+    height: 40,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.22)',
   },
   tileMonogramText: {
-    color: colors.accentContrast,
+    color: '#fff',
     fontSize: fontSize.sm,
     fontWeight: fontWeight.bold,
   },
   tileTitle: {
-    color: colors.text,
+    color: '#fff',
     fontSize: fontSize.md,
-    fontWeight: fontWeight.semibold,
+    fontWeight: fontWeight.bold,
   },
   tileMeta: {
-    color: colors.textMuted,
+    color: 'rgba(255,255,255,0.85)',
     fontSize: fontSize.sm,
   },
   tilePlay: {
     marginTop: 'auto',
+    color: '#fff',
     fontSize: fontSize.sm,
-    fontWeight: fontWeight.semibold,
+    fontWeight: fontWeight.bold,
   },
 });
