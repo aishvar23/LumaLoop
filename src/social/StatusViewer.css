@@ -1,18 +1,46 @@
 /**
- * Status story viewer overlay (WhatsApp/IG-style). Token-driven, full-screen,
- * above everything. Segmented progress bars + a centered share card.
+ * Status story viewer overlay (WhatsApp/IG-style) — immersive, category-tinted.
+ * Token-driven layout; the gradient backdrop is set inline per category. A big
+ * game emblem, an outcome badge, points, and a clear Play CTA.
  */
 .status-viewer {
   position: fixed;
   inset: 0;
   z-index: 50;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: calc(var(--safe-top) + var(--space-4)) var(--space-4)
     calc(var(--safe-bottom) + var(--space-5));
-  background: rgba(6, 7, 11, 0.96);
-  color: var(--color-text);
+  color: #fff;
+  /* `background` is set inline (category gradient); this is a fallback. */
+  background: #0b0b0f;
+}
+
+/* Soft decorative blobs for depth. */
+.status-viewer__blob {
+  position: absolute;
+  border-radius: var(--radius-pill);
+  background: #fff;
+  opacity: 0.16;
+  filter: blur(2px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.status-viewer__blob--a {
+  width: 260px;
+  height: 260px;
+  top: -60px;
+  right: -70px;
+}
+
+.status-viewer__blob--b {
+  width: 180px;
+  height: 180px;
+  bottom: 90px;
+  left: -60px;
 }
 
 /* Tap zones cover the screen; content/buttons sit above via z-index. */
@@ -54,7 +82,7 @@
   flex: 1;
   height: 3px;
   border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.3);
   overflow: hidden;
 }
 
@@ -62,7 +90,7 @@
   display: block;
   height: 100%;
   width: 0;
-  background: var(--color-text);
+  background: #fff;
   border-radius: var(--radius-pill);
 }
 
@@ -104,7 +132,9 @@
   height: 40px;
   border-radius: var(--radius-pill);
   overflow: hidden;
-  color: var(--color-accent-on, #0b0b0f);
+  background: rgba(255, 255, 255, 0.25);
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  color: #fff;
   font-weight: var(--font-weight-bold);
 }
 
@@ -121,65 +151,107 @@
 }
 
 .status-viewer__who {
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-bold);
 }
 
 .status-viewer__time {
   font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .status-viewer__close {
   appearance: none;
   border: 0;
   background: transparent;
-  color: var(--color-text);
+  color: #fff;
   font-size: var(--font-size-lg);
   cursor: pointer;
   padding: var(--space-1) var(--space-2);
 }
 
-.status-viewer__card {
+/* Centerpiece. */
+.status-viewer__center {
   position: relative;
   z-index: 2;
-  margin: auto 0;
-  width: 100%;
-  max-width: 420px;
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-6) var(--space-4);
-  border-radius: var(--radius-lg);
-  border: 2px solid var(--color-border);
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.04), var(--color-surface));
+  justify-content: center;
+  gap: var(--space-3);
+  text-align: center;
 }
 
-.status-viewer__kicker {
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
+.status-viewer__emblem {
+  display: grid;
+  place-items: center;
+  width: 108px;
+  height: 108px;
+  border-radius: 30px;
+  background: rgba(255, 255, 255, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  font-size: 42px;
+  font-weight: var(--font-weight-bold);
+}
+
+.status-viewer__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px var(--space-3);
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.92);
+  color: #1a1330;
+  font-weight: var(--font-weight-bold);
   font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
 }
 
 .status-viewer__game {
   font-size: var(--font-size-xl);
   font-weight: var(--font-weight-bold);
-  text-align: center;
+  line-height: 1.1;
 }
 
-.status-viewer__result {
+.status-viewer__points {
+  font-size: 30px;
+  font-weight: var(--font-weight-bold);
+}
+
+.status-viewer__points-unit {
   font-size: var(--font-size-md);
-  color: var(--color-text-muted);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Accessible result summary (carries outcome + points text); not shown visually. */
+.status-viewer__result {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+/* Bottom CTA. */
+.status-viewer__bottom {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .status-viewer__play {
-  margin-top: var(--space-3);
   appearance: none;
+  width: 100%;
   border: 0;
   border-radius: var(--radius-pill);
   padding: var(--space-3) var(--space-5);
-  color: var(--color-accent-on, #0b0b0f);
+  background: #fff;
+  color: #15101f;
   font-weight: var(--font-weight-bold);
   font-size: var(--font-size-md);
   cursor: pointer;
@@ -187,15 +259,11 @@
 
 .status-viewer__play:hover,
 .status-viewer__play:focus-visible {
-  filter: brightness(1.08);
+  filter: brightness(0.96);
   outline: none;
 }
 
-.status-viewer__visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
+.status-viewer__hint {
+  font-size: var(--font-size-sm);
+  color: rgba(255, 255, 255, 0.75);
 }

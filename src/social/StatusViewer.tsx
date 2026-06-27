@@ -1,25 +1,23 @@
 /**
  * Status story viewer (accounts pivot) — a WhatsApp/IG-style full-screen overlay
- * that plays through ONE user's recent shares (a {@link UserStatus}).
+ * that plays through ONE user's recent shares (a {@link UserStatus}), with an
+ * immersive, category-tinted gradient background.
  *
- * Segmented progress bars (one per share) sit on top; the active segment animates
- * over `autoAdvanceMs` and then advances to the next share, closing past the last
- * one. Tapping the right half advances, the left half goes back; explicit
- * prev/next buttons keep it keyboard/AT accessible, and Escape closes. Each share
- * shows the game + the player's result and a "Play" CTA back into the feed.
+ * Segmented progress bars on top (one per share); the active segment animates over
+ * `autoAdvanceMs` and then advances, closing past the last one. Tapping the right
+ * half advances, the left half goes back; explicit prev/next buttons keep it
+ * keyboard/AT accessible, and Escape closes. Each share shows the game emblem, the
+ * outcome + points, and a "Play" CTA back into the feed.
  *
  * Presentational only (CLAUDE.md §4): navigation is the caller's job via `onPlay`
  * / `onClose`. Pass `autoAdvanceMs={0}` to disable auto-advance (reduced motion /
  * tests).
- *
- * POSITIONING GUARDRAIL (Design §7): game activity only — handles, titles,
- * outcomes, points.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 
 import { resolveCategoryTheme } from '../ui/categoryTheme';
 import { formatRelativeTime } from './relativeTime';
-import { shareSummary, type ShareItem, type UserStatus } from './statusFeed';
+import { type ShareItem, type ShareOutcome, type UserStatus } from './statusFeed';
 import './StatusViewer.css';
 
 export interface StatusViewerProps {
@@ -35,6 +33,23 @@ export interface StatusViewerProps {
   categoryForCard?: (cardId: string) => string | undefined;
 }
 
+/** Outcome → badge glyph + word (the word carries the meaning, not colour). */
+const OUTCOME_BADGE: Record<ShareOutcome, { glyph: string; text: string }> = {
+  correct: { glyph: '✓', text: 'Solved' },
+  timeout: { glyph: '⏱', text: 'Timed out' },
+  incorrect: { glyph: '•', text: 'Played' },
+};
+
+/** Two-letter emblem monogram for a game title ("Spot it" → "SI"). */
+function emblemMonogram(title: string): string {
+  return title
+    .split(' ')
+    .map((w) => w[0] ?? '')
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+}
+
 export default function StatusViewer({
   status,
   onClose,
@@ -46,7 +61,6 @@ export default function StatusViewer({
   const items = status.items;
   const item = items[index];
 
-  // Advance past the last share → close.
   function next() {
     setIndex((i) => {
       if (i >= items.length - 1) {
@@ -79,8 +93,12 @@ export default function StatusViewer({
   }, [onClose]);
 
   if (!item) return null;
-  const accent = resolveCategoryTheme(categoryForCard?.(item.cardId)).accent;
+  const theme = resolveCategoryTheme(categoryForCard?.(item.cardId));
   const who = status.handle ? `@${status.handle}` : status.displayName ?? 'Someone';
+  const badge = OUTCOME_BADGE[item.outcome];
+  const backdrop: CSSProperties = {
+    background: `linear-gradient(160deg, ${theme.accent} 0%, ${theme.accentDeep} 55%, #0b0b0f 100%)`,
+  };
 
   return (
     <div
@@ -89,7 +107,11 @@ export default function StatusViewer({
       aria-modal="true"
       aria-label={`${who}'s status`}
       data-testid="status-viewer"
+      style={backdrop}
     >
+      <span className="status-viewer__blob status-viewer__blob--a" aria-hidden="true" />
+      <span className="status-viewer__blob status-viewer__blob--b" aria-hidden="true" />
+
       {/* Tap zones: left = previous, right = next. Behind the content/buttons. */}
       <button
         type="button"
@@ -123,7 +145,7 @@ export default function StatusViewer({
           ))}
         </div>
         <div className="status-viewer__head">
-          <span className="status-viewer__avatar" style={{ background: accent }}>
+          <span className="status-viewer__avatar">
             {status.avatarUrl ? (
               <img src={status.avatarUrl} alt="" />
             ) : (
@@ -148,23 +170,37 @@ export default function StatusViewer({
         </div>
       </div>
 
-      <div className="status-viewer__card" style={{ borderColor: accent }}>
-        <span className="status-viewer__kicker">Shared a game</span>
+      {/* Centerpiece: the shared game. */}
+      <div className="status-viewer__center">
+        <span className="status-viewer__emblem" aria-hidden="true">
+          {emblemMonogram(item.gameTitle)}
+        </span>
+        <span className="status-viewer__badge">
+          {badge.glyph} {badge.text}
+        </span>
         <span className="status-viewer__game">{item.gameTitle}</span>
+        {item.points > 0 ? (
+          <span className="status-viewer__points">
+            +{item.points} <span className="status-viewer__points-unit">pts</span>
+          </span>
+        ) : null}
+        {/* Plain-text result line (carries the machine-readable outcome + points). */}
         <span className="status-viewer__result">
           {item.outcomeLabel}
           {item.points > 0 ? ` · +${item.points} pts` : ''}
         </span>
+      </div>
+
+      <div className="status-viewer__bottom">
         <button
           type="button"
           className="status-viewer__play"
           data-testid="status-play"
-          style={{ background: accent }}
           onClick={() => onPlay(item)}
         >
-          ▶ Play
+          ▶ Play this game
         </button>
-        <span className="status-viewer__visually-hidden">{shareSummary(item)}</span>
+        <span className="status-viewer__hint">Tap the sides to browse</span>
       </div>
     </div>
   );
