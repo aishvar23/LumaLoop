@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import StatusViewer from './StatusViewer';
 import type { ShareItem, UserStatus } from './statusFeed';
+import type { LiquidCard } from '../cards/types';
+import type { RendererRegistry } from '../session/rendererRegistry';
 
 const item = (over: Partial<ShareItem> & Pick<ShareItem, 'id' | 'gameTitle'>): ShareItem => ({
   cardId: `${over.id}-card`,
@@ -70,5 +72,29 @@ describe('StatusViewer', () => {
   it('shows the result (outcome + points)', () => {
     renderViewer();
     expect(screen.getByText(/solved · \+120 pts/i)).toBeInTheDocument();
+  });
+
+  it('renders a faded preview of the actual game screen when the card resolves', () => {
+    const card = {
+      cardId: 'a-card',
+      templateType: 'spot_it',
+      category: 'visual_attention',
+      config: { timeLimitMs: 1000 },
+    } as unknown as LiquidCard;
+    const Stub = () => <div data-testid="stub-game">game screen</div>;
+    const registry = { spot_it: Stub } as unknown as RendererRegistry;
+    renderViewer({
+      getCardById: (id) => (id === 'a-card' ? card : undefined),
+      registry,
+    });
+    expect(screen.getByTestId('status-preview')).toBeInTheDocument();
+    expect(screen.getByTestId('stub-game')).toBeInTheDocument();
+  });
+
+  it('omits the preview when the card cannot be resolved', () => {
+    renderViewer({ getCardById: () => undefined });
+    expect(screen.queryByTestId('status-preview')).not.toBeInTheDocument();
+    // The full game name still shows.
+    expect(screen.getByText('Spot it')).toBeInTheDocument();
   });
 });

@@ -3,9 +3,12 @@
  * `src/social/StatusViewer.test.tsx`). Auto-advance disabled for determinism.
  */
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { Text } from 'react-native';
 
 import StatusViewer from './StatusViewer';
 import type { ShareItem, UserStatus } from './statusFeed';
+import type { LiquidCard } from '../core/cards/types';
+import type { RendererRegistry } from '../feed/rendererRegistry';
 
 const item = (over: Partial<ShareItem> & Pick<ShareItem, 'id' | 'gameTitle'>): ShareItem => ({
   cardId: `${over.id}-card`,
@@ -66,5 +69,29 @@ describe('StatusViewer (mobile)', () => {
     fireEvent.press(screen.getByTestId('status-next')); // → b (last)
     fireEvent.press(screen.getByTestId('status-next')); // past last → close
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders a faded preview of the actual game screen when the card resolves', () => {
+    const card = {
+      cardId: 'a-card',
+      templateType: 'spot_it',
+      category: 'visual_attention',
+      config: { timeLimitMs: 1000 },
+    } as unknown as LiquidCard;
+    const Stub = () => <Text testID="stub-game">game screen</Text>;
+    const registry = { spot_it: Stub } as unknown as RendererRegistry;
+    renderViewer({
+      getCardById: (id) => (id === 'a-card' ? card : undefined),
+      registry,
+    });
+    // The preview is decorative (hidden from accessibility) → opt in to find it.
+    expect(screen.getByTestId('status-preview', { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.getByTestId('stub-game', { includeHiddenElements: true })).toBeTruthy();
+  });
+
+  it('omits the preview when the card cannot be resolved', () => {
+    renderViewer({ getCardById: () => undefined });
+    expect(screen.queryByTestId('status-preview')).toBeNull();
+    expect(screen.getByText('Spot it')).toBeTruthy();
   });
 });

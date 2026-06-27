@@ -13,10 +13,19 @@
  * / `onClose`. Pass `autoAdvanceMs={0}` to disable auto-advance (reduce motion /
  * tests).
  */
-import { useEffect, useRef, useState } from 'react';
+import { createElement, useEffect, useRef, useState } from 'react';
 import { Animated, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
+import { getCardById as defaultGetCardById } from '../core/cards/catalog';
+import type { LiquidCard } from '../core/cards/types';
+import type { CardStartContext } from '../core/templates/contract';
+import {
+  defaultRendererRegistry,
+  resolveRenderer,
+  type RendererRegistry,
+  type TemplateRenderer,
+} from '../feed/rendererRegistry';
 import { formatRelativeTime } from './relativeTime';
 import type { ShareItem, ShareOutcome, UserStatus } from './statusFeed';
 import { useReducedMotion } from '../feed/useReducedMotion';
@@ -30,7 +39,27 @@ export interface StatusViewerProps {
   autoAdvanceMs?: number;
   /** Optional cardId → category for accent tinting. */
   categoryForCard?: (cardId: string) => string | undefined;
+  /** Test seam: cardId → card for the faded preview. Defaults to the catalog. */
+  getCardById?: (cardId: string) => LiquidCard | undefined;
+  /** Test seam: renderer registry for the faded preview. Defaults to the app's. */
+  registry?: RendererRegistry;
 }
+
+/** Disarm the card's countdown so the faded preview never ticks (mirrors the feed). */
+function previewCard(card: LiquidCard): LiquidCard {
+  return {
+    ...card,
+    config: { ...card.config, timeLimitMs: Number.POSITIVE_INFINITY },
+  } as LiquidCard;
+}
+
+function noop(): void {}
+const PREVIEW_CONTEXT: CardStartContext = {
+  sessionId: 'status-preview',
+  cardIndex: 0,
+  activeAtMs: 0,
+  interactionEnabledAtMs: 0,
+};
 
 /** Outcome → badge glyph + word (the word carries the meaning, not colour). */
 const OUTCOME_BADGE: Record<ShareOutcome, { glyph: string; text: string }> = {
@@ -39,22 +68,14 @@ const OUTCOME_BADGE: Record<ShareOutcome, { glyph: string; text: string }> = {
   incorrect: { glyph: '•', text: 'Played' },
 };
 
-/** Two-letter emblem monogram for a game title ("Spot it" → "SI"). */
-function emblemMonogram(title: string): string {
-  return title
-    .split(' ')
-    .map((w) => w[0] ?? '')
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
-}
-
 export default function StatusViewer({
   status,
   onClose,
   onPlay,
   autoAdvanceMs = 4000,
   categoryForCard,
+  getCardById = defaultGetCardById,
+  registry = defaultRendererRegistry,
 }: StatusViewerProps) {
   const [index, setIndex] = useState(0);
   const items = status.items;
@@ -98,6 +119,10 @@ export default function StatusViewer({
   const who = status.handle ? `@${status.handle}` : status.displayName ?? 'Someone';
   const badge = OUTCOME_BADGE[item.outcome];
 
+  // The faded game-screen preview (the real renderer, disarmed + non-interactive).
+  const card = getCardById(item.cardId);
+  const Renderer = card ? resolveRenderer(registry, card) : undefined;
+
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.root} testID="status-viewer">
@@ -108,9 +133,26 @@ export default function StatusViewer({
           end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFill}
         />
-        {/* Soft decorative blobs for depth. */}
-        <View style={[styles.blob, styles.blobA]} />
-        <View style={[styles.blob, styles.blobB]} />
+        {/* Faded preview of the ACTUAL game screen, behind everything. */}
+        {card && Renderer ? (
+          <View
+            style={styles.preview}
+            pointerEvents="none"
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            testID="status-preview"
+          >
+            {createElement(Renderer as TemplateRenderer<LiquidCard>, {
+              card: previewCard(card),
+              context: PREVIEW_CONTEXT,
+              isActive: false,
+              onAttempt: noop,
+              onResolve: noop,
+            })}
+          </View>
+        ) : null}
+        {/* Scrim over the preview so foreground text stays legible. */}
+        <View style={styles.scrim} pointerEvents="none" />
 
         {/* Tap zones behind the content. */}
         <Pressable
@@ -177,17 +219,15 @@ export default function StatusViewer({
           </View>
         </View>
 
-        {/* Centerpiece: the shared game. */}
+        {/* Front: the full game name + status + score. */}
         <View style={styles.center} pointerEvents="box-none">
-          <View style={styles.emblem}>
-            <Text style={styles.emblemMono}>{emblemMonogram(item.gameTitle)}</Text>
-          </View>
+          <Text style={styles.kicker}>SHARED A GAME</Text>
+          <Text style={styles.game}>{item.gameTitle}</Text>
           <View style={styles.outcomeBadge}>
             <Text style={styles.outcomeText}>
               {badge.glyph} {badge.text}
             </Text>
           </View>
-          <Text style={styles.game}>{item.gameTitle}</Text>
           {item.points > 0 ? (
             <Text style={styles.points}>
               +{item.points} <Text style={styles.pointsUnit}>pts</Text>
@@ -220,14 +260,26 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingBottom: space.xl,
   },
-  blob: {
+  // Faded game-screen preview behind the content (no blur lib → low opacity + scrim).
+  preview: {
     position: 'absolute',
-    borderRadius: 999,
-    opacity: 0.18,
-    backgroundColor: '#ffffff',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    opacity: 0.22,
+    transform: [{ scale: 1.06 }],
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  blobA: { width: 220, height: 220, top: -40, right: -60 },
-  blobB: { width: 160, height: 160, bottom: 80, left: -50 },
+  scrim: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(8,8,14,0.45)',
+  },
   zone: { position: 'absolute', top: 0, bottom: 0, width: '50%' },
   zoneLeft: { left: 0 },
   zoneRight: { right: 0 },
@@ -267,17 +319,12 @@ const styles = StyleSheet.create({
   close: { color: '#fff', fontSize: fontSize.lg, paddingHorizontal: space.sm },
   // Center.
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: space.md },
-  emblem: {
-    width: 104,
-    height: 104,
-    borderRadius: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.22)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.35)',
+  kicker: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.semibold,
+    letterSpacing: 2,
   },
-  emblemMono: { color: '#fff', fontSize: 40, fontWeight: fontWeight.heavy },
   outcomeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -289,11 +336,21 @@ const styles = StyleSheet.create({
   outcomeText: { color: '#1a1330', fontWeight: fontWeight.bold, fontSize: fontSize.sm },
   game: {
     color: '#fff',
-    fontSize: 30,
+    fontSize: 34,
     fontWeight: fontWeight.heavy,
     textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 14,
   },
-  points: { color: '#fff', fontSize: 28, fontWeight: fontWeight.heavy },
+  points: {
+    color: '#fff',
+    fontSize: 32,
+    fontWeight: fontWeight.heavy,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 14,
+  },
   pointsUnit: { fontSize: fontSize.md, fontWeight: fontWeight.semibold },
   // Bottom.
   bottom: { alignItems: 'center', gap: space.sm },

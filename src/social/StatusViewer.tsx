@@ -1,20 +1,31 @@
 /**
  * Status story viewer (accounts pivot) — a WhatsApp/IG-style full-screen overlay
- * that plays through ONE user's recent shares (a {@link UserStatus}), with an
- * immersive, category-tinted gradient background.
+ * that plays through ONE user's recent shares (a {@link UserStatus}).
  *
- * Segmented progress bars on top (one per share); the active segment animates over
- * `autoAdvanceMs` and then advances, closing past the last one. Tapping the right
- * half advances, the left half goes back; explicit prev/next buttons keep it
- * keyboard/AT accessible, and Escape closes. Each share shows the game emblem, the
- * outcome + points, and a "Play" CTA back into the feed.
+ * Each share is shown as the ACTUAL game screen, rendered faded + non-interactive
+ * in the background (so it reads as a preview of the real game), with the full
+ * game name, the outcome status + points in front, and a "Play this game" CTA at
+ * the bottom. Segmented progress bars on top; the active one animates over
+ * `autoAdvanceMs` then advances, closing past the last share. Tapping the right
+ * half advances, the left half goes back; Escape closes.
  *
  * Presentational only (CLAUDE.md §4): navigation is the caller's job via `onPlay`
- * / `onClose`. Pass `autoAdvanceMs={0}` to disable auto-advance (reduced motion /
- * tests).
+ * / `onClose`. The faded preview mounts a BASE renderer with a non-finite timer
+ * and `isActive={false}` so it never counts down, never resolves, and never takes
+ * input — it is decorative (`inert` + pointer-events none). Pass `autoAdvanceMs={0}`
+ * to disable auto-advance (reduced motion / tests).
  */
-import { useEffect, useState, type CSSProperties } from 'react';
+import { createElement, useEffect, useState, type CSSProperties } from 'react';
 
+import { getCardById as defaultGetCardById } from '../cards/catalog';
+import type { LiquidCard } from '../cards/types';
+import {
+  defaultRendererRegistry,
+  resolveRenderer,
+  type RendererRegistry,
+  type TemplateRenderer,
+} from '../session/rendererRegistry';
+import type { CardStartContext } from '../templates/contract';
 import { resolveCategoryTheme } from '../ui/categoryTheme';
 import { formatRelativeTime } from './relativeTime';
 import { type ShareItem, type ShareOutcome, type UserStatus } from './statusFeed';
@@ -31,23 +42,25 @@ export interface StatusViewerProps {
   autoAdvanceMs?: number;
   /** Optional cardId → category for accent tinting (defaults to neutral). */
   categoryForCard?: (cardId: string) => string | undefined;
+  /** Test seam: cardId → card for the faded preview. Defaults to the catalog. */
+  getCardById?: (cardId: string) => LiquidCard | undefined;
+  /** Test seam: renderer registry for the faded preview. Defaults to the app's. */
+  registry?: RendererRegistry;
 }
 
-/** Outcome → badge glyph + word (the word carries the meaning, not colour). */
+/** Outcome → status glyph + word (the word carries the meaning, not colour). */
 const OUTCOME_BADGE: Record<ShareOutcome, { glyph: string; text: string }> = {
   correct: { glyph: '✓', text: 'Solved' },
   timeout: { glyph: '⏱', text: 'Timed out' },
   incorrect: { glyph: '•', text: 'Played' },
 };
 
-/** Two-letter emblem monogram for a game title ("Spot it" → "SI"). */
-function emblemMonogram(title: string): string {
-  return title
-    .split(' ')
-    .map((w) => w[0] ?? '')
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
+/** Disarm the card's countdown so the faded preview never ticks (mirrors the feed). */
+function previewCard(card: LiquidCard): LiquidCard {
+  return {
+    ...card,
+    config: { ...card.config, timeLimitMs: Number.POSITIVE_INFINITY },
+  } as LiquidCard;
 }
 
 export default function StatusViewer({
@@ -56,6 +69,8 @@ export default function StatusViewer({
   onPlay,
   autoAdvanceMs = 4000,
   categoryForCard,
+  getCardById = defaultGetCardById,
+  registry = defaultRendererRegistry,
 }: StatusViewerProps) {
   const [index, setIndex] = useState(0);
   const items = status.items;
@@ -74,8 +89,7 @@ export default function StatusViewer({
     setIndex((i) => Math.max(0, i - 1));
   }
 
-  // Auto-advance: re-armed whenever the active share changes. Disabled when
-  // autoAdvanceMs is 0 (reduced motion / tests).
+  // Auto-advance: re-armed whenever the active share changes. Disabled when 0.
   useEffect(() => {
     if (autoAdvanceMs <= 0) return undefined;
     const id = setTimeout(next, autoAdvanceMs);
@@ -93,12 +107,17 @@ export default function StatusViewer({
   }, [onClose]);
 
   if (!item) return null;
-  const theme = resolveCategoryTheme(categoryForCard?.(item.cardId));
+  const category = categoryForCard?.(item.cardId);
+  const theme = resolveCategoryTheme(category);
   const who = status.handle ? `@${status.handle}` : status.displayName ?? 'Someone';
   const badge = OUTCOME_BADGE[item.outcome];
   const backdrop: CSSProperties = {
     background: `linear-gradient(160deg, ${theme.accent} 0%, ${theme.accentDeep} 55%, #0b0b0f 100%)`,
   };
+
+  // The faded game-screen preview (the real renderer, disarmed + non-interactive).
+  const card = getCardById(item.cardId);
+  const Renderer = card ? resolveRenderer(registry, card) : undefined;
 
   return (
     <div
@@ -109,8 +128,34 @@ export default function StatusViewer({
       data-testid="status-viewer"
       style={backdrop}
     >
-      <span className="status-viewer__blob status-viewer__blob--a" aria-hidden="true" />
-      <span className="status-viewer__blob status-viewer__blob--b" aria-hidden="true" />
+      {/* Faded preview of the actual game screen, behind everything. */}
+      {card && Renderer ? (
+        <div
+          className="status-viewer__preview"
+          data-testid="status-preview"
+          aria-hidden="true"
+          ref={(node) => {
+            // `inert` removes it from focus/AT/interaction (decorative only).
+            if (node) (node as HTMLElement & { inert: boolean }).inert = true;
+          }}
+          style={
+            {
+              '--accent': theme.accent,
+              '--accent-deep': theme.accentDeep,
+              '--accent-tint': theme.accentTint,
+            } as CSSProperties
+          }
+        >
+          {createElement(Renderer as TemplateRenderer<LiquidCard>, {
+            card: previewCard(card),
+            context: PREVIEW_CONTEXT,
+            isActive: false,
+            onAttempt: noop,
+            onResolve: noop,
+          })}
+        </div>
+      ) : null}
+      <span className="status-viewer__scrim" aria-hidden="true" />
 
       {/* Tap zones: left = previous, right = next. Behind the content/buttons. */}
       <button
@@ -170,21 +215,19 @@ export default function StatusViewer({
         </div>
       </div>
 
-      {/* Centerpiece: the shared game. */}
+      {/* Front: the full game name + status + score. */}
       <div className="status-viewer__center">
-        <span className="status-viewer__emblem" aria-hidden="true">
-          {emblemMonogram(item.gameTitle)}
-        </span>
+        <span className="status-viewer__kicker">Shared a game</span>
+        <span className="status-viewer__game">{item.gameTitle}</span>
         <span className="status-viewer__badge">
           {badge.glyph} {badge.text}
         </span>
-        <span className="status-viewer__game">{item.gameTitle}</span>
         {item.points > 0 ? (
           <span className="status-viewer__points">
             +{item.points} <span className="status-viewer__points-unit">pts</span>
           </span>
         ) : null}
-        {/* Plain-text result line (carries the machine-readable outcome + points). */}
+        {/* Accessible result summary (carries outcome + points text). */}
         <span className="status-viewer__result">
           {item.outcomeLabel}
           {item.points > 0 ? ` · +${item.points} pts` : ''}
@@ -205,3 +248,12 @@ export default function StatusViewer({
     </div>
   );
 }
+
+/** No-op handlers + a static context for the decorative preview renderer. */
+function noop(): void {}
+const PREVIEW_CONTEXT: CardStartContext = {
+  sessionId: 'status-preview',
+  cardIndex: 0,
+  activeAtMs: 0,
+  interactionEnabledAtMs: 0,
+};
