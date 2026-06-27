@@ -64,6 +64,9 @@ export interface ProfilePageProps {
   onBack?: () => void;
 }
 
+/** How many "Your games" rows to reveal per page (paged, not loaded all at once). */
+const YOUR_GAMES_PAGE_SIZE = 6;
+
 /** Format a category id ("visual_attention") into a label ("Visual attention"). */
 function categoryLabel(category: string): string {
   const spaced = category.replace(/_/g, ' ');
@@ -87,6 +90,8 @@ export default function ProfilePage({
   const client = clientProp ?? auth.client ?? supabase;
   const [stats, setStats] = useState<ProfileStats>(EMPTY_PROFILE_STATS);
   const [games, setGames] = useState<YourGameRow[]>([]);
+  // How many "Your games" rows are revealed (paged via "Show more").
+  const [visibleGames, setVisibleGames] = useState(YOUR_GAMES_PAGE_SIZE);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -107,6 +112,7 @@ export default function ProfilePage({
       if (playsRes.error) setError(playsRes.error);
       setStats(computeStats(playsRes.plays as GamePlay[]));
       setGames(buildYourGames(scoresRes.scores, getCardById, 'recent'));
+      setVisibleGames(YOUR_GAMES_PAGE_SIZE); // reset paging on a fresh load.
       setLoading(false);
     })();
     return () => {
@@ -207,7 +213,8 @@ export default function ProfilePage({
       {!loading && games.length > 0 && (
         <View accessibilityLabel="Your games" style={styles.categories}>
           <Text style={styles.sectionTitle}>Your games</Text>
-          {games.map((g) => (
+          {/* Paged: render only the revealed page, not the whole list at once. */}
+          {games.slice(0, visibleGames).map((g) => (
             <View key={g.cardId} style={styles.gameRow}>
               <View
                 style={[
@@ -236,6 +243,26 @@ export default function ProfilePage({
               </Text>
             </View>
           ))}
+          {visibleGames < games.length && (
+            <Pressable
+              accessibilityRole="button"
+              testID="your-games-show-more"
+              onPress={() =>
+                setVisibleGames((n) =>
+                  Math.min(n + YOUR_GAMES_PAGE_SIZE, games.length),
+                )
+              }
+              style={({ pressed }) => [
+                a.providerBtn,
+                styles.showMore,
+                pressed && a.providerBtnPressed,
+              ]}
+            >
+              <Text style={a.providerBtnText}>
+                Show more ({games.length - visibleGames} more)
+              </Text>
+            </Pressable>
+          )}
         </View>
       )}
 
@@ -573,6 +600,9 @@ const styles = StyleSheet.create({
     fontWeight: fontWeight.bold,
   },
   signOut: {
+    marginTop: space.md,
+  },
+  showMore: {
     marginTop: space.md,
   },
 });

@@ -48,6 +48,10 @@ export interface ProfilePageProps {
   getCardById?: (cardId: string) => LiquidCard | undefined;
 }
 
+/** How many "Your games" rows to reveal per page (the list is paged, not loaded
+ * all at once). "Show more" reveals the next page. */
+const YOUR_GAMES_PAGE_SIZE = 6;
+
 /** Format a category id ("visual_attention") into a label ("Visual attention"). */
 function categoryLabel(category: string): string {
   const spaced = category.replace(/_/g, ' ');
@@ -69,6 +73,8 @@ export default function ProfilePage({
   const client = clientProp ?? auth.client ?? supabase;
   const [stats, setStats] = useState<ProfileStats>(EMPTY_PROFILE_STATS);
   const [games, setGames] = useState<YourGameRow[]>([]);
+  // How many "Your games" rows are currently revealed (paged via "Show more").
+  const [visibleGames, setVisibleGames] = useState(YOUR_GAMES_PAGE_SIZE);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -89,6 +95,7 @@ export default function ProfilePage({
       if (playsRes.error) setError(playsRes.error);
       setStats(computeStats(playsRes.plays as GamePlay[]));
       setGames(buildYourGames(scoresRes.scores, getCardById, 'recent'));
+      setVisibleGames(YOUR_GAMES_PAGE_SIZE); // reset paging on a fresh load.
       setLoading(false);
     })();
     return () => {
@@ -166,7 +173,8 @@ export default function ProfilePage({
       {!loading && games.length > 0 && (
         <section aria-label="Your games">
           <h2 className="profile-section-title">Your games</h2>
-          {games.map((g) => (
+          {/* Paged: render only the revealed page, not the whole list at once. */}
+          {games.slice(0, visibleGames).map((g) => (
             <div key={g.cardId} className="profile-game-row">
               <span
                 className="profile-game-accent"
@@ -192,6 +200,20 @@ export default function ProfilePage({
               </span>
             </div>
           ))}
+          {visibleGames < games.length && (
+            <button
+              type="button"
+              className="profile-show-more"
+              data-testid="your-games-show-more"
+              onClick={() =>
+                setVisibleGames((n) =>
+                  Math.min(n + YOUR_GAMES_PAGE_SIZE, games.length),
+                )
+              }
+            >
+              Show more ({games.length - visibleGames} more)
+            </button>
+          )}
         </section>
       )}
 
