@@ -35,6 +35,7 @@ function fakeClient(results: unknown[]) {
       calls.from.push(t);
       return chain();
     },
+    rpc: () => Promise.resolve(next()),
   } as unknown as AuthClient;
   return { client, calls };
 }

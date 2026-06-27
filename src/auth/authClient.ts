@@ -25,4 +25,4 @@ export type { AuthChangeEvent, Session, User };
 export type OAuthProvider = 'google' | 'apple' | 'facebook';
 
 /** The subset of `SupabaseClient` the account layer depends on. */
-export type AuthClient = Pick<SupabaseClient, 'auth' | 'from'>;
+export type AuthClient = Pick<SupabaseClient, 'auth' | 'from' | 'rpc'>;

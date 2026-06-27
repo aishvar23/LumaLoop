@@ -141,7 +141,58 @@ to the **Google OAuth** authorized origins/redirects.
 
 ---
 
-## 6. Quick recommendation
+## 6. Security notes
+
+**The big picture:** the Supabase **anon/publishable key shipped in the APK (and
+the web bundle) is NOT a secret** — it's designed to be public; anyone can extract
+it from any client. All security rests on **Row-Level Security (RLS)**, not on
+hiding that key. The only true secret — the `service_role` key — is **server-side
+only** (Vercel `/api`), never in the mobile app. ✅
+
+**RLS posture (reviewed):** `game_plays` is self-only; `profiles` / `follows` /
+`game_likes` / `game_comments` / `game_shares` are public-read + self-write;
+`telemetry_events` is deny-all to clients (server-insert only). So any signed-in
+user can read every public **profile** (handle/display name/avatar/bio — but
+**not** email), all comments/shares/follows, and aggregate stats. That's expected
+for a social app — just be aware comment/share content is visible to all testers.
+
+**Supabase security advisor — current state:**
+- ✅ **Fixed (was the only ERROR):** `user_public_stats` was a SECURITY DEFINER
+  *view* (definer views bypass the caller's RLS). Migration **0007** replaces it
+  with a SECURITY DEFINER **function** with a pinned `search_path`
+  (`user_public_stats(target)`) and `EXECUTE` **revoked from `anon`** (signed-in
+  users only). It returns ONLY the aggregate (games/correct/points), never raw
+  plays or PII.
+- ℹ️ **Intentional (residual WARN):** the advisor still flags that the
+  `authenticated` role can call that definer function via `/rest/v1/rpc` — that's
+  exactly the point (other users' profiles show public stats). Acceptable for the
+  prototype; the fully-lint-clean alternative is a trigger-maintained aggregate
+  table, which is overkill here.
+- ℹ️ **Intentional:** `telemetry_events` "RLS enabled, no policy" = deny-all to
+  clients (only the server inserts). Leave as-is.
+- ➖ **N/A:** "leaked-password protection disabled" — the app uses Google OAuth +
+  passwordless magic link, so there are no passwords to check. Optional to enable.
+
+**Other notes:**
+- **OAuth deep link** (`lumaloop://auth/callback`): custom-scheme links can be
+  scheme-squatted, but the flow uses **PKCE**, so an intercepted code is useless
+  without the in-app verifier. Fine for a prototype; verified **App Links** are
+  stronger for production.
+- **`CRON_SECRET`:** when you deploy the web `/api`, **set it** — otherwise
+  `/api/daily-reminder` is callable unauthenticated (it won't email anyone unless
+  `RESEND_API_KEY` is also set, but it would let someone trigger a user scan).
+- **Sideloaded APK** asks testers to enable "install unknown apps" — fine for a
+  trusted 50-person beta; use the Play internal track for wider release.
+- **Privacy/PII:** the accounts pivot means you now store email + handle +
+  gameplay (the original design was anonymous). Add a one-line consent/privacy note
+  to your invite; telemetry already strips IP/UA at ingestion.
+
+**Before a public release (not blockers for 50 testers):** add **Sign in with
+Apple** (Guideline 4.8), switch the OAuth redirect to **App Links / Universal
+Links**, add basic **rate-limiting** on social writes, and publish a real
+**privacy policy**.
+
+## 7. Quick recommendation
 
 For "just 50 testers, prototype, iOS-priority":
 1. **Now:** ship the **Android APK** (§2) — same day, zero per-tester setup.

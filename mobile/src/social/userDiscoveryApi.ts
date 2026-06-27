@@ -109,24 +109,28 @@ export async function fetchProfileById(
   }
 }
 
-/** Load a user's public game-stats aggregate. Zeroes on error / no plays. */
+/**
+ * Load a user's public game-stats aggregate. Calls the SECURITY DEFINER function
+ * `user_public_stats(target)` (migration 0007) — it returns ONLY the aggregate
+ * (counts + points), never raw plays. Zeroes on error / no plays.
+ */
 export async function fetchPublicStats(
   client: AuthClient,
   id: string | null,
 ): Promise<PublicStats> {
   if (!id) return EMPTY_STATS;
   try {
-    const { data, error } = await client
-      .from('user_public_stats')
-      .select('games_played, correct_count, total_points')
-      .eq('user_id', id)
-      .maybeSingle();
+    const { data, error } = await client.rpc('user_public_stats', { target: id });
     if (error || !data) return EMPTY_STATS;
-    const r = data as Record<string, unknown>;
+    // The table-returning function yields rows; take the single aggregate row.
+    const row = (Array.isArray(data) ? data[0] : data) as
+      | Record<string, unknown>
+      | undefined;
+    if (!row) return EMPTY_STATS;
     return {
-      gamesPlayed: asCount(r.games_played),
-      correctCount: asCount(r.correct_count),
-      totalPoints: asCount(r.total_points),
+      gamesPlayed: asCount(row.games_played),
+      correctCount: asCount(row.correct_count),
+      totalPoints: asCount(row.total_points),
     };
   } catch {
     return EMPTY_STATS;
