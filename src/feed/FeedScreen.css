@@ -531,24 +531,31 @@
   min-height: 34px;
 }
 
+/* The LumaLoop logo — a loop (∞) badge with the brand gradient (matches Home). */
 .feed-slide__brand-mark {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 10px;
-  color: var(--color-accent-on);
-  background: linear-gradient(145deg, var(--accent), var(--accent-deep));
-  font-weight: 900;
-  box-shadow: 0 8px 22px color-mix(in srgb, var(--accent) 30%, transparent);
+  width: 32px;
+  height: 32px;
+  border-radius: 11px;
+  color: #fff;
+  background: linear-gradient(135deg, #6c7bff 0%, #9d7bff 45%, #ff7eb6 100%);
+  font-size: 21px;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 8px 20px rgba(124, 110, 255, 0.45);
 }
 
+/* The "LumaLoop" wordmark — larger + gradient ink so the brand reads clearly. */
 .feed-slide__brand-name {
-  color: var(--color-text);
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-lg);
   font-weight: 800;
   letter-spacing: -0.02em;
+  background: linear-gradient(90deg, #ffffff, #c9c4ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .feed-slide__brand-mode {

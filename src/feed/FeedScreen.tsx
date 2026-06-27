@@ -831,7 +831,7 @@ function SlideTopChrome({
     <div className="feed-slide__top">
       <span className="feed-slide__brand">
         <span className="feed-slide__brand-mark" aria-hidden="true">
-          L
+          ∞
         </span>
         <span className="feed-slide__brand-name">LumaLoop</span>
         <span className="feed-slide__brand-mode">Discover</span>

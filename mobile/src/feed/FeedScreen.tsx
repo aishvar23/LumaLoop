@@ -1102,8 +1102,8 @@ function FeedHeader({
   return (
     <View style={styles.header}>
       <View style={styles.brandRow}>
-        <View style={[styles.brandMark, { backgroundColor: accent }]}>
-          <Text style={styles.brandMarkText}>L</Text>
+        <View style={styles.brandMark}>
+          <Text style={styles.brandMarkText}>∞</Text>
         </View>
         <Text style={styles.brandName}>LumaLoop</Text>
         <Text style={styles.brandMode}>Discover</Text>
@@ -1296,22 +1296,26 @@ const styles = StyleSheet.create({
     gap: space.sm,
     minHeight: 34,
   },
+  // The LumaLoop logo — a loop (∞) badge with the brand purple (matches Home).
   brandMark: {
-    width: 30,
-    height: 30,
-    borderRadius: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#7b54d6',
   },
   brandMarkText: {
-    color: colors.accentContrast,
-    fontSize: fontSize.md,
-    fontWeight: fontWeight.heavy,
+    color: '#fff',
+    fontSize: 21,
+    fontWeight: fontWeight.bold,
+    marginTop: -2,
   },
   brandName: {
     color: colors.text,
-    fontSize: fontSize.md,
+    fontSize: fontSize.lg,
     fontWeight: fontWeight.heavy,
+    letterSpacing: -0.3,
   },
   brandMode: {
     color: colors.textMuted,
