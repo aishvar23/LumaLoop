@@ -128,7 +128,7 @@ describe('HomeScreen', () => {
     jest.useFakeTimers();
     try {
       fireEvent.press(upload);
-      expect(screen.getByText(/uploading your own puzzles is coming soon/i)).toBeTruthy();
+      expect(screen.getByText(/coming soon/i)).toBeTruthy();
       act(() => {
         jest.advanceTimersByTime(5000);
       });

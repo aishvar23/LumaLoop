@@ -145,9 +145,7 @@ describe('HomePage', () => {
     vi.useFakeTimers();
     try {
       fireEvent.click(upload);
-      expect(
-        screen.getByText(/uploading your own puzzles is coming soon/i),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/coming soon/i)).toBeInTheDocument();
       act(() => {
         vi.advanceTimersByTime(5000);
       });

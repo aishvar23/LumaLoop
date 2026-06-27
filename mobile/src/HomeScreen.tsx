@@ -20,6 +20,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from './auth/AuthProvider';
@@ -295,29 +296,46 @@ export default function HomeScreen({
             accessibilityLabel="Play now"
             testID="home-start"
             onPress={() => onStart()}
-            style={({ pressed }) => [
-              a.primaryBtn,
-              styles.startBtn,
-              pressed && a.primaryBtnPressed,
-            ]}
+            style={({ pressed }) => [styles.ctaBtn, pressed && styles.ctaBtnPressed]}
           >
-            <Text style={styles.startText}>▶ Play now</Text>
+            <LinearGradient
+              colors={['#3fd6c9', '#5b8cff']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.ctaIcon}
+            >
+              <Text style={styles.ctaIconText}>▶</Text>
+            </LinearGradient>
+            <Text style={styles.ctaText}>Play now</Text>
           </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Upload puzzle"
-            testID="home-upload"
-            onPress={showComingSoon}
-            style={({ pressed }) => [styles.uploadBtn, pressed && styles.uploadBtnPressed]}
-          >
-            <Text style={styles.uploadBtnText}>＋ Upload puzzle</Text>
-          </Pressable>
+          <View style={styles.ctaWrap}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Upload puzzle"
+              testID="home-upload"
+              onPress={showComingSoon}
+              style={({ pressed }) => [styles.ctaBtn, pressed && styles.ctaBtnPressed]}
+            >
+              <LinearGradient
+                colors={['#ff7eb6', '#9d7bff']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.ctaIcon}
+              >
+                <Text style={styles.ctaIconText}>＋</Text>
+              </LinearGradient>
+              <Text style={styles.ctaText}>Upload puzzle</Text>
+            </Pressable>
+            {uploadNotice ? (
+              <View style={styles.pop} pointerEvents="none" accessibilityRole="alert">
+                <View style={styles.popBubble}>
+                  <Text style={styles.popText}>Coming soon ✨</Text>
+                </View>
+                <View style={styles.popTail} />
+              </View>
+            ) : null}
+          </View>
         </View>
-        {uploadNotice && (
-          <Text style={styles.uploadNotice} accessibilityRole="alert">
-            Uploading your own puzzles is coming soon.
-          </Text>
-        )}
         {!loading && (
           <View style={styles.statStrip} accessibilityLabel="Your game activity">
             <StatChip icon="🎮" value={String(stats.gamesPlayed)} label="Games played" />
@@ -454,36 +472,65 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
-    gap: space.sm,
+    gap: space.md,
   },
-  // "Upload puzzle" — a hero secondary button (translucent on the purple hero).
-  uploadBtn: {
-    minHeight: 44,
+  ctaWrap: { position: 'relative' },
+  // Both CTAs share the SAME format: a bold white pill with a gradient icon chip.
+  ctaBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    minHeight: 48,
+    paddingLeft: space.sm,
+    paddingRight: space.lg,
+    borderRadius: radius.pill,
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOpacity: 0.28,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
+  },
+  ctaBtnPressed: { opacity: 0.92, transform: [{ scale: 0.97 }] },
+  ctaIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.4)',
-    backgroundColor: 'rgba(255,255,255,0.16)',
-    paddingHorizontal: space.lg,
   },
-  uploadBtnPressed: {
-    backgroundColor: 'rgba(255,255,255,0.28)',
+  ctaIconText: { color: '#fff', fontSize: 15, fontWeight: fontWeight.bold },
+  ctaText: { color: '#1a1330', fontSize: fontSize.md, fontWeight: fontWeight.bold },
+  // "Coming soon" popover — pops OUT of the Upload button (above it, with a tail).
+  pop: {
+    position: 'absolute',
+    bottom: 52,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
   },
-  uploadBtnText: {
-    color: '#fff',
-    fontSize: fontSize.md,
-    fontWeight: fontWeight.bold,
-  },
-  uploadNotice: {
-    color: '#fff',
-    fontSize: fontSize.sm,
-    backgroundColor: 'rgba(255,255,255,0.16)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.28)',
-    borderRadius: radius.md,
+  popBubble: {
     paddingHorizontal: space.md,
     paddingVertical: space.sm,
+    borderRadius: radius.pill,
+    backgroundColor: '#15101f',
+    shadowColor: '#000',
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
+  },
+  popText: { color: '#fff', fontSize: fontSize.sm, fontWeight: fontWeight.bold },
+  popTail: {
+    width: 0,
+    height: 0,
+    marginTop: -1,
+    borderLeftWidth: 7,
+    borderRightWidth: 7,
+    borderTopWidth: 8,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: '#15101f',
   },
   avatar: {
     width: 40,
@@ -567,16 +614,6 @@ const styles = StyleSheet.create({
   subtitle: {
     color: 'rgba(255,255,255,0.85)',
     fontSize: fontSize.md,
-  },
-  startBtn: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: space.xl,
-    backgroundColor: '#fff',
-  },
-  startText: {
-    color: '#5a52e0',
-    fontSize: fontSize.md,
-    fontWeight: fontWeight.bold,
   },
   // Slim stat strip (on the colored hero).
   statStrip: {

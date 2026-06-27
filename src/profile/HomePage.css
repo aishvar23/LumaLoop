@@ -88,44 +88,114 @@
   outline: none;
 }
 
-/* "Play now" + "Upload puzzle" sit side by side under the greeting. */
+/* "Play now" + "Upload puzzle" — a matched, eye-catching pair under the greeting. */
 .home-hero__cta {
   position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-3);
 }
 
-/* "Upload puzzle" — a hero secondary button (the creator feature is coming). */
-.home-upload-btn {
+.home-cta-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+/* Both CTAs share the SAME format: a bold white pill with a gradient icon chip. */
+.home-cta-btn {
   appearance: none;
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  background: rgba(255, 255, 255, 0.16);
-  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  border: 0;
+  background: #ffffff;
+  color: #1a1330;
   border-radius: var(--radius-pill);
-  padding: var(--space-3) var(--space-4);
+  padding: 10px 20px 10px 10px;
   font-size: var(--font-size-md);
   font-weight: var(--font-weight-bold);
+  text-decoration: none;
   cursor: pointer;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
 
-.home-upload-btn:hover,
-.home-upload-btn:focus-visible {
-  background: rgba(255, 255, 255, 0.28);
+.home-cta-btn:hover,
+.home-cta-btn:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.34);
   outline: none;
 }
 
-/* "Coming soon" notice (on the purple hero) — auto-dismisses after 5s. */
-.home-upload-notice {
-  position: relative;
-  margin: 0;
+.home-cta-btn:active {
+  transform: translateY(0) scale(0.97);
+}
+
+/* Gradient icon chip — same shape on both, different hue so the pair is playful. */
+.home-cta-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-pill);
+  color: #fff;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.home-cta-icon--play {
+  background: linear-gradient(135deg, #3fd6c9, #5b8cff);
+}
+
+.home-cta-icon--upload {
+  background: linear-gradient(135deg, #ff7eb6, #9d7bff);
+}
+
+/* "Coming soon" popover — pops OUT of the Upload button (above it, with a tail). */
+.home-upload-pop {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
   padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.16);
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: var(--radius-pill);
+  background: #15101f;
   color: #fff;
   font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
+  animation: home-pop-in 0.18s var(--ease-pop, ease-out) both;
+}
+
+.home-upload-pop__tail {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 8px solid #15101f;
+}
+
+@keyframes home-pop-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(6px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-upload-pop {
+    animation: none;
+  }
 }
 
 .home-profile-link {
@@ -308,24 +378,6 @@
   margin: 0;
   color: rgba(255, 255, 255, 0.85);
   font-size: var(--font-size-md);
-}
-
-.home-start-btn {
-  align-self: flex-start;
-  text-decoration: none;
-  background: #fff;
-  color: #5a52e0;
-  border-radius: var(--radius-pill);
-  padding: var(--space-3) var(--space-6);
-  font-weight: var(--font-weight-bold);
-  font-size: var(--font-size-md);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
-}
-
-.home-start-btn:hover,
-.home-start-btn:focus-visible {
-  transform: translateY(-1px);
-  outline: none;
 }
 
 /* Color-tinted stat chips. */

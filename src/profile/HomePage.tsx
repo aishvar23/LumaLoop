@@ -255,23 +255,32 @@ export default function HomePage({
         </h1>
         <p className="home-subtitle">Ready for today’s puzzles?</p>
         <div className="home-hero__cta">
-          <Link to={ROUTES.feed} className="home-start-btn">
-            ▶ Play now
+          <Link to={ROUTES.feed} className="home-cta-btn">
+            <span className="home-cta-icon home-cta-icon--play" aria-hidden="true">
+              ▶
+            </span>
+            Play now
           </Link>
-          <button
-            type="button"
-            className="home-upload-btn"
-            aria-label="Upload puzzle"
-            onClick={showComingSoon}
-          >
-            <span aria-hidden="true">＋</span> Upload puzzle
-          </button>
+          <span className="home-cta-wrap">
+            <button
+              type="button"
+              className="home-cta-btn"
+              aria-label="Upload puzzle"
+              onClick={showComingSoon}
+            >
+              <span className="home-cta-icon home-cta-icon--upload" aria-hidden="true">
+                ＋
+              </span>
+              Upload puzzle
+            </button>
+            {uploadNotice && (
+              <span className="home-upload-pop" role="status">
+                Coming soon ✨
+                <span className="home-upload-pop__tail" aria-hidden="true" />
+              </span>
+            )}
+          </span>
         </div>
-        {uploadNotice && (
-          <p className="home-upload-notice" role="status">
-            Uploading your own puzzles is coming soon.
-          </p>
-        )}
         {!loading && (
           <div className="home-stat-strip" aria-label="Your game activity">
             <StatChip icon="🎮" value={String(stats.gamesPlayed)} label="Games" tone="visual_attention" />
