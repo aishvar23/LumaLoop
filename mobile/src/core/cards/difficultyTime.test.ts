@@ -10,9 +10,9 @@ import type { LiquidCard } from './types';
 describe('TIME_LIMIT_BY_DIFFICULTY', () => {
   it('maps each difficulty tier to its agreed budget (ms)', () => {
     expect(TIME_LIMIT_BY_DIFFICULTY).toEqual({
-      extremely_easy: 12000,
-      easy: 40000,
-      medium: 60000,
+      extremely_easy: 30000,
+      easy: 60000,
+      medium: 90000,
       hard: 120000,
       extremely_hard: 180000,
     });
@@ -36,7 +36,7 @@ describe('TIME_LIMIT_BY_DIFFICULTY', () => {
 
 describe('timeLimitForDifficulty', () => {
   it('returns the tier budget', () => {
-    expect(timeLimitForDifficulty('medium')).toBe(60000);
+    expect(timeLimitForDifficulty('medium')).toBe(90000);
     expect(timeLimitForDifficulty('extremely_hard')).toBe(180000);
   });
 });

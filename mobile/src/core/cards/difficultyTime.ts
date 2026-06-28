@@ -10,7 +10,7 @@
  * agnostic — they still read `card.config.timeLimitMs`; only its provenance moved
  * to one place (CLAUDE.md §6: data-driven, localized).
  *
- * Tiers: extremely_easy 12s · easy 40s · medium 60s · hard 120s · extremely_hard
+ * Tiers: extremely_easy 30s · easy 60s · medium 90s · hard 120s · extremely_hard
  * 180s. Applies to ALL templates, including the timed reaction/speed games.
  */
 import type { Difficulty, LiquidCard } from './types';
@@ -18,9 +18,9 @@ import type { Difficulty, LiquidCard } from './types';
 /** Time budget (ms) per difficulty tier. The one place these numbers live. */
 export const TIME_LIMIT_BY_DIFFICULTY: Readonly<Record<Difficulty, number>> =
   Object.freeze({
-    extremely_easy: 12_000,
-    easy: 40_000,
-    medium: 60_000,
+    extremely_easy: 30_000,
+    easy: 60_000,
+    medium: 90_000,
     hard: 120_000,
     extremely_hard: 180_000,
   });

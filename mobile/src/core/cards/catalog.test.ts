@@ -81,6 +81,8 @@ describe('authored card catalog', () => {
   });
 
   it('has a strong hard-tier ceiling for the difficulty ramp', () => {
+    // code_break is intentionally extremely-hard-only, so it is excluded from the
+    // per-template hard-card requirement.
     const templates: TemplateType[] = [
       'what_changed',
       'rule_flip',
@@ -88,7 +90,6 @@ describe('authored card catalog', () => {
       'memory_sequence',
       'pattern_chain',
       'step_logic',
-      'code_break',
       'prism_path',
       'signal_set',
       'circuit_flow',
@@ -130,6 +131,8 @@ describe('authored card catalog', () => {
   });
 
   it('mixes difficulty within each non-entry template', () => {
+    // code_break is intentionally a single-tier (extremely_hard) template, so it
+    // is excluded from the per-template difficulty-mix requirement.
     const templates: TemplateType[] = [
       'what_changed',
       'rule_flip',
@@ -137,7 +140,6 @@ describe('authored card catalog', () => {
       'memory_sequence',
       'pattern_chain',
       'step_logic',
-      'code_break',
       'prism_path',
       'signal_set',
       'circuit_flow',

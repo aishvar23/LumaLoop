@@ -612,7 +612,7 @@ const FeedSlide = memo(function FeedSlide({
         <SlideTopChrome
           category={card.category}
           difficulty={card.difficulty}
-          estimatedSeconds={card.estimatedSeconds}
+          timeLimitMs={card.config.timeLimitMs}
         />
         <div
           className="feed-slide__game"
@@ -821,11 +821,11 @@ function GamePostChrome({
 function SlideTopChrome({
   category,
   difficulty,
-  estimatedSeconds,
+  timeLimitMs,
 }: {
   category: string;
   difficulty: string;
-  estimatedSeconds: number;
+  timeLimitMs: number;
 }) {
   return (
     <div className="feed-slide__top">
@@ -841,10 +841,28 @@ function SlideTopChrome({
         <span className="feed-slide__meta-pill">
           {categoryLabel(difficulty)}
         </span>
-        <span className="feed-slide__meta-pill">~{estimatedSeconds}s</span>
+        {/* The actual time the player gets — the per-difficulty budget, not an
+            estimate (so the tag matches the countdown). */}
+        <span className="feed-slide__meta-pill" data-testid="feed-time-pill">
+          {formatTimeLimitLabel(timeLimitMs)}
+        </span>
       </span>
     </div>
   );
+}
+
+/**
+ * Format a time-limit (ms) as a compact tag: under a minute reads as `30s`; a
+ * minute or more reads as `m:ss` (e.g. 90000 → `1:30`, 120000 → `2:00`). A
+ * non-finite limit (a timer-gated, off-screen slide) shows nothing.
+ */
+function formatTimeLimitLabel(ms: number): string {
+  if (!Number.isFinite(ms)) return '';
+  const totalSeconds = Math.round(ms / 1000);
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
 /**

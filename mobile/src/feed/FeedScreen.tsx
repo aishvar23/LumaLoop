@@ -644,7 +644,7 @@ const FeedSlide = memo(function FeedSlide({
         <FeedHeader
           category={card.category}
           difficulty={card.difficulty}
-          estimatedSeconds={card.estimatedSeconds}
+          timeLimitMs={card.config.timeLimitMs}
         />
         {/* MP2 (#134): center the game (and, via the gate, the feedback step)
             vertically + horizontally in the slide. The full-width inner wrapper
@@ -1089,14 +1089,28 @@ function GamePostChrome({
  * modest, guardrail-safe copy (no IQ/trait language). The chip text carries the
  * meaning — colour only reinforces it.
  */
+/**
+ * Format a time-limit (ms) as a compact tag: under a minute reads as `30s`; a
+ * minute or more reads as `m:ss` (90000 → `1:30`, 120000 → `2:00`). A non-finite
+ * limit (a timer-gated, off-screen slide) shows nothing.
+ */
+function formatTimeLimitLabel(ms: number): string {
+  if (!Number.isFinite(ms)) return '';
+  const totalSeconds = Math.round(ms / 1000);
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
+
 function FeedHeader({
   category,
   difficulty,
-  estimatedSeconds,
+  timeLimitMs,
 }: {
   category: string;
   difficulty: string;
-  estimatedSeconds: number;
+  timeLimitMs: number;
 }) {
   const { accent, tint } = categoryAccent(category);
   return (
@@ -1118,7 +1132,9 @@ function FeedHeader({
           <Text style={styles.metaPillText}>{categoryLabel(difficulty)}</Text>
         </View>
         <View style={styles.metaPill}>
-          <Text style={styles.metaPillText}>~{estimatedSeconds}s</Text>
+          <Text testID="feed-time-pill" style={styles.metaPillText}>
+            {formatTimeLimitLabel(timeLimitMs)}
+          </Text>
         </View>
       </View>
     </View>
