@@ -28,6 +28,7 @@ const ALL_TEMPLATE_TYPES: TemplateType[] = [
   'schulte_order',
   'matrix_reasoning',
   'gears_rotation',
+  'memory_match',
 ];
 
 const ALL_CATEGORIES: ChallengeCategory[] = [
@@ -114,6 +115,7 @@ describe('templateCategoryMap', () => {
       schulte_order: ['processing_speed', 'visual_attention'],
       matrix_reasoning: ['pattern_recognition', 'logical_reasoning'],
       gears_rotation: ['pattern_recognition', 'logical_reasoning'],
+      memory_match: ['working_memory', 'visual_attention'],
     });
   });
 });
@@ -184,6 +186,9 @@ function categoriesForCard(card: LiquidCard): ChallengeCategory {
     case 'gears_rotation':
       void card.config.gearCount;
       return 'pattern_recognition';
+    case 'memory_match':
+      void card.config.tiles;
+      return 'working_memory';
     default: {
       // If a new TemplateType is added without a case above, `card` is no
       // longer `never` here and this assignment fails to compile.

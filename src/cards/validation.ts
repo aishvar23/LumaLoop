@@ -27,6 +27,7 @@ import {
   type LiquidCard,
   type MatrixReasoningCard,
   type GearsRotationCard,
+  type MemoryMatchCard,
   type MemorySequenceCard,
   type OddOneOutCard,
   type PatternChainCard,
@@ -148,6 +149,7 @@ const templateAnswerValidators: {
   schulte_order: validateSchulteOrderAnswer,
   matrix_reasoning: validateMatrixReasoningAnswer,
   gears_rotation: validateGearsRotationAnswer,
+  memory_match: validateMemoryMatchAnswer,
 };
 
 /**
@@ -392,6 +394,86 @@ function validateGearsRotationAnswer(
         `gears_rotation correctOptionId "${correctOptionId}" is not among options`,
       ),
     );
+  }
+  return errors;
+}
+
+/**
+ * memory_match: a rows×columns flip-and-match board. Validates that the grid is
+ * positive and EVEN (tiles come in pairs), that `tiles` is exactly rows*columns
+ * long with unique non-empty ids and non-empty glyphs, and that every `pairKey`
+ * appears EXACTLY twice (a well-formed pairing).
+ */
+function validateMemoryMatchAnswer(card: MemoryMatchCard): ValidationError[] {
+  const { rows, columns, tiles } = card.config;
+  const errors: ValidationError[] = [];
+
+  if (!Number.isInteger(rows) || rows < 1) {
+    errors.push(
+      answerError(card.cardId, `memory_match rows must be a positive integer, got ${rows}`),
+    );
+  }
+  if (!Number.isInteger(columns) || columns < 1) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `memory_match columns must be a positive integer, got ${columns}`,
+      ),
+    );
+  }
+  const cellCount = rows * columns;
+  if (cellCount % 2 !== 0) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `memory_match rows*columns must be even (tiles come in pairs), got ${cellCount}`,
+      ),
+    );
+  }
+  if (tiles.length !== cellCount) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `memory_match tiles length must equal rows*columns (${cellCount}), got ${tiles.length}`,
+      ),
+    );
+  }
+
+  const ids = new Set<string>();
+  const pairCounts = new Map<string, number>();
+  for (const tile of tiles) {
+    if (
+      tile.id.trim().length === 0 ||
+      tile.pairKey.trim().length === 0 ||
+      tile.glyph.trim().length === 0
+    ) {
+      errors.push(
+        answerError(
+          card.cardId,
+          'memory_match tile ids, pairKeys and glyphs must be non-empty',
+        ),
+      );
+    }
+    if (ids.has(tile.id)) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `memory_match has a duplicate tile id "${tile.id}"`,
+        ),
+      );
+    }
+    ids.add(tile.id);
+    pairCounts.set(tile.pairKey, (pairCounts.get(tile.pairKey) ?? 0) + 1);
+  }
+  for (const [pairKey, count] of pairCounts) {
+    if (count !== 2) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `memory_match pairKey "${pairKey}" must appear exactly twice, got ${count}`,
+        ),
+      );
+    }
   }
   return errors;
 }

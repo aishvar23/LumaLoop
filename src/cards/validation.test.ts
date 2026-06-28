@@ -25,6 +25,7 @@ import {
   type LiquidCard,
   type MatrixReasoningCard,
   type GearsRotationCard,
+  type MemoryMatchCard,
   type MemorySequenceCard,
   type NBackCard,
   type OddOneOutCard,
@@ -651,6 +652,33 @@ function validGearsRotation(): GearsRotationCard {
   };
 }
 
+function validMemoryMatch(): MemoryMatchCard {
+  return {
+    cardId: 'memorymatch-1',
+    creatorHandle: '@test',
+    templateType: 'memory_match',
+    category: 'working_memory',
+    difficulty: 'extremely_easy',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 10,
+    prompt: 'Flip the tiles two at a time to find the matching pairs.',
+    puzzleDna: dna('pair-recall'),
+    explanation: { title: 'Pairs', body: 'Two tiles share a shape.' },
+    config: {
+      rows: 2,
+      columns: 2,
+      tiles: [
+        { id: 't1', pairKey: 'p1', glyph: '●' },
+        { id: 't2', pairKey: 'p2', glyph: '■' },
+        { id: 't3', pairKey: 'p1', glyph: '●' },
+        { id: 't4', pairKey: 'p2', glyph: '■' },
+      ],
+      timeLimitMs: 12000,
+    },
+  };
+}
+
 function validCatalog(): LiquidCard[] {
   return [
     validSpotIt(),
@@ -670,6 +698,7 @@ function validCatalog(): LiquidCard[] {
     validSchulteOrder(),
     validMatrixReasoning(),
     validGearsRotation(),
+    validMemoryMatch(),
   ];
 }
 
@@ -1435,6 +1464,7 @@ const ALL_TEMPLATE_TYPES: TemplateType[] = [
   'schulte_order',
   'matrix_reasoning',
   'gears_rotation',
+  'memory_match',
 ];
 
 const ALL_CATEGORIES: ChallengeCategory[] = [
@@ -1467,6 +1497,7 @@ const validCardFor: Record<TemplateType, () => LiquidCard> = {
   schulte_order: validSchulteOrder,
   matrix_reasoning: validMatrixReasoning,
   gears_rotation: validGearsRotation,
+  memory_match: validMemoryMatch,
 };
 
 describe('templateCategoryMap <-> validation consistency', () => {

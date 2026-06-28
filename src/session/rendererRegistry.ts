@@ -41,6 +41,7 @@ import OddOneOutCard from '../templates/oddOneOut/OddOneOutCard';
 import SchulteOrderCard from '../templates/schulteOrder/SchulteOrderCard';
 import MatrixReasoningCard from '../templates/matrixReasoning/MatrixReasoningCard';
 import GearsRotationCard from '../templates/gearsRotation/GearsRotationCard';
+import MemoryMatchCard from '../templates/memoryMatch/MemoryMatchCard';
 
 /**
  * A template renderer: a component that accepts {@link TemplateProps} for its
@@ -121,4 +122,5 @@ export const defaultRendererRegistry: RendererRegistry = {
   schulte_order: SchulteOrderCard,
   matrix_reasoning: MatrixReasoningCard,
   gears_rotation: GearsRotationCard,
+  memory_match: MemoryMatchCard,
 };

@@ -70,7 +70,8 @@ export type TemplateType =
   | 'odd_one_out'
   | 'schulte_order'
   | 'matrix_reasoning'
-  | 'gears_rotation';
+  | 'gears_rotation'
+  | 'memory_match';
 
 export type Difficulty =
   | 'extremely_easy'
@@ -451,6 +452,30 @@ export type GearsRotationCard = LiquidCardBase & {
   };
 };
 
+/**
+ * memory_match — a flip-and-match pairs board (concentration). A rows×columns
+ * grid of face-down tiles is flipped two at a time; a matching pair stays up,
+ * a mismatch flips back. The card resolves CORRECT when every pair is found.
+ * VISUAL: each tile carries a distinct SHAPE/emoji glyph (never colour), so a
+ * pair is recognised by glyph, not hue — accessible by construction.
+ */
+export type MemoryMatchCard = LiquidCardBase & {
+  templateType: 'memory_match';
+  config: {
+    /** Grid rows and columns. rows*columns must be EVEN (tiles come in pairs). */
+    rows: number;
+    columns: number;
+    /**
+     * The board tiles in ROW-MAJOR order, length === rows*columns. Each tile has a
+     * stable id, a `pairKey` (two tiles share a pairKey = a matching pair), and the
+     * `glyph` shown when face-up (a unicode geometric glyph or emoji — distinct
+     * SHAPES, never colour-dependent). Every pairKey appears EXACTLY twice.
+     */
+    tiles: ReadonlyArray<{ id: string; pairKey: string; glyph: string }>;
+    timeLimitMs: number;
+  };
+};
+
 /** Visual attributes used by the original signal_set triad puzzle. */
 export type SignalShape = 'circle' | 'triangle' | 'diamond';
 export type SignalFill = 'solid' | 'striped' | 'outline';
@@ -810,7 +835,8 @@ export type LiquidCard =
   | OddOneOutCard
   | SchulteOrderCard
   | MatrixReasoningCard
-  | GearsRotationCard;
+  | GearsRotationCard
+  | MemoryMatchCard;
 
 /**
  * The categories each template is allowed to map to (Technical Design §11).
@@ -912,5 +938,13 @@ export const templateCategoryMap: Readonly<
   gears_rotation: Object.freeze([
     'pattern_recognition',
     'logical_reasoning',
+  ] as const),
+  // memory_match is a concentration board: hold the glyph→position bindings in
+  // mind and recall them to clear every pair — working_memory, with
+  // visual_attention for scanning the grid. No new ChallengeCategory is
+  // warranted (the same pairing as schulte_order's recall+scan shape).
+  memory_match: Object.freeze([
+    'working_memory',
+    'visual_attention',
   ] as const),
 }) satisfies Readonly<Record<TemplateType, readonly ChallengeCategory[]>>;

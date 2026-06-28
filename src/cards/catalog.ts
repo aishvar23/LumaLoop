@@ -33,6 +33,7 @@ import type {
   GearsRotationCard,
   LiquidCard,
   MatrixReasoningCard,
+  MemoryMatchCard,
   NBackCard,
   MemorySequenceCard,
   OddOneOutCard,
@@ -6408,6 +6409,205 @@ const gearsRotationCards: GearsRotationCard[] = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// memory_match — a flip-and-match pairs board (concentration). Reveal tiles two
+// at a time; a matching pair (same glyph) stays up, a mismatch flips back. Clear
+// every pair to solve. Glyphs are distinct SHAPES (never colour) for accessibility.
+// Categories allowed: working_memory | visual_attention.
+// ---------------------------------------------------------------------------
+
+const memoryMatchCards: MemoryMatchCard[] = [
+  {
+    cardId: 'memorymatch-001',
+    creatorHandle: '@memomatch',
+    templateType: 'memory_match',
+    category: 'working_memory',
+    difficulty: 'extremely_easy',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 10,
+    prompt: 'Flip the tiles two at a time to find the matching pairs.',
+    puzzleDna: {
+      mechanic: 'pair-recall',
+      inputMode: 'tap',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'Remember where each shape sits',
+      body: 'Turn two tiles at a time. A pair that shows the same shape stays up; otherwise it flips back, so hold its position in mind for next time. Clear all the pairs to win.',
+    },
+    config: {
+      rows: 2,
+      columns: 2,
+      tiles: [
+        { id: 't1', pairKey: 'p1', glyph: '●' },
+        { id: 't2', pairKey: 'p2', glyph: '■' },
+        { id: 't3', pairKey: 'p1', glyph: '●' },
+        { id: 't4', pairKey: 'p2', glyph: '■' },
+      ],
+      timeLimitMs: 12000,
+    },
+  },
+  {
+    cardId: 'memorymatch-002',
+    creatorHandle: '@memomatch',
+    templateType: 'memory_match',
+    category: 'working_memory',
+    difficulty: 'easy',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 25,
+    prompt: 'Flip the tiles two at a time to find the matching pairs.',
+    puzzleDna: {
+      mechanic: 'pair-recall',
+      inputMode: 'tap',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'Three shapes, three pairs',
+      body: 'Each shape appears exactly twice. When a flip reveals a shape you have seen before, recall where its twin was and turn it next.',
+    },
+    config: {
+      rows: 2,
+      columns: 3,
+      tiles: [
+        { id: 't1', pairKey: 'p1', glyph: '●' },
+        { id: 't2', pairKey: 'p3', glyph: '▲' },
+        { id: 't3', pairKey: 'p2', glyph: '■' },
+        { id: 't4', pairKey: 'p3', glyph: '▲' },
+        { id: 't5', pairKey: 'p1', glyph: '●' },
+        { id: 't6', pairKey: 'p2', glyph: '■' },
+      ],
+      timeLimitMs: 40000,
+    },
+  },
+  {
+    cardId: 'memorymatch-003',
+    creatorHandle: '@memomatch',
+    templateType: 'memory_match',
+    category: 'working_memory',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 40,
+    prompt: 'Flip the tiles two at a time to find the matching pairs.',
+    puzzleDna: {
+      mechanic: 'pair-recall',
+      inputMode: 'tap',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'Six pairs on a wider board',
+      body: 'With twelve tiles, every wrong flip is still useful: note the shape and its place so you can pair it on a later turn. Fewer mismatches means a faster clear.',
+    },
+    config: {
+      rows: 3,
+      columns: 4,
+      tiles: [
+        { id: 't1', pairKey: 'p1', glyph: '●' },
+        { id: 't2', pairKey: 'p4', glyph: '◆' },
+        { id: 't3', pairKey: 'p2', glyph: '■' },
+        { id: 't4', pairKey: 'p5', glyph: '★' },
+        { id: 't5', pairKey: 'p3', glyph: '▲' },
+        { id: 't6', pairKey: 'p6', glyph: '○' },
+        { id: 't7', pairKey: 'p4', glyph: '◆' },
+        { id: 't8', pairKey: 'p1', glyph: '●' },
+        { id: 't9', pairKey: 'p5', glyph: '★' },
+        { id: 't10', pairKey: 'p2', glyph: '■' },
+        { id: 't11', pairKey: 'p6', glyph: '○' },
+        { id: 't12', pairKey: 'p3', glyph: '▲' },
+      ],
+      timeLimitMs: 60000,
+    },
+  },
+  {
+    cardId: 'memorymatch-004',
+    creatorHandle: '@memomatch',
+    templateType: 'memory_match',
+    category: 'visual_attention',
+    difficulty: 'hard',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 75,
+    prompt: 'Flip the tiles two at a time to find the matching pairs.',
+    puzzleDna: {
+      mechanic: 'pair-recall',
+      inputMode: 'tap',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'Eight pairs to hold in mind',
+      body: 'A full 4×4 board has eight pairs. Scan deliberately and build a mental map of what sits where, then convert that memory into matches with as few flips as possible.',
+    },
+    config: {
+      rows: 4,
+      columns: 4,
+      tiles: [
+        { id: 't1', pairKey: 'p1', glyph: '●' },
+        { id: 't2', pairKey: 'p8', glyph: '☆' },
+        { id: 't3', pairKey: 'p7', glyph: '◇' },
+        { id: 't4', pairKey: 'p2', glyph: '■' },
+        { id: 't5', pairKey: 'p5', glyph: '★' },
+        { id: 't6', pairKey: 'p3', glyph: '▲' },
+        { id: 't7', pairKey: 'p6', glyph: '○' },
+        { id: 't8', pairKey: 'p4', glyph: '◆' },
+        { id: 't9', pairKey: 'p2', glyph: '■' },
+        { id: 't10', pairKey: 'p7', glyph: '◇' },
+        { id: 't11', pairKey: 'p1', glyph: '●' },
+        { id: 't12', pairKey: 'p5', glyph: '★' },
+        { id: 't13', pairKey: 'p6', glyph: '○' },
+        { id: 't14', pairKey: 'p4', glyph: '◆' },
+        { id: 't15', pairKey: 'p8', glyph: '☆' },
+        { id: 't16', pairKey: 'p3', glyph: '▲' },
+      ],
+      timeLimitMs: 120000,
+    },
+  },
+  {
+    cardId: 'memorymatch-005',
+    creatorHandle: '@memomatch',
+    templateType: 'memory_match',
+    category: 'visual_attention',
+    difficulty: 'extremely_hard',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 110,
+    prompt: 'Flip the tiles two at a time to find the matching pairs.',
+    puzzleDna: {
+      mechanic: 'pair-recall',
+      inputMode: 'tap',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'Subtle outlines test careful recall',
+      body: 'The shapes here are deliberately similar outlines, so a quick glance is not enough — fix each one precisely in memory by its exact form and position before you commit to a pair.',
+    },
+    config: {
+      rows: 4,
+      columns: 4,
+      tiles: [
+        { id: 't1', pairKey: 'p1', glyph: '○' },
+        { id: 't2', pairKey: 'p8', glyph: '▷' },
+        { id: 't3', pairKey: 'p6', glyph: '□' },
+        { id: 't4', pairKey: 'p3', glyph: '△' },
+        { id: 't5', pairKey: 'p2', glyph: '◇' },
+        { id: 't6', pairKey: 'p5', glyph: '☆' },
+        { id: 't7', pairKey: 'p4', glyph: '▽' },
+        { id: 't8', pairKey: 'p7', glyph: '◁' },
+        { id: 't9', pairKey: 'p3', glyph: '△' },
+        { id: 't10', pairKey: 'p6', glyph: '□' },
+        { id: 't11', pairKey: 'p1', glyph: '○' },
+        { id: 't12', pairKey: 'p4', glyph: '▽' },
+        { id: 't13', pairKey: 'p5', glyph: '☆' },
+        { id: 't14', pairKey: 'p7', glyph: '◁' },
+        { id: 't15', pairKey: 'p2', glyph: '◇' },
+        { id: 't16', pairKey: 'p8', glyph: '▷' },
+      ],
+      timeLimitMs: 180000,
+    },
+  },
+];
+
 const authoredCatalog: readonly LiquidCard[] = [
   ...spotItCards,
   ...whatChangedCards,
@@ -6428,6 +6628,7 @@ const authoredCatalog: readonly LiquidCard[] = [
   ...schulteOrderCards,
   ...matrixReasoningCards,
   ...gearsRotationCards,
+  ...memoryMatchCards,
 ];
 
 /**
