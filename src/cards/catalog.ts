@@ -34,6 +34,7 @@ import type {
   LiquidCard,
   MatrixReasoningCard,
   MemoryMatchCard,
+  MazePathCard,
   NBackCard,
   MemorySequenceCard,
   OddOneOutCard,
@@ -6608,6 +6609,297 @@ const memoryMatchCards: MemoryMatchCard[] = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// maze_path — a navigable grid maze. Tap from the start cell through adjacent
+// open squares to the exit (backtracking allowed); resolves CORRECT on reaching
+// the exit. Cells are distinguished by SHAPE/label (start ●, exit ★, walls a
+// filled block), never colour alone. Every maze below is hand-checked solvable
+// (validation also runs a BFS via hasPath and would reject an unsolvable maze).
+// Categories allowed: logical_reasoning | visual_attention.
+// ---------------------------------------------------------------------------
+
+const mazePathCards: MazePathCard[] = [
+  {
+    cardId: 'mazepath-001',
+    creatorHandle: '@mazerunner',
+    templateType: 'maze_path',
+    category: 'logical_reasoning',
+    difficulty: 'extremely_easy',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 10,
+    prompt: 'Tap your way through the open squares from the start to the exit.',
+    puzzleDna: {
+      mechanic: 'route-finding',
+      inputMode: 'tap',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'Step to an adjacent open square',
+      body: 'You can only move up, down, left or right into an open square — never diagonally and never through a wall. Hug the open squares along the top, then drop down the right edge to the exit.',
+    },
+    config: {
+      rows: 3,
+      columns: 3,
+      // S . .
+      // # # .
+      // . . E
+      cells: [
+        'open',
+        'open',
+        'open',
+        'wall',
+        'wall',
+        'open',
+        'open',
+        'open',
+        'open',
+      ],
+      startIndex: 0,
+      exitIndex: 8,
+      timeLimitMs: 12000,
+    },
+  },
+  {
+    cardId: 'mazepath-002',
+    creatorHandle: '@mazerunner',
+    templateType: 'maze_path',
+    category: 'logical_reasoning',
+    difficulty: 'easy',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 18,
+    prompt: 'Tap your way through the open squares from the start to the exit.',
+    puzzleDna: {
+      mechanic: 'route-finding',
+      inputMode: 'tap',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'Walls force a detour',
+      body: 'Walls block the direct line, so drop down the left side, cross the open middle row, then step down to the exit corner.',
+    },
+    config: {
+      rows: 4,
+      columns: 4,
+      // S . # .
+      // . # . .
+      // . . . #
+      // # . . E
+      cells: [
+        'open',
+        'open',
+        'wall',
+        'open',
+        'open',
+        'wall',
+        'open',
+        'open',
+        'open',
+        'open',
+        'open',
+        'wall',
+        'wall',
+        'open',
+        'open',
+        'open',
+      ],
+      startIndex: 0,
+      exitIndex: 15,
+      timeLimitMs: 40000,
+    },
+  },
+  {
+    cardId: 'mazepath-003',
+    creatorHandle: '@mazerunner',
+    templateType: 'maze_path',
+    category: 'visual_attention',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 28,
+    prompt: 'Tap your way through the open squares from the start to the exit.',
+    puzzleDna: {
+      mechanic: 'route-finding',
+      inputMode: 'tap',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'Find the one open corridor',
+      body: 'Only one column near the top is open: thread down through it to the wide middle row, then run along the bottom row to the exit.',
+    },
+    config: {
+      rows: 5,
+      columns: 5,
+      // S . . # .
+      // # # . # .
+      // . . . . .
+      // . # # # .
+      // . . . . E
+      cells: [
+        'open',
+        'open',
+        'open',
+        'wall',
+        'open',
+        'wall',
+        'wall',
+        'open',
+        'wall',
+        'open',
+        'open',
+        'open',
+        'open',
+        'open',
+        'open',
+        'open',
+        'wall',
+        'wall',
+        'wall',
+        'open',
+        'open',
+        'open',
+        'open',
+        'open',
+        'open',
+      ],
+      startIndex: 0,
+      exitIndex: 24,
+      timeLimitMs: 60000,
+    },
+  },
+  {
+    cardId: 'mazepath-004',
+    creatorHandle: '@mazerunner',
+    templateType: 'maze_path',
+    category: 'logical_reasoning',
+    difficulty: 'hard',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 40,
+    prompt: 'Tap your way through the open squares from the start to the exit.',
+    puzzleDna: {
+      mechanic: 'route-finding',
+      inputMode: 'tap',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'Dense walls, one winding route',
+      body: 'Drop down the left edge, cut across the third row, then take the single open column down to the bottom row and along to the exit.',
+    },
+    config: {
+      rows: 5,
+      columns: 5,
+      // S . # . .
+      // . # . . #
+      // . . . # .
+      // # # . # .
+      // . . . . E
+      cells: [
+        'open',
+        'open',
+        'wall',
+        'open',
+        'open',
+        'open',
+        'wall',
+        'open',
+        'open',
+        'wall',
+        'open',
+        'open',
+        'open',
+        'wall',
+        'open',
+        'wall',
+        'wall',
+        'open',
+        'wall',
+        'open',
+        'open',
+        'open',
+        'open',
+        'open',
+        'open',
+      ],
+      startIndex: 0,
+      exitIndex: 24,
+      timeLimitMs: 120000,
+    },
+  },
+  {
+    cardId: 'mazepath-005',
+    creatorHandle: '@mazerunner',
+    templateType: 'maze_path',
+    category: 'visual_attention',
+    difficulty: 'extremely_hard',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 60,
+    prompt: 'Tap your way through the open squares from the start to the exit.',
+    puzzleDna: {
+      mechanic: 'route-finding',
+      inputMode: 'tap',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'A long maze across the whole grid',
+      body: 'Weave across the top into the open third row, then drop down the right edge: only the rightmost column stays open all the way down to the exit.',
+    },
+    config: {
+      rows: 6,
+      columns: 6,
+      // S . . # . .
+      // # # . # . #
+      // . . . . . .
+      // . # # # # .
+      // . . . # . .
+      // # # . # . E
+      cells: [
+        'open',
+        'open',
+        'open',
+        'wall',
+        'open',
+        'open',
+        'wall',
+        'wall',
+        'open',
+        'wall',
+        'open',
+        'wall',
+        'open',
+        'open',
+        'open',
+        'open',
+        'open',
+        'open',
+        'open',
+        'wall',
+        'wall',
+        'wall',
+        'wall',
+        'open',
+        'open',
+        'open',
+        'open',
+        'wall',
+        'open',
+        'open',
+        'wall',
+        'wall',
+        'open',
+        'wall',
+        'open',
+        'open',
+      ],
+      startIndex: 0,
+      exitIndex: 35,
+      timeLimitMs: 180000,
+    },
+  },
+];
+
 const authoredCatalog: readonly LiquidCard[] = [
   ...spotItCards,
   ...whatChangedCards,
@@ -6629,6 +6921,7 @@ const authoredCatalog: readonly LiquidCard[] = [
   ...matrixReasoningCards,
   ...gearsRotationCards,
   ...memoryMatchCards,
+  ...mazePathCards,
 ];
 
 /**

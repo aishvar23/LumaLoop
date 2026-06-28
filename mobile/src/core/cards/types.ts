@@ -71,7 +71,8 @@ export type TemplateType =
   | 'schulte_order'
   | 'matrix_reasoning'
   | 'gears_rotation'
-  | 'memory_match';
+  | 'memory_match'
+  | 'maze_path';
 
 export type Difficulty =
   | 'extremely_easy'
@@ -476,6 +477,32 @@ export type MemoryMatchCard = LiquidCardBase & {
   };
 };
 
+/**
+ * maze_path — a navigable grid maze. A rows×columns grid of 'open' and 'wall'
+ * cells; the player taps from the start cell, stepping 4-directionally between
+ * adjacent open cells (backtracking allowed), and resolves CORRECT on reaching
+ * the exit. VISUAL and near-zero reading: cells are distinguished by SHAPE and
+ * glyph/label (start ●, exit ★, walls a filled block), never colour alone.
+ */
+export type MazePathCard = LiquidCardBase & {
+  templateType: 'maze_path';
+  config: {
+    rows: number;
+    columns: number;
+    /**
+     * The maze cells in ROW-MAJOR order, length === rows*columns. 'open' cells are
+     * walkable; 'wall' cells block movement. Movement is 4-directional between
+     * adjacent open cells.
+     */
+    cells: ReadonlyArray<'open' | 'wall'>;
+    /** Row-major index of the start cell (must be 'open'). */
+    startIndex: number;
+    /** Row-major index of the exit cell (must be 'open', != startIndex). */
+    exitIndex: number;
+    timeLimitMs: number;
+  };
+};
+
 /** Visual attributes used by the original signal_set triad puzzle. */
 export type SignalShape = 'circle' | 'triangle' | 'diamond';
 export type SignalFill = 'solid' | 'striped' | 'outline';
@@ -836,7 +863,8 @@ export type LiquidCard =
   | SchulteOrderCard
   | MatrixReasoningCard
   | GearsRotationCard
-  | MemoryMatchCard;
+  | MemoryMatchCard
+  | MazePathCard;
 
 /**
  * The categories each template is allowed to map to (Technical Design §11).
@@ -945,6 +973,13 @@ export const templateCategoryMap: Readonly<
   // warranted (the same pairing as schulte_order's recall+scan shape).
   memory_match: Object.freeze([
     'working_memory',
+    'visual_attention',
+  ] as const),
+  // maze_path is a route-finding navigation puzzle: reason about which adjacent
+  // open cells lead toward the exit (logical_reasoning) while scanning the grid
+  // for the path (visual_attention). No new ChallengeCategory is warranted.
+  maze_path: Object.freeze([
+    'logical_reasoning',
     'visual_attention',
   ] as const),
 }) satisfies Readonly<Record<TemplateType, readonly ChallengeCategory[]>>;

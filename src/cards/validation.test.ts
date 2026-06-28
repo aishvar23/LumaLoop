@@ -26,6 +26,7 @@ import {
   type MatrixReasoningCard,
   type GearsRotationCard,
   type MemoryMatchCard,
+  type MazePathCard,
   type MemorySequenceCard,
   type NBackCard,
   type OddOneOutCard,
@@ -679,6 +680,40 @@ function validMemoryMatch(): MemoryMatchCard {
   };
 }
 
+function validMazePath(): MazePathCard {
+  return {
+    cardId: 'mazepath-1',
+    creatorHandle: '@test',
+    templateType: 'maze_path',
+    category: 'logical_reasoning',
+    difficulty: 'extremely_easy',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 12,
+    prompt: 'Tap your way through the open squares from the start to the exit.',
+    puzzleDna: dna('route-finding'),
+    explanation: { title: 'Route', body: 'Step to an adjacent open square.' },
+    config: {
+      rows: 3,
+      columns: 3,
+      cells: [
+        'open',
+        'open',
+        'open',
+        'open',
+        'open',
+        'open',
+        'open',
+        'open',
+        'open',
+      ],
+      startIndex: 0,
+      exitIndex: 8,
+      timeLimitMs: 12000,
+    },
+  };
+}
+
 function validCatalog(): LiquidCard[] {
   return [
     validSpotIt(),
@@ -699,6 +734,7 @@ function validCatalog(): LiquidCard[] {
     validMatrixReasoning(),
     validGearsRotation(),
     validMemoryMatch(),
+    validMazePath(),
   ];
 }
 
@@ -1465,6 +1501,7 @@ const ALL_TEMPLATE_TYPES: TemplateType[] = [
   'matrix_reasoning',
   'gears_rotation',
   'memory_match',
+  'maze_path',
 ];
 
 const ALL_CATEGORIES: ChallengeCategory[] = [
@@ -1498,6 +1535,7 @@ const validCardFor: Record<TemplateType, () => LiquidCard> = {
   matrix_reasoning: validMatrixReasoning,
   gears_rotation: validGearsRotation,
   memory_match: validMemoryMatch,
+  maze_path: validMazePath,
 };
 
 describe('templateCategoryMap <-> validation consistency', () => {

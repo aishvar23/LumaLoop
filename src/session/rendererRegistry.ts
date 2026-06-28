@@ -42,6 +42,7 @@ import SchulteOrderCard from '../templates/schulteOrder/SchulteOrderCard';
 import MatrixReasoningCard from '../templates/matrixReasoning/MatrixReasoningCard';
 import GearsRotationCard from '../templates/gearsRotation/GearsRotationCard';
 import MemoryMatchCard from '../templates/memoryMatch/MemoryMatchCard';
+import MazePathCard from '../templates/mazePath/MazePathCard';
 
 /**
  * A template renderer: a component that accepts {@link TemplateProps} for its
@@ -123,4 +124,5 @@ export const defaultRendererRegistry: RendererRegistry = {
   matrix_reasoning: MatrixReasoningCard,
   gears_rotation: GearsRotationCard,
   memory_match: MemoryMatchCard,
+  maze_path: MazePathCard,
 };

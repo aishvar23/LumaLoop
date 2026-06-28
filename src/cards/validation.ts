@@ -28,6 +28,7 @@ import {
   type MatrixReasoningCard,
   type GearsRotationCard,
   type MemoryMatchCard,
+  type MazePathCard,
   type MemorySequenceCard,
   type OddOneOutCard,
   type PatternChainCard,
@@ -56,6 +57,7 @@ import { isValidSignalTrio } from '../templates/signalSet/signalSetEvaluator';
 import { isValidUnscramble } from '../templates/wordUnscramble/wordUnscrambleEvaluator';
 import { computeQuickMath } from '../templates/quickMath/quickMathEvaluator';
 import { matchIndicesAreConsistent } from '../templates/nBack/nBackEvaluator';
+import { hasPath } from '../templates/mazePath/mazePathEvaluator';
 
 /** Inclusive lower bound for any template's `config.timeLimitMs` (5 seconds). */
 export const MIN_TIME_LIMIT_MS = 5000;
@@ -150,6 +152,7 @@ const templateAnswerValidators: {
   matrix_reasoning: validateMatrixReasoningAnswer,
   gears_rotation: validateGearsRotationAnswer,
   memory_match: validateMemoryMatchAnswer,
+  maze_path: validateMazePathAnswer,
 };
 
 /**
@@ -474,6 +477,81 @@ function validateMemoryMatchAnswer(card: MemoryMatchCard): ValidationError[] {
         ),
       );
     }
+  }
+  return errors;
+}
+
+/**
+ * maze_path: a rows×columns grid of 'open'/'wall' cells. Validates that the grid
+ * is positive, that `cells` is exactly rows*columns long, that the start and
+ * exit are in range, distinct, and 'open', and — critically — that the exit is
+ * actually REACHABLE from the start (BFS via {@link hasPath}), so no unsolvable
+ * maze can ship.
+ */
+function validateMazePathAnswer(card: MazePathCard): ValidationError[] {
+  const { rows, columns, cells, startIndex, exitIndex } = card.config;
+  const errors: ValidationError[] = [];
+
+  if (!Number.isInteger(rows) || rows < 1) {
+    errors.push(
+      answerError(card.cardId, `maze_path rows must be a positive integer, got ${rows}`),
+    );
+  }
+  if (!Number.isInteger(columns) || columns < 1) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `maze_path columns must be a positive integer, got ${columns}`,
+      ),
+    );
+  }
+  const cellCount = rows * columns;
+  if (cells.length !== cellCount) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `maze_path cells length must equal rows*columns (${cellCount}), got ${cells.length}`,
+      ),
+    );
+  }
+
+  const inRange = (i: number) => Number.isInteger(i) && i >= 0 && i < cells.length;
+  if (!inRange(startIndex)) {
+    errors.push(
+      answerError(card.cardId, `maze_path startIndex ${startIndex} is out of range`),
+    );
+  } else if (cells[startIndex] !== 'open') {
+    errors.push(
+      answerError(card.cardId, 'maze_path startIndex must be an open cell'),
+    );
+  }
+  if (!inRange(exitIndex)) {
+    errors.push(
+      answerError(card.cardId, `maze_path exitIndex ${exitIndex} is out of range`),
+    );
+  } else if (cells[exitIndex] !== 'open') {
+    errors.push(
+      answerError(card.cardId, 'maze_path exitIndex must be an open cell'),
+    );
+  }
+  if (startIndex === exitIndex) {
+    errors.push(
+      answerError(card.cardId, 'maze_path startIndex and exitIndex must differ'),
+    );
+  }
+
+  // Only run the reachability BFS once the structural checks above pass, so the
+  // error is "unsolvable maze" rather than noise from a malformed grid.
+  if (
+    errors.length === 0 &&
+    !hasPath({ rows, columns, cells, startIndex, exitIndex })
+  ) {
+    errors.push(
+      answerError(
+        card.cardId,
+        'maze_path exit is not reachable from the start (unsolvable maze)',
+      ),
+    );
   }
   return errors;
 }
