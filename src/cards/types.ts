@@ -66,7 +66,8 @@ export type TemplateType =
   | 'color_word'
   | 'n_back'
   | 'odd_one_out'
-  | 'schulte_order';
+  | 'schulte_order'
+  | 'matrix_reasoning';
 
 export type Difficulty =
   | 'extremely_easy'
@@ -396,6 +397,31 @@ export type PrismPathCard = LiquidCardBase & {
      */
     solution: ReadonlyArray<PrismPathSolution>;
     /** Countdown for the whole solve (5-120s; see validation). */
+    timeLimitMs: number;
+  };
+};
+
+/**
+ * matrix_reasoning — a Raven's-style visual reasoning puzzle. A 3×3 matrix of
+ * geometric glyphs has one cell missing; the player picks the option tile that
+ * completes the pattern. Pure pick-one (mirrors tiny_logic), but VISUAL: the
+ * grid and options are unicode geometric glyphs, so there is near-zero reading
+ * and the puzzle never depends on colour (distinct shapes carry the meaning).
+ */
+export type MatrixReasoningCard = LiquidCardBase & {
+  templateType: 'matrix_reasoning';
+  config: {
+    /**
+     * The 3×3 matrix in ROW-MAJOR order — exactly 9 entries. Exactly ONE entry is
+     * `null`: the missing cell. Non-null entries are unicode geometric glyphs
+     * (e.g. '●', '▲', '◆') so the matrix reads as shapes, not text.
+     */
+    grid: ReadonlyArray<string | null>;
+    /** Candidate tiles to complete the matrix; the player picks exactly one. */
+    options: ReadonlyArray<{ id: string; glyph: string }>;
+    /** The id of the option that correctly completes the pattern. */
+    correctOptionId: string;
+    /** Countdown for the whole solve (see validation). */
     timeLimitMs: number;
   };
 };
@@ -757,7 +783,8 @@ export type LiquidCard =
   | ColorWordCard
   | NBackCard
   | OddOneOutCard
-  | SchulteOrderCard;
+  | SchulteOrderCard
+  | MatrixReasoningCard;
 
 /**
  * The categories each template is allowed to map to (Technical Design §11).
@@ -843,5 +870,13 @@ export const templateCategoryMap: Readonly<
   schulte_order: Object.freeze([
     'processing_speed',
     'visual_attention',
+  ] as const),
+  // matrix_reasoning is a Raven's-style VISUAL inference: read the row/column
+  // pattern of shapes and pick the tile that completes it — pattern_recognition,
+  // with logical_reasoning for the deductive step. No new ChallengeCategory is
+  // warranted (the same pairing as odd_one_out).
+  matrix_reasoning: Object.freeze([
+    'pattern_recognition',
+    'logical_reasoning',
   ] as const),
 }) satisfies Readonly<Record<TemplateType, readonly ChallengeCategory[]>>;

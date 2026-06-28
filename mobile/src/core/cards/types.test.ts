@@ -26,6 +26,7 @@ const ALL_TEMPLATE_TYPES: TemplateType[] = [
   'n_back',
   'odd_one_out',
   'schulte_order',
+  'matrix_reasoning',
 ];
 
 const ALL_CATEGORIES: ChallengeCategory[] = [
@@ -110,6 +111,7 @@ describe('templateCategoryMap', () => {
       n_back: ['working_memory'],
       odd_one_out: ['pattern_recognition', 'logical_reasoning'],
       schulte_order: ['processing_speed', 'visual_attention'],
+      matrix_reasoning: ['pattern_recognition', 'logical_reasoning'],
     });
   });
 });
@@ -174,6 +176,9 @@ function categoriesForCard(card: LiquidCard): ChallengeCategory {
     case 'schulte_order':
       void card.config.targets;
       return 'processing_speed';
+    case 'matrix_reasoning':
+      void card.config.grid;
+      return 'pattern_recognition';
     default: {
       // If a new TemplateType is added without a case above, `card` is no
       // longer `never` here and this assignment fails to compile.

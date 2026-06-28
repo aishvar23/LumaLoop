@@ -23,6 +23,7 @@ import {
   type CircuitFlowCard,
   type ColorWordCard,
   type LiquidCard,
+  type MatrixReasoningCard,
   type MemorySequenceCard,
   type NBackCard,
   type OddOneOutCard,
@@ -597,6 +598,32 @@ function validSchulteOrder(): SchulteOrderCard {
   };
 }
 
+function validMatrixReasoning(): MatrixReasoningCard {
+  return {
+    cardId: 'matrix-1',
+    creatorHandle: '@test',
+    templateType: 'matrix_reasoning',
+    category: 'pattern_recognition',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 20,
+    prompt: 'Pick the shape that completes the pattern.',
+    puzzleDna: dna('visual-pattern-completion'),
+    explanation: { title: 'Pattern', body: 'Each row adds one shape.' },
+    config: {
+      grid: ['●', '●●', '●●●', '■', '■■', '■■■', '▲', '▲▲', null],
+      options: [
+        { id: 'opt-a', glyph: '▲▲▲' },
+        { id: 'opt-b', glyph: '▲▲' },
+        { id: 'opt-c', glyph: '●●●' },
+      ],
+      correctOptionId: 'opt-a',
+      timeLimitMs: 20000,
+    },
+  };
+}
+
 function validCatalog(): LiquidCard[] {
   return [
     validSpotIt(),
@@ -614,6 +641,7 @@ function validCatalog(): LiquidCard[] {
     validNBack(),
     validOddOneOut(),
     validSchulteOrder(),
+    validMatrixReasoning(),
   ];
 }
 
@@ -1377,6 +1405,7 @@ const ALL_TEMPLATE_TYPES: TemplateType[] = [
   'n_back',
   'odd_one_out',
   'schulte_order',
+  'matrix_reasoning',
 ];
 
 const ALL_CATEGORIES: ChallengeCategory[] = [
@@ -1407,6 +1436,7 @@ const validCardFor: Record<TemplateType, () => LiquidCard> = {
   n_back: validNBack,
   odd_one_out: validOddOneOut,
   schulte_order: validSchulteOrder,
+  matrix_reasoning: validMatrixReasoning,
 };
 
 describe('templateCategoryMap <-> validation consistency', () => {

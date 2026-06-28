@@ -31,6 +31,7 @@ import type {
   CodeBreakCard,
   ColorWordCard,
   LiquidCard,
+  MatrixReasoningCard,
   NBackCard,
   MemorySequenceCard,
   OddOneOutCard,
@@ -6074,6 +6075,171 @@ const schulteOrderCards: SchulteOrderCard[] = [
  * catalog's. Declared `readonly` so the authored source-of-truth cannot be
  * mutated at runtime.
  */
+// ---------------------------------------------------------------------------
+// matrix_reasoning — Raven's-style visual pattern completion. A 3×3 glyph grid
+// with one missing cell; pick the option that completes the row/column rule.
+// Glyphs are distinct SHAPES (never colour) so the puzzle stays accessible.
+// Categories allowed: pattern_recognition | logical_reasoning.
+// ---------------------------------------------------------------------------
+
+const matrixReasoningCards: MatrixReasoningCard[] = [
+  {
+    cardId: 'matrixreason-001',
+    creatorHandle: '@patternpilot',
+    templateType: 'matrix_reasoning',
+    category: 'pattern_recognition',
+    difficulty: 'extremely_easy',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 10,
+    prompt: 'Pick the shape that completes the pattern.',
+    puzzleDna: {
+      mechanic: 'visual-pattern-completion',
+      inputMode: 'choice',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'Count goes up across each row',
+      body: 'Every row keeps one shape and adds one more across the columns: one, two, three. The bottom row is triangles, so the missing cell is three triangles.',
+    },
+    config: {
+      grid: ['●', '●●', '●●●', '■', '■■', '■■■', '▲', '▲▲', null],
+      options: [
+        { id: 'opt-a', glyph: '▲▲▲' },
+        { id: 'opt-b', glyph: '▲▲' },
+        { id: 'opt-c', glyph: '●●●' },
+        { id: 'opt-d', glyph: '■■■' },
+      ],
+      correctOptionId: 'opt-a',
+      timeLimitMs: 12000,
+    },
+  },
+  {
+    cardId: 'matrixreason-002',
+    creatorHandle: '@patternpilot',
+    templateType: 'matrix_reasoning',
+    category: 'pattern_recognition',
+    difficulty: 'easy',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 16,
+    prompt: 'Pick the shape that completes the pattern.',
+    puzzleDna: {
+      mechanic: 'visual-pattern-completion',
+      inputMode: 'choice',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'Each shape shifts one place per row',
+      body: 'The three shapes rotate position down the rows so each row and each column holds all three. The bottom row already has a triangle and a circle, so the missing cell is the square.',
+    },
+    config: {
+      grid: ['●', '■', '▲', '■', '▲', '●', '▲', '●', null],
+      options: [
+        { id: 'opt-a', glyph: '■' },
+        { id: 'opt-b', glyph: '●' },
+        { id: 'opt-c', glyph: '▲' },
+        { id: 'opt-d', glyph: '◆' },
+      ],
+      correctOptionId: 'opt-a',
+      timeLimitMs: 40000,
+    },
+  },
+  {
+    cardId: 'matrixreason-003',
+    creatorHandle: '@patternpilot',
+    templateType: 'matrix_reasoning',
+    category: 'pattern_recognition',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 22,
+    prompt: 'Pick the shape that completes the pattern.',
+    puzzleDna: {
+      mechanic: 'visual-pattern-completion',
+      inputMode: 'choice',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'Solid and outline alternate like a checkerboard',
+      body: 'Filled and hollow circles alternate across every row and column. The bottom row is solid, hollow, so the missing cell is a solid circle.',
+    },
+    config: {
+      grid: ['●', '○', '●', '○', '●', '○', '●', '○', null],
+      options: [
+        { id: 'opt-a', glyph: '●' },
+        { id: 'opt-b', glyph: '○' },
+        { id: 'opt-c', glyph: '◆' },
+        { id: 'opt-d', glyph: '■' },
+      ],
+      correctOptionId: 'opt-a',
+      timeLimitMs: 60000,
+    },
+  },
+  {
+    cardId: 'matrixreason-004',
+    creatorHandle: '@patternpilot',
+    templateType: 'matrix_reasoning',
+    category: 'logical_reasoning',
+    difficulty: 'hard',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 30,
+    prompt: 'Pick the shape that completes the pattern.',
+    puzzleDna: {
+      mechanic: 'visual-pattern-completion',
+      inputMode: 'choice',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'Two rules at once: shape rotates, count climbs',
+      body: 'The shape rotates one step down each row, while the count climbs one to three across the columns. The bottom-right cell is the square at count three: three squares.',
+    },
+    config: {
+      grid: ['●', '■■', '▲▲▲', '■', '▲▲', '●●●', '▲', '●●', null],
+      options: [
+        { id: 'opt-a', glyph: '■■■' },
+        { id: 'opt-b', glyph: '●●●' },
+        { id: 'opt-c', glyph: '▲▲▲' },
+        { id: 'opt-d', glyph: '■■' },
+      ],
+      correctOptionId: 'opt-a',
+      timeLimitMs: 120000,
+    },
+  },
+  {
+    cardId: 'matrixreason-005',
+    creatorHandle: '@patternpilot',
+    templateType: 'matrix_reasoning',
+    category: 'logical_reasoning',
+    difficulty: 'extremely_hard',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 45,
+    prompt: 'Pick the shape that completes the pattern.',
+    puzzleDna: {
+      mechanic: 'visual-pattern-completion',
+      inputMode: 'choice',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'Three shapes rotate while the count climbs',
+      body: 'Diamond, star, and circle each shift one place down the rows so every row and column holds all three, and the count climbs one to three across the columns. The missing cell is the star at count three: three stars.',
+    },
+    config: {
+      grid: ['◆', '★★', '●●●', '★', '●●', '◆◆◆', '●', '◆◆', null],
+      options: [
+        { id: 'opt-a', glyph: '★★★' },
+        { id: 'opt-b', glyph: '◆◆◆' },
+        { id: 'opt-c', glyph: '●●●' },
+        { id: 'opt-d', glyph: '★★' },
+      ],
+      correctOptionId: 'opt-a',
+      timeLimitMs: 180000,
+    },
+  },
+];
+
 const authoredCatalog: readonly LiquidCard[] = [
   ...spotItCards,
   ...whatChangedCards,
@@ -6092,6 +6258,7 @@ const authoredCatalog: readonly LiquidCard[] = [
   ...nBackCards,
   ...oddOneOutCards,
   ...schulteOrderCards,
+  ...matrixReasoningCards,
 ];
 
 /**

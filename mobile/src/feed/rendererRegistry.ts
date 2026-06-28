@@ -43,6 +43,7 @@ import ColorWordCard from './templates/ColorWordCard';
 import NBackCard from './templates/NBackCard';
 import OddOneOutCard from './templates/OddOneOutCard';
 import SchulteOrderCard from './templates/SchulteOrderCard';
+import MatrixReasoningCard from './templates/MatrixReasoningCard';
 
 /**
  * A template renderer: a component that accepts {@link TemplateProps} for its
@@ -115,4 +116,5 @@ export const defaultRendererRegistry: RendererRegistry = {
   n_back: NBackCard,
   odd_one_out: OddOneOutCard,
   schulte_order: SchulteOrderCard,
+  matrix_reasoning: MatrixReasoningCard,
 };

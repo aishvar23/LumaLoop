@@ -27,6 +27,7 @@ import {
   type EvidenceTier,
   type NBackCard,
   type LiquidCard,
+  type MatrixReasoningCard,
   type MemorySequenceCard,
   type OddOneOutCard,
   type PatternChainCard,
@@ -146,6 +147,7 @@ const templateAnswerValidators: {
   n_back: validateNBackAnswer,
   odd_one_out: validateOddOneOutAnswer,
   schulte_order: validateSchulteOrderAnswer,
+  matrix_reasoning: validateMatrixReasoningAnswer,
 };
 
 /**
@@ -263,6 +265,78 @@ function validateTinyLogicAnswer(card: TinyLogicCard): ValidationError[] {
     ];
   }
   return [];
+}
+
+/**
+ * matrix_reasoning: a 3×3 glyph grid (exactly one missing cell) plus options;
+ * exactly one option completes the pattern. Validates the grid shape, that every
+ * visible glyph + option glyph is non-empty, unique non-empty option ids, and
+ * that `correctOptionId` is among the options.
+ */
+const MATRIX_GRID_SIZE = 9;
+function validateMatrixReasoningAnswer(
+  card: MatrixReasoningCard,
+): ValidationError[] {
+  const { grid, options, correctOptionId } = card.config;
+  const errors: ValidationError[] = [];
+
+  if (grid.length !== MATRIX_GRID_SIZE) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `matrix_reasoning grid must have ${MATRIX_GRID_SIZE} cells, got ${grid.length}`,
+      ),
+    );
+  }
+  const blanks = grid.filter((cell) => cell === null).length;
+  if (blanks !== 1) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `matrix_reasoning must have exactly one missing cell, got ${blanks}`,
+      ),
+    );
+  }
+  if (grid.some((cell) => cell !== null && cell.trim().length === 0)) {
+    errors.push(
+      answerError(card.cardId, 'matrix_reasoning grid glyphs must be non-empty'),
+    );
+  }
+
+  if (options.length < 2) {
+    errors.push(
+      answerError(card.cardId, 'matrix_reasoning needs at least two options'),
+    );
+  }
+  const ids = new Set<string>();
+  for (const option of options) {
+    if (option.id.trim().length === 0 || option.glyph.trim().length === 0) {
+      errors.push(
+        answerError(
+          card.cardId,
+          'matrix_reasoning option ids and glyphs must be non-empty',
+        ),
+      );
+    }
+    if (ids.has(option.id)) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `matrix_reasoning has a duplicate option id "${option.id}"`,
+        ),
+      );
+    }
+    ids.add(option.id);
+  }
+  if (!options.some((option) => option.id === correctOptionId)) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `matrix_reasoning correctOptionId "${correctOptionId}" is not among options`,
+      ),
+    );
+  }
+  return errors;
 }
 
 /** Inclusive bounds for a memory_sequence's reproduction length (Tech #137).
