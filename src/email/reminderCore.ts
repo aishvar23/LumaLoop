@@ -56,23 +56,23 @@ export function isValidEmail(email: string): boolean {
 
 /** Build the (static, daily) reminder email. Guardrail-safe copy. */
 export function buildReminderEmail(): ReminderEmail {
-  const subject = 'Your next LumaLoop puzzle is waiting';
+  const subject = 'Your next Witzy puzzle is waiting';
   const text = [
     'Ready for today’s games?',
     '',
-    'A fresh feed of quick puzzles is ready to play on LumaLoop. ' +
+    'A fresh feed of quick puzzles is ready to play on Witzy. ' +
       'Keep your streak going and see what you can solve today.',
     '',
-    'Open LumaLoop and start playing: https://lumaloop.app',
+    'Open Witzy and start playing: https://witzy.app',
   ].join('\n');
   const html = [
     '<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:480px;margin:0 auto;color:#16181f">',
     '<h1 style="font-size:20px;margin:0 0 12px">Ready for today’s games?</h1>',
     '<p style="font-size:15px;line-height:1.5;margin:0 0 16px">',
-    'A fresh feed of quick puzzles is ready to play on LumaLoop. Keep your streak going and see what you can solve today.',
+    'A fresh feed of quick puzzles is ready to play on Witzy. Keep your streak going and see what you can solve today.',
     '</p>',
     '<p style="margin:0 0 16px">',
-    '<a href="https://lumaloop.app" style="display:inline-block;background:#6c7bff;color:#fff;text-decoration:none;padding:12px 20px;border-radius:999px;font-weight:600">Start playing</a>',
+    '<a href="https://witzy.app" style="display:inline-block;background:#6c7bff;color:#fff;text-decoration:none;padding:12px 20px;border-radius:999px;font-weight:600">Start playing</a>',
     '</p>',
     '</div>',
   ].join('');

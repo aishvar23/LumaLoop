@@ -84,7 +84,7 @@ export default function ProfileCreationScreen({
       <div className="auth-card">
         <h1 className="auth-brand">Create your profile</h1>
         <p className="auth-tagline">
-          Pick a handle and name. This is how you show up across LumaLoop.
+          Pick a handle and name. This is how you show up across Witzy.
         </p>
 
         <form onSubmit={handleSubmit} className="auth-providers">

@@ -175,7 +175,7 @@ export default function HomePage({
           <span className="home-logo" aria-hidden="true">
             <span className="home-logo__loop">∞</span>
           </span>
-          <span className="home-wordmark">LumaLoop</span>
+          <span className="home-wordmark">Witzy</span>
         </span>
         <div className="home-topbar__actions">
           {/* Find other users to follow. */}

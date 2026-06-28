@@ -55,7 +55,7 @@ export function NotFoundRoutePlaceholder() {
           Page not found
         </h1>
         <p style={{ margin: 0, color: 'var(--color-text-muted)' }}>
-          That link doesn’t lead anywhere in LumaLoop.
+          That link doesn’t lead anywhere in Witzy.
         </p>
         {/* Client-side nav: `Link` keeps SPA state instead of full reload. */}
         <Link to={ROUTES.home}>Back to home</Link>

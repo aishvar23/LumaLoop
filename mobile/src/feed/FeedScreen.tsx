@@ -1105,7 +1105,7 @@ function FeedHeader({
         <View style={styles.brandMark}>
           <Text style={styles.brandMarkText}>∞</Text>
         </View>
-        <Text style={styles.brandName}>LumaLoop</Text>
+        <Text style={styles.brandName}>Witzy</Text>
         <Text style={styles.brandMode}>Discover</Text>
       </View>
       <View style={styles.chipRow}>

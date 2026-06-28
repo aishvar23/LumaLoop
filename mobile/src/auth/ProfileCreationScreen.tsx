@@ -84,7 +84,7 @@ export default function ProfileCreationScreen({
       <View style={s.card}>
         <Text style={s.brand}>Create your profile</Text>
         <Text style={s.tagline}>
-          Pick a handle and name. This is how you show up across LumaLoop.
+          Pick a handle and name. This is how you show up across Witzy.
         </Text>
 
         <View style={s.field}>

@@ -63,7 +63,7 @@ export default function LoginScreen() {
   return (
     <ScrollView contentContainerStyle={s.screen} keyboardShouldPersistTaps="handled">
       <View style={s.card}>
-        <Text style={s.brand}>LumaLoop</Text>
+        <Text style={s.brand}>Witzy</Text>
         <Text style={s.tagline}>
           Sign in to scroll the feed and play. Your profile tracks the games you
           play.

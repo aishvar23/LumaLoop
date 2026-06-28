@@ -68,7 +68,7 @@ describe('AppRoutes', () => {
     renderAt('/', auth);
     await waitFor(() =>
       expect(
-        screen.getByRole('heading', { name: 'LumaLoop' }),
+        screen.getByRole('heading', { name: 'Witzy' }),
       ).toBeInTheDocument(),
     );
     expect(

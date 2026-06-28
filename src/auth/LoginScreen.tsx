@@ -64,7 +64,7 @@ export default function LoginScreen() {
   return (
     <div className="auth-screen">
       <div className="auth-card">
-        <h1 className="auth-brand">LumaLoop</h1>
+        <h1 className="auth-brand">Witzy</h1>
         <p className="auth-tagline">
           Sign in to scroll the feed and play. Your profile tracks the games you
           play.

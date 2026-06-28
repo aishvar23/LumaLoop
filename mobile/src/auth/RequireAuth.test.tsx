@@ -33,7 +33,7 @@ function renderGuard(options: FakeAuthOptions) {
 describe('RequireAuth (three gate states)', () => {
   it('signed out → shows the login screen, never the feed', async () => {
     renderGuard({ session: null, profile: null });
-    await waitFor(() => expect(screen.getByText('LumaLoop')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Witzy')).toBeTruthy());
     expect(screen.queryByText('FEED CONTENT')).toBeNull();
   });
 
@@ -48,6 +48,6 @@ describe('RequireAuth (three gate states)', () => {
   it('signed in WITH a profile → renders the feed (children)', async () => {
     renderGuard({ session: makeSession(), profile: makeProfile() });
     await waitFor(() => expect(screen.getByText('FEED CONTENT')).toBeTruthy());
-    expect(screen.queryByText('LumaLoop')).toBeNull();
+    expect(screen.queryByText('Witzy')).toBeNull();
   });
 });

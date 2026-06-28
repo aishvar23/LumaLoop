@@ -204,7 +204,7 @@ export default function HomeScreen({
           <View style={styles.logo}>
             <Text style={styles.logoLoop}>∞</Text>
           </View>
-          <Text style={styles.brand}>LumaLoop</Text>
+          <Text style={styles.brand}>Witzy</Text>
         </View>
         <View style={styles.topbarActions}>
           {/* Find other users to follow. */}

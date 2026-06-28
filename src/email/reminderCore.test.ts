@@ -21,10 +21,10 @@ describe('isValidEmail', () => {
 describe('buildReminderEmail', () => {
   it('builds guardrail-safe copy (no IQ / brain-training claims)', () => {
     const email = buildReminderEmail();
-    expect(email.subject).toMatch(/lumaloop/i);
+    expect(email.subject).toMatch(/witzy/i);
     const body = `${email.text} ${email.html}`.toLowerCase();
     expect(body).not.toMatch(/iq|brain|train|smarter|clinical|cognitive/);
-    expect(email.html).toContain('href="https://lumaloop.app"');
+    expect(email.html).toContain('href="https://witzy.app"');
   });
 });
 
