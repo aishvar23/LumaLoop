@@ -30,6 +30,7 @@ import type {
   CircuitFlowCard,
   CodeBreakCard,
   ColorWordCard,
+  GearsRotationCard,
   LiquidCard,
   MatrixReasoningCard,
   NBackCard,
@@ -6240,6 +6241,173 @@ const matrixReasoningCards: MatrixReasoningCard[] = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// gears_rotation — meshed-gear direction puzzle. A horizontal chain of meshed
+// gears turns in ALTERNATING directions; the driver (first) gear's spin is shown
+// and the player picks which way the LAST gear spins. The last gear's direction
+// equals the driver's iff (gearCount - 1) meshes is EVEN, else the opposite.
+// Meaning is carried by an arrow glyph + a WORD, never colour.
+// Categories allowed: pattern_recognition | logical_reasoning.
+// ---------------------------------------------------------------------------
+
+const gearsRotationCards: GearsRotationCard[] = [
+  {
+    cardId: 'gearsrot-001',
+    creatorHandle: '@gearworks',
+    templateType: 'gears_rotation',
+    category: 'pattern_recognition',
+    difficulty: 'extremely_easy',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 10,
+    prompt: 'Which way does the last gear spin?',
+    puzzleDna: {
+      mechanic: 'gear-direction',
+      inputMode: 'choice',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'Meshed gears spin opposite ways',
+      body: 'Meshed gears spin opposite ways, so they alternate down the chain. With 3 gears there are 2 meshes (an even number), so the last gear matches the driver: clockwise.',
+    },
+    config: {
+      // 3 gears → 2 meshes (even) → last gear matches the driver (cw).
+      gearCount: 3,
+      driveDirection: 'cw',
+      options: [
+        { id: 'cw', label: 'Clockwise' },
+        { id: 'ccw', label: 'Counter-clockwise' },
+      ],
+      correctOptionId: 'cw',
+      timeLimitMs: 12000,
+    },
+  },
+  {
+    cardId: 'gearsrot-002',
+    creatorHandle: '@gearworks',
+    templateType: 'gears_rotation',
+    category: 'pattern_recognition',
+    difficulty: 'easy',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 16,
+    prompt: 'Which way does the last gear spin?',
+    puzzleDna: {
+      mechanic: 'gear-direction',
+      inputMode: 'choice',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'An odd number of meshes flips the direction',
+      body: 'Meshed gears spin opposite ways, so they alternate down the chain. With 4 gears there are 3 meshes (an odd number), so the last gear is opposite the driver: counter-clockwise.',
+    },
+    config: {
+      // 4 gears → 3 meshes (odd) → last gear is opposite the driver (cw → ccw).
+      gearCount: 4,
+      driveDirection: 'cw',
+      options: [
+        { id: 'cw', label: 'Clockwise' },
+        { id: 'ccw', label: 'Counter-clockwise' },
+      ],
+      correctOptionId: 'ccw',
+      timeLimitMs: 40000,
+    },
+  },
+  {
+    cardId: 'gearsrot-003',
+    creatorHandle: '@gearworks',
+    templateType: 'gears_rotation',
+    category: 'pattern_recognition',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 22,
+    prompt: 'Which way does the last gear spin?',
+    puzzleDna: {
+      mechanic: 'gear-direction',
+      inputMode: 'choice',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'Count the meshes, not the gears',
+      body: 'Meshed gears spin opposite ways, so they alternate down the chain. With 5 gears there are 4 meshes (an even number), so the last gear matches the driver: counter-clockwise.',
+    },
+    config: {
+      // 5 gears → 4 meshes (even) → last gear matches the driver (ccw).
+      gearCount: 5,
+      driveDirection: 'ccw',
+      options: [
+        { id: 'cw', label: 'Clockwise' },
+        { id: 'ccw', label: 'Counter-clockwise' },
+      ],
+      correctOptionId: 'ccw',
+      timeLimitMs: 60000,
+    },
+  },
+  {
+    cardId: 'gearsrot-004',
+    creatorHandle: '@gearworks',
+    templateType: 'gears_rotation',
+    category: 'logical_reasoning',
+    difficulty: 'hard',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 30,
+    prompt: 'Which way does the last gear spin?',
+    puzzleDna: {
+      mechanic: 'gear-direction',
+      inputMode: 'choice',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'Two meshes return to the start direction',
+      body: 'Meshed gears spin opposite ways, so they alternate down the chain. With 3 gears there are 2 meshes (an even number), so the last gear matches the driver: counter-clockwise.',
+    },
+    config: {
+      // 3 gears → 2 meshes (even) → last gear matches the driver (ccw).
+      gearCount: 3,
+      driveDirection: 'ccw',
+      options: [
+        { id: 'cw', label: 'Clockwise' },
+        { id: 'ccw', label: 'Counter-clockwise' },
+      ],
+      correctOptionId: 'ccw',
+      timeLimitMs: 120000,
+    },
+  },
+  {
+    cardId: 'gearsrot-005',
+    creatorHandle: '@gearworks',
+    templateType: 'gears_rotation',
+    category: 'logical_reasoning',
+    difficulty: 'extremely_hard',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 45,
+    prompt: 'Which way does the last gear spin?',
+    puzzleDna: {
+      mechanic: 'gear-direction',
+      inputMode: 'choice',
+      measuredSignals: ['accuracy', 'reaction_time'],
+    },
+    explanation: {
+      title: 'A long chain still just alternates',
+      body: 'Meshed gears spin opposite ways, so they alternate down the chain. With 6 gears there are 5 meshes (an odd number), so the last gear is opposite the driver: counter-clockwise.',
+    },
+    config: {
+      // 6 gears → 5 meshes (odd) → last gear is opposite the driver (cw → ccw).
+      gearCount: 6,
+      driveDirection: 'cw',
+      options: [
+        { id: 'cw', label: 'Clockwise' },
+        { id: 'ccw', label: 'Counter-clockwise' },
+      ],
+      correctOptionId: 'ccw',
+      timeLimitMs: 180000,
+    },
+  },
+];
+
 const authoredCatalog: readonly LiquidCard[] = [
   ...spotItCards,
   ...whatChangedCards,
@@ -6259,6 +6427,7 @@ const authoredCatalog: readonly LiquidCard[] = [
   ...oddOneOutCards,
   ...schulteOrderCards,
   ...matrixReasoningCards,
+  ...gearsRotationCards,
 ];
 
 /**

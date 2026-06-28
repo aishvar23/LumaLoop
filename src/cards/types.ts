@@ -67,7 +67,8 @@ export type TemplateType =
   | 'n_back'
   | 'odd_one_out'
   | 'schulte_order'
-  | 'matrix_reasoning';
+  | 'matrix_reasoning'
+  | 'gears_rotation';
 
 export type Difficulty =
   | 'extremely_easy'
@@ -422,6 +423,28 @@ export type MatrixReasoningCard = LiquidCardBase & {
     /** The id of the option that correctly completes the pattern. */
     correctOptionId: string;
     /** Countdown for the whole solve (see validation). */
+    timeLimitMs: number;
+  };
+};
+
+/**
+ * gears_rotation — a meshed-gear direction puzzle. A horizontal chain of meshed
+ * gears turns in ALTERNATING directions; the driver (first) gear's spin is shown
+ * and the player picks which way the LAST gear spins. Pure pick-one (mirrors
+ * matrix_reasoning), but VISUAL: the chain is rendered as gear glyphs with
+ * rotation arrows, so meaning is carried by SHAPE + arrow + word, never colour.
+ */
+export type GearsRotationCard = LiquidCardBase & {
+  templateType: 'gears_rotation';
+  config: {
+    /** Number of meshed gears in the chain (>= 2). */
+    gearCount: number;
+    /** Spin direction of the DRIVER (first) gear, shown to the player. */
+    driveDirection: 'cw' | 'ccw';
+    /** The two choices (clockwise / counter-clockwise). */
+    options: ReadonlyArray<{ id: string; label: string }>;
+    /** The id of the option matching the LAST gear's true direction. */
+    correctOptionId: string;
     timeLimitMs: number;
   };
 };
@@ -784,7 +807,8 @@ export type LiquidCard =
   | NBackCard
   | OddOneOutCard
   | SchulteOrderCard
-  | MatrixReasoningCard;
+  | MatrixReasoningCard
+  | GearsRotationCard;
 
 /**
  * The categories each template is allowed to map to (Technical Design §11).
@@ -876,6 +900,14 @@ export const templateCategoryMap: Readonly<
   // with logical_reasoning for the deductive step. No new ChallengeCategory is
   // warranted (the same pairing as odd_one_out).
   matrix_reasoning: Object.freeze([
+    'pattern_recognition',
+    'logical_reasoning',
+  ] as const),
+  // gears_rotation is a VISUAL deduction: meshed gears alternate direction down
+  // the chain, so the player infers the last gear's spin from the driver's —
+  // pattern_recognition, with logical_reasoning for the deductive step. No new
+  // ChallengeCategory is warranted (the same pairing as matrix_reasoning).
+  gears_rotation: Object.freeze([
     'pattern_recognition',
     'logical_reasoning',
   ] as const),

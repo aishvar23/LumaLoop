@@ -27,6 +27,7 @@ const ALL_TEMPLATE_TYPES: TemplateType[] = [
   'odd_one_out',
   'schulte_order',
   'matrix_reasoning',
+  'gears_rotation',
 ];
 
 const ALL_CATEGORIES: ChallengeCategory[] = [
@@ -112,6 +113,7 @@ describe('templateCategoryMap', () => {
       odd_one_out: ['pattern_recognition', 'logical_reasoning'],
       schulte_order: ['processing_speed', 'visual_attention'],
       matrix_reasoning: ['pattern_recognition', 'logical_reasoning'],
+      gears_rotation: ['pattern_recognition', 'logical_reasoning'],
     });
   });
 });
@@ -178,6 +180,9 @@ function categoriesForCard(card: LiquidCard): ChallengeCategory {
       return 'processing_speed';
     case 'matrix_reasoning':
       void card.config.grid;
+      return 'pattern_recognition';
+    case 'gears_rotation':
+      void card.config.gearCount;
       return 'pattern_recognition';
     default: {
       // If a new TemplateType is added without a case above, `card` is no

@@ -44,6 +44,7 @@ import NBackCard from './templates/NBackCard';
 import OddOneOutCard from './templates/OddOneOutCard';
 import SchulteOrderCard from './templates/SchulteOrderCard';
 import MatrixReasoningCard from './templates/MatrixReasoningCard';
+import GearsRotationCard from './templates/GearsRotationCard';
 
 /**
  * A template renderer: a component that accepts {@link TemplateProps} for its
@@ -117,4 +118,5 @@ export const defaultRendererRegistry: RendererRegistry = {
   odd_one_out: OddOneOutCard,
   schulte_order: SchulteOrderCard,
   matrix_reasoning: MatrixReasoningCard,
+  gears_rotation: GearsRotationCard,
 };

@@ -28,6 +28,7 @@ import {
   type NBackCard,
   type LiquidCard,
   type MatrixReasoningCard,
+  type GearsRotationCard,
   type MemorySequenceCard,
   type OddOneOutCard,
   type PatternChainCard,
@@ -148,6 +149,7 @@ const templateAnswerValidators: {
   odd_one_out: validateOddOneOutAnswer,
   schulte_order: validateSchulteOrderAnswer,
   matrix_reasoning: validateMatrixReasoningAnswer,
+  gears_rotation: validateGearsRotationAnswer,
 };
 
 /**
@@ -333,6 +335,63 @@ function validateMatrixReasoningAnswer(
       answerError(
         card.cardId,
         `matrix_reasoning correctOptionId "${correctOptionId}" is not among options`,
+      ),
+    );
+  }
+  return errors;
+}
+
+/**
+ * gears_rotation: a meshed-gear chain (gearCount >= 2) plus two direction
+ * options; exactly one option matches the last gear's true spin. Validates the
+ * gear count, that there are at least two options with unique non-empty ids and
+ * non-empty labels, and that `correctOptionId` is among the options.
+ */
+function validateGearsRotationAnswer(
+  card: GearsRotationCard,
+): ValidationError[] {
+  const { gearCount, options, correctOptionId } = card.config;
+  const errors: ValidationError[] = [];
+
+  if (!Number.isInteger(gearCount) || gearCount < 2) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `gears_rotation gearCount must be an integer >= 2, got ${gearCount}`,
+      ),
+    );
+  }
+
+  if (options.length < 2) {
+    errors.push(
+      answerError(card.cardId, 'gears_rotation needs at least two options'),
+    );
+  }
+  const ids = new Set<string>();
+  for (const option of options) {
+    if (option.id.trim().length === 0 || option.label.trim().length === 0) {
+      errors.push(
+        answerError(
+          card.cardId,
+          'gears_rotation option ids and labels must be non-empty',
+        ),
+      );
+    }
+    if (ids.has(option.id)) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `gears_rotation has a duplicate option id "${option.id}"`,
+        ),
+      );
+    }
+    ids.add(option.id);
+  }
+  if (!options.some((option) => option.id === correctOptionId)) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `gears_rotation correctOptionId "${correctOptionId}" is not among options`,
       ),
     );
   }

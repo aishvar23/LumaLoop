@@ -24,6 +24,7 @@ import {
   type ColorWordCard,
   type LiquidCard,
   type MatrixReasoningCard,
+  type GearsRotationCard,
   type MemorySequenceCard,
   type NBackCard,
   type OddOneOutCard,
@@ -624,6 +625,32 @@ function validMatrixReasoning(): MatrixReasoningCard {
   };
 }
 
+function validGearsRotation(): GearsRotationCard {
+  return {
+    cardId: 'gears-1',
+    creatorHandle: '@test',
+    templateType: 'gears_rotation',
+    category: 'pattern_recognition',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 20,
+    prompt: 'Which way does the last gear spin?',
+    puzzleDna: dna('gear-direction'),
+    explanation: { title: 'Gears', body: 'Meshed gears alternate direction.' },
+    config: {
+      gearCount: 3,
+      driveDirection: 'cw',
+      options: [
+        { id: 'cw', label: 'Clockwise' },
+        { id: 'ccw', label: 'Counter-clockwise' },
+      ],
+      correctOptionId: 'cw',
+      timeLimitMs: 20000,
+    },
+  };
+}
+
 function validCatalog(): LiquidCard[] {
   return [
     validSpotIt(),
@@ -642,6 +669,7 @@ function validCatalog(): LiquidCard[] {
     validOddOneOut(),
     validSchulteOrder(),
     validMatrixReasoning(),
+    validGearsRotation(),
   ];
 }
 
@@ -1406,6 +1434,7 @@ const ALL_TEMPLATE_TYPES: TemplateType[] = [
   'odd_one_out',
   'schulte_order',
   'matrix_reasoning',
+  'gears_rotation',
 ];
 
 const ALL_CATEGORIES: ChallengeCategory[] = [
@@ -1437,6 +1466,7 @@ const validCardFor: Record<TemplateType, () => LiquidCard> = {
   odd_one_out: validOddOneOut,
   schulte_order: validSchulteOrder,
   matrix_reasoning: validMatrixReasoning,
+  gears_rotation: validGearsRotation,
 };
 
 describe('templateCategoryMap <-> validation consistency', () => {
