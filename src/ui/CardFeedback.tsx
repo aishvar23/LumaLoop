@@ -48,6 +48,12 @@ export type CardFeedbackProps = {
   footer?: ReactNode;
   /** Advance the feed to the next card. The ONLY way out of this state. */
   onContinue: () => void;
+  /**
+   * Replay the SAME card from the start. When provided, a secondary "Play again"
+   * action is shown beneath "Next"; each replay is recorded as a new play
+   * (product decision 2026-06). Omitted in standalone renders/tests → not shown.
+   */
+  onReplay?: () => void;
 };
 
 /** Per-outcome heading copy. Modest + performance-based (Design §7). */
@@ -81,6 +87,7 @@ export default function CardFeedback({
   cardScore,
   footer,
   onContinue,
+  onReplay,
 }: CardFeedbackProps) {
   const { resolutionType } = resolution;
   const heading = OUTCOME_HEADING[resolutionType];
@@ -186,6 +193,18 @@ export default function CardFeedback({
         <Button autoFocus onClick={onContinue} data-testid="feedback-next">
           Next
         </Button>
+
+        {/* Optional replay of the SAME card — secondary to "Next". Each replay
+            is recorded as a new play (the gate wires the recording). */}
+        {onReplay ? (
+          <Button
+            variant="ghost"
+            onClick={onReplay}
+            data-testid="feedback-replay"
+          >
+            Play again
+          </Button>
+        ) : null}
       </Stack>
     </section>
   );

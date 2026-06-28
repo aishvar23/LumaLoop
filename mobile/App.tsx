@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -7,6 +7,13 @@ import { v4 as uuidV4 } from 'uuid';
 
 import FeedScreen from './src/feed/FeedScreen';
 import FirstRunNotice from './src/feed/FirstRunNotice';
+import { CardReplayProvider } from './src/feed/FeedbackGate';
+import {
+  applyResolution,
+  INITIAL_SCORE_STATE,
+} from './src/core/feed/scoring';
+import type { LiquidCard } from './src/core/cards/types';
+import type { CardResolution } from './src/core/templates/contract';
 import { createTelemetryClient } from './src/telemetry/telemetryClient';
 import { ensureAnonymousUserId } from './src/telemetry/anonymousUser';
 import { useFeedTelemetry } from './src/telemetry/useFeedTelemetry';
@@ -237,6 +244,23 @@ function TelemetryFeed({
     client: effectiveClient,
   });
 
+  // "Play again" replays the same card; each replayed attempt is recorded as its
+  // own play (product decision 2026-06). The first attempt records on resolve via
+  // the latched `onCardScored` path; the feed's per-index latch would drop a
+  // replay's resolution, so the gate records replays HERE with per-attempt points
+  // computed standalone (a replay carries no in-feed streak/combo). Best-effort.
+  const recordReplayPlay = useCallback(
+    (card: LiquidCard, resolution: CardResolution) => {
+      const { cardScore } = applyResolution(
+        INITIAL_SCORE_STATE,
+        resolution,
+        card.config.timeLimitMs,
+      );
+      recordGamePlay(-1, resolution, cardScore);
+    },
+    [recordGamePlay],
+  );
+
   // D2: best-effort fetch of the signed-in user's already-played games so the
   // feed skips them. The controller captures the exclusion set ONCE at mount, so
   // we wait for `ready` before mounting the feed (the first batch already skips
@@ -267,20 +291,24 @@ function TelemetryFeed({
     // concern keyed by cardId — the feed/engine stays auth-free (the rail reads
     // this context; no provider → it renders nothing).
     <SocialConfigProvider value={{ client: effectiveClient, userId }}>
-      <FeedScreen
-        key={userId ?? 'anon'}
-        anonymousUserId={anonymousUserId}
-        excludeCardIds={played.cardIds}
-        startCardId={startCardId}
-        feedId={feedId}
-        onCardActive={handlers.onCardActive}
-        onCardEngaged={handlers.onCardEngaged}
-        onCardResolved={handlers.onCardResolved}
-        onCardSkipped={handlers.onCardSkipped}
-        onCardAbandoned={handlers.onCardAbandoned}
-        onCardExplanationViewed={handlers.onCardExplanationViewed}
-        onCardScored={recordGamePlay}
-      />
+      {/* Records each "Play again" replay as a new play (off the feed's per-index
+          latch). No provider in tests → replay just remounts. */}
+      <CardReplayProvider handler={recordReplayPlay}>
+        <FeedScreen
+          key={userId ?? 'anon'}
+          anonymousUserId={anonymousUserId}
+          excludeCardIds={played.cardIds}
+          startCardId={startCardId}
+          feedId={feedId}
+          onCardActive={handlers.onCardActive}
+          onCardEngaged={handlers.onCardEngaged}
+          onCardResolved={handlers.onCardResolved}
+          onCardSkipped={handlers.onCardSkipped}
+          onCardAbandoned={handlers.onCardAbandoned}
+          onCardExplanationViewed={handlers.onCardExplanationViewed}
+          onCardScored={recordGamePlay}
+        />
+      </CardReplayProvider>
     </SocialConfigProvider>
   );
 }

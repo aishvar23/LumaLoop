@@ -5,7 +5,7 @@
  * GAME-POINTS copy (no ability/IQ/trait language).
  */
 
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import CardFeedback from './CardFeedback';
 import type { CardResolution, ResolutionType } from '../core/templates/contract';
@@ -30,6 +30,24 @@ describe('CardFeedback score chip (RN)', () => {
       <CardFeedback resolution={makeResolution('correct')} explanation={explanation} />,
     );
     expect(screen.queryByTestId('card-score')).toBeNull();
+  });
+
+  it('shows "Play again" only when onReplay is provided, and fires it', () => {
+    const onReplay = jest.fn();
+    const { rerender } = render(
+      <CardFeedback resolution={makeResolution('correct')} explanation={explanation} />,
+    );
+    expect(screen.queryByTestId('feedback-replay')).toBeNull();
+
+    rerender(
+      <CardFeedback
+        resolution={makeResolution('correct')}
+        explanation={explanation}
+        onReplay={onReplay}
+      />,
+    );
+    fireEvent.press(screen.getByTestId('feedback-replay'));
+    expect(onReplay).toHaveBeenCalledTimes(1);
   });
 
   it('renders a renderer-supplied failure reason above the authored explanation', () => {

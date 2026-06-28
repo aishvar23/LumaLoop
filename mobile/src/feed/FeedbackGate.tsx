@@ -34,7 +34,15 @@
  * NO explanation seam — that card was left, not played.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 
 import type { LiquidCard, TemplateType } from '../core/cards/types';
 import type { CardResolution, TemplateProps } from '../core/templates/contract';
@@ -43,6 +51,37 @@ import CardShareButton from '../social/CardShareButton';
 import CardFeedback from './CardFeedback';
 import { defaultRendererRegistry } from './rendererRegistry';
 import type { RendererRegistry, TemplateRenderer } from './rendererRegistry';
+
+/**
+ * Records ONE replayed attempt as a play when the player taps "Play again" to
+ * replay the same card (product decision 2026-06 — each replay counts as a new
+ * play). Threaded via context so the gate stays template-agnostic and the feed's
+ * per-index resolution latch (which ignores repeat resolutions of one slide) is
+ * left untouched: the FIRST attempt records on resolve through the normal latched
+ * path; each REPLAY (which that latch would drop) records here instead. Absent a
+ * provider (tests/standalone), replay just remounts the card with no recording.
+ */
+export type CardReplayHandler = (
+  card: LiquidCard,
+  resolution: CardResolution,
+) => void;
+
+const CardReplayContext = createContext<CardReplayHandler | null>(null);
+
+/** Provide the replay-record handler to the gates rendered beneath it. */
+export function CardReplayProvider({
+  handler,
+  children,
+}: {
+  handler: CardReplayHandler;
+  children: ReactNode;
+}) {
+  return (
+    <CardReplayContext.Provider value={handler}>
+      {children}
+    </CardReplayContext.Provider>
+  );
+}
 
 /**
  * Wraps one renderer so its resolution pauses on the uniform feedback +
@@ -86,13 +125,34 @@ export function withFeedbackGate(
     isActiveRef.current = isActive;
     const [played, setPlayed] = useState(false);
 
+    // "Play again" remounts the SAME card fresh by bumping this counter (it is
+    // part of the inner renderer's React key), resetting the renderer's state and
+    // re-arming its countdown. Read via a ref inside the stable resolve handler.
+    const [replayKey, setReplayKey] = useState(0);
+    const replayKeyRef = useRef(0);
+    replayKeyRef.current = replayKey;
+    const recordReplay = useContext(CardReplayContext);
+    const recordReplayRef = useRef(recordReplay);
+    recordReplayRef.current = recordReplay;
+
     const onResolveRef = useRef(onResolve);
     onResolveRef.current = onResolve;
-    const handleResolve = useCallback((next: CardResolution) => {
-      setResolution(next);
-      if (isActiveRef.current !== false) setPlayed(true);
-      onResolveRef.current(next);
-    }, []);
+    const handleResolve = useCallback(
+      (next: CardResolution) => {
+        setResolution(next);
+        if (isActiveRef.current !== false) setPlayed(true);
+        // First play (replayKey 0) records through the normal latched path. A
+        // REPLAY's resolution would be dropped by the feed's per-index latch, so
+        // record it here off that path — at resolve time, so it still counts even
+        // if the player swipes away instead of tapping "Play again" again.
+        if (replayKeyRef.current === 0) {
+          onResolveRef.current(next);
+        } else {
+          recordReplayRef.current?.(card, next);
+        }
+      },
+      [card],
+    );
 
     const showFeedback = resolution !== null && played;
 
@@ -132,12 +192,21 @@ export function withFeedbackGate(
               points={cardScore?.points ?? 0}
             />
           }
+          // "Play again": remount the same card fresh. Recording is done at
+          // resolve time (see `handleResolve`), so this only resets the gate.
+          onReplay={() => {
+            setResolution(null);
+            setPlayed(false);
+            setReplayKey((key) => key + 1);
+          }}
         />
       );
     }
 
     return (
       <Inner
+        // Bumped by "Play again" to force a fresh mount of the same card.
+        key={replayKey}
         card={card}
         context={context}
         isActive={isActive}

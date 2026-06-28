@@ -25,10 +25,11 @@
  * deterministic feed and assert events with NO real network/storage. Real router
  * usage passes none of them.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { getCardById as defaultGetCardById } from '../cards/catalog';
 import type { LiquidCard } from '../cards/types';
+import type { CardResolution } from '../templates/contract';
 import type { RendererRegistry } from '../session/rendererRegistry';
 import { getAnonymousUserId } from '../telemetry/anonymousUser';
 import { parseTelemetrySource } from '../telemetry/feedTelemetry';
@@ -38,7 +39,8 @@ import {
 } from '../telemetry/telemetryClient';
 import type { TelemetrySource } from '../telemetry/telemetryEvents';
 import { useFeedTelemetry } from '../telemetry/useFeedTelemetry';
-import { ExplanationViewedProvider } from '../ui/feedRegistry';
+import { CardReplayProvider, ExplanationViewedProvider } from '../ui/feedRegistry';
+import { applyResolution, INITIAL_SCORE_STATE } from './scoring';
 import { SocialConfigProvider } from '../social/SocialContext';
 import { useOptionalAuth } from '../auth/AuthProvider';
 import { supabase } from '../auth/supabaseClient';
@@ -171,6 +173,24 @@ export default function FeedRoute({
     client: effectiveClient,
   });
 
+  // "Play again" replays the same card; each replayed attempt is recorded as its
+  // own `game_plays` row (product decision 2026-06). The engine's per-index
+  // resolution latch deliberately ignores repeat resolutions of one slide, so we
+  // record the replay HERE — off that latched path — with per-attempt points
+  // computed standalone (a replay carries no in-feed streak/combo). Best-effort:
+  // `recordGamePlay` no-ops when signed out.
+  const recordReplayPlay = useCallback(
+    (card: LiquidCard, resolution: CardResolution) => {
+      const { cardScore } = applyResolution(
+        INITIAL_SCORE_STATE,
+        resolution,
+        card.config.timeLimitMs,
+      );
+      recordGamePlay(-1, resolution, cardScore);
+    },
+    [recordGamePlay],
+  );
+
   // D2: best-effort fetch of the signed-in user's already-played games so the
   // feed skips them. The controller captures the exclusion set ONCE at mount, so
   // we wait for `ready` before mounting the feed — that way even the first batch
@@ -190,6 +210,9 @@ export default function FeedRoute({
       {/* The gate fires Card_Explanation_Viewed through this seam (no telemetry
           coupling inside the gate/renderer — CLAUDE.md §4/§6). */}
       <ExplanationViewedProvider handler={telemetry.onExplanationViewed}>
+        {/* Records each "Play again" replay as a new play (off the engine's
+            per-index latch). No provider in tests → replay just remounts. */}
+        <CardReplayProvider handler={recordReplayPlay}>
         {/* Supply the per-card social surface (likes + comments) with the SAME
             client the provider authenticated against + the signed-in user id.
             Feed-layer concern keyed by cardId — the feed/engine stays auth-free
@@ -215,6 +238,7 @@ export default function FeedRoute({
           />
           )}
         </SocialConfigProvider>
+        </CardReplayProvider>
       </ExplanationViewedProvider>
       <FirstRunNotice />
     </>

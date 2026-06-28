@@ -19,7 +19,7 @@ import { Pressable, Text } from 'react-native';
 import type { LiquidCard, TinyLogicCard as TinyLogicCardType } from '../core/cards/types';
 import type { CardResolution, TemplateProps } from '../core/templates/contract';
 import type { TemplateRenderer } from './rendererRegistry';
-import { withFeedbackGate } from './FeedbackGate';
+import { CardReplayProvider, withFeedbackGate } from './FeedbackGate';
 import TinyLogicCard from './templates/TinyLogicCard';
 
 const ACTIVE_AT = 1000;
@@ -253,6 +253,46 @@ it('a card PLAYED while active keeps its outcome after going off-screen and back
   } finally {
     jest.useRealTimers();
   }
+});
+
+it('Play again remounts the card; the first attempt records normally, replays record off-latch', () => {
+  const onResolve = jest.fn<void, [CardResolution]>();
+  const recordReplay = jest.fn();
+  const Gated = withFeedbackGate(makeResolver('correct'));
+  render(
+    <CardReplayProvider handler={recordReplay}>
+      <Gated
+        card={tinyLogicCard() as LiquidCard}
+        context={context()}
+        onAttempt={jest.fn()}
+        onResolve={onResolve}
+        onExplanationViewed={jest.fn()}
+      />
+    </CardReplayProvider>,
+  );
+
+  // First attempt resolves → feedback shows, recorded via the normal (latched)
+  // path, NOT the replay path.
+  fireEvent.press(screen.getByTestId('test-resolve'));
+  expect(screen.getByTestId('card-feedback')).toBeOnTheScreen();
+  expect(onResolve).toHaveBeenCalledTimes(1);
+  expect(recordReplay).not.toHaveBeenCalled();
+
+  // "Play again" remounts the same card fresh (game back, feedback gone) and does
+  // NOT re-record the first attempt (already recorded on resolve).
+  fireEvent.press(screen.getByTestId('feedback-replay'));
+  expect(screen.queryByTestId('card-feedback')).toBeNull();
+  expect(screen.getByTestId('test-resolve')).toBeOnTheScreen();
+  expect(recordReplay).not.toHaveBeenCalled();
+
+  // The REPLAY attempt resolves: the feed's per-index latch would drop it, so the
+  // gate records it through the replay seam instead — and not via onResolve again.
+  fireEvent.press(screen.getByTestId('test-resolve'));
+  expect(screen.getByTestId('card-feedback')).toBeOnTheScreen();
+  expect(onResolve).toHaveBeenCalledTimes(1);
+  expect(recordReplay).toHaveBeenCalledTimes(1);
+  expect(recordReplay.mock.calls[0][0]).toMatchObject({ cardId: 'tl-1' });
+  expect(recordReplay.mock.calls[0][1]).toMatchObject({ resolutionType: 'correct' });
 });
 
 it('an ABANDONED card (resolves while OFF-SCREEN) forwards the resolution but shows no feedback', () => {

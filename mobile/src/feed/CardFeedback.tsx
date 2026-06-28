@@ -29,7 +29,7 @@
  */
 
 import { useEffect, useRef, type ReactNode } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { CardScore } from '../core/feed/scoring';
 import type { CardResolution, ResolutionType } from '../core/templates/contract';
@@ -61,6 +61,12 @@ export type CardFeedbackProps = {
    * Supabase-free; CLAUDE.md §4). Omitted in standalone renders/tests.
    */
   footer?: ReactNode;
+  /**
+   * Replay the SAME card from the start. When provided, a "Play again" button is
+   * shown above the swipe cue; each replay is recorded as a new play (product
+   * decision 2026-06). Omitted in standalone renders/tests → not shown.
+   */
+  onReplay?: () => void;
 };
 
 /** Per-outcome heading copy. Modest + performance-based, no trait language (Design §7). */
@@ -89,6 +95,7 @@ export default function CardFeedback({
   explanation,
   cardScore,
   footer,
+  onReplay,
 }: CardFeedbackProps) {
   const { resolutionType } = resolution;
   const heading = OUTCOME_HEADING[resolutionType];
@@ -215,6 +222,23 @@ export default function CardFeedback({
 
       {/* Optional injected actions (the feed's Share button). */}
       {footer}
+
+      {/* Replay the SAME card. Each replay is recorded as a new play (the gate
+          wires the recording). Omitted in standalone renders/tests. */}
+      {onReplay ? (
+        <Pressable
+          testID="feedback-replay"
+          accessibilityRole="button"
+          accessibilityLabel="Play again"
+          onPress={onReplay}
+          style={({ pressed }) => [
+            styles.replayButton,
+            pressed && styles.replayButtonPressed,
+          ]}
+        >
+          <Text style={styles.replayButtonLabel}>↻  Play again</Text>
+        </Pressable>
+      ) : null}
 
       {/* Advancing is a swipe, not a button — a subtle cue with a chevron. */}
       <Text
@@ -345,6 +369,23 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: fontSize.sm,
     lineHeight: fontSize.sm * lineHeight.relaxed,
+  },
+  replayButton: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    paddingVertical: space.md,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  replayButtonPressed: {
+    opacity: 0.7,
+  },
+  replayButtonLabel: {
+    color: colors.text,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.semibold,
   },
   swipeCue: {
     color: colors.textFaint,

@@ -37,6 +37,30 @@ describe('CardFeedback', () => {
     }
   });
 
+  it('shows "Play again" only when onReplay is provided, and fires it', () => {
+    const onReplay = vi.fn();
+    const { rerender } = render(
+      <CardFeedback
+        resolution={makeResolution('correct')}
+        explanation={explanation}
+        onContinue={() => {}}
+      />,
+    );
+    // Omitted by default (standalone renders/tests).
+    expect(screen.queryByTestId('feedback-replay')).not.toBeInTheDocument();
+
+    rerender(
+      <CardFeedback
+        resolution={makeResolution('correct')}
+        explanation={explanation}
+        onContinue={() => {}}
+        onReplay={onReplay}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('feedback-replay'));
+    expect(onReplay).toHaveBeenCalledTimes(1);
+  });
+
   it('exposes the machine-readable outcome on the card (data-outcome)', () => {
     render(
       <CardFeedback
