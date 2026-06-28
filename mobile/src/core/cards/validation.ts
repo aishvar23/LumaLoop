@@ -58,8 +58,12 @@ import { matchIndicesAreConsistent } from '../templates/nBack/nBackEvaluator';
 
 /** Inclusive lower bound for any template's `config.timeLimitMs` (5 seconds). */
 export const MIN_TIME_LIMIT_MS = 5000;
-/** Inclusive upper bound for any template's `config.timeLimitMs` (120 seconds). */
-export const MAX_TIME_LIMIT_MS = 120000;
+/**
+ * Inclusive upper bound for any template's `config.timeLimitMs` (180 seconds).
+ * Sized to the longest difficulty budget — `extremely_hard` = 180s (see
+ * {@link TIME_LIMIT_BY_DIFFICULTY}).
+ */
+export const MAX_TIME_LIMIT_MS = 180000;
 /**
  * Maximum Spot It columns that preserve the 48 px tap target in the mobile
  * feed card. More visual-search items should be added as rows, not by making
@@ -1407,11 +1411,12 @@ function validateOddOneOutAnswer(card: OddOneOutCard): ValidationError[] {
 export const MIN_SCHULTE_TARGETS = 4;
 export const MAX_SCHULTE_TARGETS = 25;
 /**
- * schulte_order is a timed visual scan; its time limit lives in the tighter
- * [5s, 30s] window (the same band the other timed-stream mechanics use), not the
- * full [5s, 120s] catalog band.
+ * schulte_order is a timed visual scan. Its time limit now follows the uniform
+ * per-difficulty budget like every other template (product decision 2026-06 —
+ * limits apply to ALL games), so this cap is the global maximum rather than a
+ * tighter band.
  */
-export const MAX_SCHULTE_TIME_LIMIT_MS = 30000;
+export const MAX_SCHULTE_TIME_LIMIT_MS = MAX_TIME_LIMIT_MS;
 
 function validateSchulteOrderAnswer(card: SchulteOrderCard): ValidationError[] {
   const { rows, columns, targets, timeLimitMs } = card.config;

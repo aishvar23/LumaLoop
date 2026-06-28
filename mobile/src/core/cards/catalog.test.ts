@@ -1,4 +1,5 @@
 import { catalog } from './catalog';
+import { TIME_LIMIT_BY_DIFFICULTY } from './difficultyTime';
 import { templateCategoryMap, type TemplateType } from './types';
 import {
   ALLOWED_EVIDENCE_TIERS,
@@ -169,10 +170,11 @@ describe('authored card catalog', () => {
     }
   });
 
-  it('keeps every config.timeLimitMs within [5000, 120000] ms', () => {
+  it('derives every config.timeLimitMs from the card difficulty budget', () => {
     for (const card of catalog) {
-      expect(card.config.timeLimitMs).toBeGreaterThanOrEqual(5000);
-      expect(card.config.timeLimitMs).toBeLessThanOrEqual(120000);
+      expect(card.config.timeLimitMs).toBe(
+        TIME_LIMIT_BY_DIFFICULTY[card.difficulty],
+      );
     }
   });
 
@@ -227,7 +229,9 @@ describe('authored card catalog', () => {
     expect(card?.prompt).toBe(
       'Work out the sequence, then pick the next four items.',
     );
-    expect(card?.config.timeLimitMs).toBe(16000);
+    // Time limit now follows the difficulty budget (easy = 40s), not the
+    // authored per-card value.
+    expect(card?.config.timeLimitMs).toBe(TIME_LIMIT_BY_DIFFICULTY.easy);
   });
 
   it('keeps the letter-plus-doubling pattern chain in the medium tier', () => {
@@ -240,10 +244,10 @@ describe('authored card catalog', () => {
     expect(card?.prompt).toBe(
       'Work out the sequence, then pick the next three items.',
     );
-    expect(card?.config.timeLimitMs).toBe(28000);
+    expect(card?.config.timeLimitMs).toBe(TIME_LIMIT_BY_DIFFICULTY.medium);
   });
 
-  it('keeps the five-slot code_break card in the extremely hard two-minute tier', () => {
+  it('keeps the five-slot code_break card in the extremely hard tier', () => {
     const card = catalog.find(
       (candidate) => candidate.cardId === 'codebreak-005',
     );
@@ -256,10 +260,10 @@ describe('authored card catalog', () => {
     expect(card.config.codeLength).toBe(5);
     expect(card.config.palette).toHaveLength(6);
     expect(card.config.maxGuesses).toBe(6);
-    expect(card.config.timeLimitMs).toBe(120000);
+    expect(card.config.timeLimitMs).toBe(TIME_LIMIT_BY_DIFFICULTY.extremely_hard);
   });
 
-  it('keeps the nine-tile endpoint circuit in the extremely hard two-minute tier', () => {
+  it('keeps the nine-tile endpoint circuit in the extremely hard tier', () => {
     const card = catalog.find(
       (candidate) => candidate.cardId === 'circuitflow-003',
     );
@@ -275,7 +279,7 @@ describe('authored card catalog', () => {
     expect(card.config.tiles.find((tile) => tile.id === 'i')?.connections).toEqual([
       'left',
     ]);
-    expect(card.config.timeLimitMs).toBe(120000);
+    expect(card.config.timeLimitMs).toBe(TIME_LIMIT_BY_DIFFICULTY.extremely_hard);
   });
 
   it('keeps every spot_it prompt neutral and answer-free', () => {
@@ -315,13 +319,15 @@ describe('authored card catalog', () => {
     }
   });
 
-  it('classifies every spot_it odd-one-out card as extremely easy eight-second play', () => {
+  it('classifies every spot_it odd-one-out card as extremely easy', () => {
     const spotIt = catalog.filter((card) => card.templateType === 'spot_it');
     expect(spotIt.length).toBeGreaterThan(0);
     for (const card of spotIt) {
       expect(card.difficulty).toBe('extremely_easy');
       expect(card.estimatedSeconds).toBe(8);
-      expect(card.config.timeLimitMs).toBe(8000);
+      expect(card.config.timeLimitMs).toBe(
+        TIME_LIMIT_BY_DIFFICULTY.extremely_easy,
+      );
     }
   });
 
@@ -343,7 +349,7 @@ describe('authored card catalog', () => {
       expect(card.difficulty).toBe('easy');
       expect(card.estimatedSeconds).toBe(14);
       expect(card.config.previewMs).toBe(3000);
-      expect(card.config.timeLimitMs).toBe(12000);
+      expect(card.config.timeLimitMs).toBe(TIME_LIMIT_BY_DIFFICULTY.easy);
     }
   });
 });

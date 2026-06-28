@@ -1806,9 +1806,15 @@ describe('schulte_order answer validation', () => {
     expect(validateCatalog([card]).valid).toBe(false);
   });
 
-  it('rejects a time limit beyond the timed-scan maximum', () => {
+  it('accepts a long time limit (schulte now follows the global maximum)', () => {
     const card = validSchulteOrder();
-    card.config = { ...card.config, timeLimitMs: 45000 };
+    card.config = { ...card.config, timeLimitMs: 120000 };
+    expect(validateCatalog([card]).valid).toBe(true);
+  });
+
+  it('rejects a time limit beyond the global maximum', () => {
+    const card = validSchulteOrder();
+    card.config = { ...card.config, timeLimitMs: MAX_TIME_LIMIT_MS + 1 };
     expect(validateCatalog([card]).valid).toBe(false);
   });
 });

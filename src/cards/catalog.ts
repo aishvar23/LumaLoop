@@ -9,7 +9,8 @@
  *   - Unique `cardId` (stable kebab slugs).
  *   - `category` is valid for the card's `templateType` (see
  *     `templateCategoryMap`).
- *   - `config.timeLimitMs` ∈ [5000, 120000] ms.
+ *   - `config.timeLimitMs` is derived from the card's `difficulty` tier (see
+ *     `./difficultyTime`), overriding any authored per-card value.
  *   - Template-specific correct answer present and in-bounds.
  *   - Non-empty `prompt` and `explanation` { title, body }.
  *   - `evidenceTier` ∈ { 'entertainment_only', 'mechanic_mapped' }.
@@ -45,6 +46,7 @@ import type {
   WhatChangedCard,
   WordUnscrambleCard,
 } from './types';
+import { withDifficultyTimeLimit } from './difficultyTime';
 
 // ---------------------------------------------------------------------------
 // spot_it — find the single element whose SHAPE/GLYPH differs (not its color).
@@ -6072,7 +6074,7 @@ const schulteOrderCards: SchulteOrderCard[] = [
  * catalog's. Declared `readonly` so the authored source-of-truth cannot be
  * mutated at runtime.
  */
-export const catalog: readonly LiquidCard[] = [
+const authoredCatalog: readonly LiquidCard[] = [
   ...spotItCards,
   ...whatChangedCards,
   ...ruleFlipCards,
@@ -6091,6 +6093,15 @@ export const catalog: readonly LiquidCard[] = [
   ...oddOneOutCards,
   ...schulteOrderCards,
 ];
+
+/**
+ * Every card's time limit is derived from its difficulty tier (one budget per
+ * tier — see {@link withDifficultyTimeLimit}), not the per-card value authored
+ * above. This is the single normalization point so the engine/feed continue to
+ * read `card.config.timeLimitMs` with no knowledge of where it came from.
+ */
+export const catalog: readonly LiquidCard[] =
+  authoredCatalog.map(withDifficultyTimeLimit);
 
 /**
  * O(1) cardId → card index over the authored {@link catalog}, built once. Both
