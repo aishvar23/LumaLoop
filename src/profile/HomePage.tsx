@@ -23,6 +23,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 import { ROUTES } from '../app/routes';
+import Wordmark from '../ui/Wordmark';
 import { useAuth } from '../auth/AuthProvider';
 import type { AuthClient } from '../auth/authClient';
 import { fetchGamePlays } from '../auth/profileApi';
@@ -182,9 +183,9 @@ export default function HomePage({
       <header className="home-topbar">
         <span className="home-brand">
           <span className="home-logo" aria-hidden="true">
-            <span className="home-logo__loop">∞</span>
+            <span className="home-logo__loop">✦</span>
           </span>
-          <span className="home-wordmark">Witzy</span>
+          <Wordmark className="home-wordmark" />
         </span>
         <div className="home-topbar__actions">
           {/* Find other users to follow. */}

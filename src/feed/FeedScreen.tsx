@@ -47,6 +47,7 @@ import {
 
 import { getCardById as getCatalogCardById } from '../cards/catalog';
 import { hookForCard } from '../cards/cardHook';
+import Wordmark from '../ui/Wordmark';
 import type { LiquidCard } from '../cards/types';
 import { resolveRenderer } from '../session/rendererRegistry';
 import type {
@@ -838,9 +839,9 @@ function SlideTopChrome({
     <div className="feed-slide__top">
       <span className="feed-slide__brand">
         <span className="feed-slide__brand-mark" aria-hidden="true">
-          ∞
+          ✦
         </span>
-        <span className="feed-slide__brand-name">Witzy</span>
+        <Wordmark className="feed-slide__brand-name" />
         <span className="feed-slide__brand-mode">Discover</span>
       </span>
       <span className="feed-slide__meta">

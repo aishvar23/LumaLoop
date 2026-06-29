@@ -15,6 +15,7 @@
 import { useState, type FormEvent } from 'react';
 
 import Button from '../ui/Button';
+import Wordmark from '../ui/Wordmark';
 import { useAuth } from './AuthProvider';
 import type { OAuthProvider } from './authClient';
 import './AuthScreens.css';
@@ -64,7 +65,9 @@ export default function LoginScreen() {
   return (
     <div className="auth-screen">
       <div className="auth-card">
-        <h1 className="auth-brand">Witzy</h1>
+        <h1 className="auth-brand" aria-label="Witzy">
+          <Wordmark />
+        </h1>
         <p className="auth-tagline">
           Sign in to scroll the feed and play. Your profile tracks the games you
           play.

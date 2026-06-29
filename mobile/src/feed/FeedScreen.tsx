@@ -61,6 +61,7 @@ import {
   type EdgeInsets,
 } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import Wordmark from '../Wordmark';
 
 import {
   colors,
@@ -1123,10 +1124,15 @@ function FeedHeader({
   return (
     <View style={styles.header}>
       <View style={styles.brandRow}>
-        <View style={styles.brandMark}>
-          <Text style={styles.brandMarkText}>∞</Text>
-        </View>
-        <Text style={styles.brandName}>Witzy</Text>
+        <LinearGradient
+          colors={['#6c7bff', '#9d7bff', '#ff7eb6']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.brandMark}
+        >
+          <Text style={styles.brandMarkText}>✦</Text>
+        </LinearGradient>
+        <Wordmark fontSize={fontSize.lg} />
         <Text style={styles.brandMode}>Discover</Text>
       </View>
       <View style={styles.chipRow}>
@@ -1335,19 +1341,11 @@ const styles = StyleSheet.create({
     borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#7b54d6',
   },
   brandMarkText: {
     color: '#fff',
-    fontSize: 21,
+    fontSize: 18,
     fontWeight: fontWeight.bold,
-    marginTop: -2,
-  },
-  brandName: {
-    color: colors.text,
-    fontSize: fontSize.lg,
-    fontWeight: fontWeight.heavy,
-    letterSpacing: -0.3,
   },
   brandMode: {
     color: colors.textMuted,

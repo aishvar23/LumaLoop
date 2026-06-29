@@ -36,6 +36,11 @@ export const authStyles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: space.md,
   },
+  /** Centers the composed Witzy Wordmark on the auth screens. */
+  brandWrap: {
+    alignSelf: 'center',
+    marginBottom: space.md,
+  },
   tagline: {
     color: colors.textMuted,
     fontSize: fontSize.md,

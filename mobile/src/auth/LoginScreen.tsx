@@ -15,6 +15,7 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
+import Wordmark from '../Wordmark';
 import { useAuth } from './AuthProvider';
 import type { OAuthProvider } from './authClient';
 import { authStyles as s } from './authStyles';
@@ -63,7 +64,7 @@ export default function LoginScreen() {
   return (
     <ScrollView contentContainerStyle={s.screen} keyboardShouldPersistTaps="handled">
       <View style={s.card}>
-        <Text style={s.brand}>Witzy</Text>
+        <Wordmark fontSize={30} style={s.brandWrap} />
         <Text style={s.tagline}>
           Sign in to scroll the feed and play. Your profile tracks the games you
           play.

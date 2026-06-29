@@ -546,7 +546,7 @@
   min-height: 34px;
 }
 
-/* The LumaLoop logo — a loop (∞) badge with the brand gradient (matches Home). */
+/* The Witzy logo — a spark (✦) badge with the brand gradient (matches Home). */
 .feed-slide__brand-mark {
   display: inline-flex;
   align-items: center;
@@ -556,21 +556,16 @@
   border-radius: 11px;
   color: #fff;
   background: linear-gradient(135deg, #6c7bff 0%, #9d7bff 45%, #ff7eb6 100%);
-  font-size: 21px;
+  font-size: 18px;
   font-weight: 800;
   line-height: 1;
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.45);
   box-shadow: 0 8px 20px rgba(124, 110, 255, 0.45);
 }
 
-/* The "LumaLoop" wordmark — larger + gradient ink so the brand reads clearly. */
+/* The "Witzy" wordmark — size only; the gradient + spark live in `.wordmark`. */
 .feed-slide__brand-name {
   font-size: var(--font-size-lg);
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  background: linear-gradient(90deg, #ffffff, #c9c4ff);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
 }
 
 .feed-slide__brand-mode {

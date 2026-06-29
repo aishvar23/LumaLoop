@@ -23,6 +23,7 @@ import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import Wordmark from './Wordmark';
 import { useAuth } from './auth/AuthProvider';
 import type { AuthClient } from './auth/authClient';
 import { fetchGamePlays } from './auth/profileApi';
@@ -218,10 +219,15 @@ export default function HomeScreen({
     >
       <View style={styles.topbar}>
         <View style={styles.brandRow}>
-          <View style={styles.logo}>
-            <Text style={styles.logoLoop}>∞</Text>
-          </View>
-          <Text style={styles.brand}>Witzy</Text>
+          <LinearGradient
+            colors={['#6c7bff', '#9d7bff', '#ff7eb6']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.logo}
+          >
+            <Text style={styles.logoLoop}>✦</Text>
+          </LinearGradient>
+          <Wordmark fontSize={fontSize.xl} />
         </View>
         <View style={styles.topbarActions}>
           {/* Find other users to follow. */}
@@ -461,21 +467,13 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 13,
-    backgroundColor: '#7b54d6',
     alignItems: 'center',
     justifyContent: 'center',
   },
   logoLoop: {
     color: '#fff',
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: fontWeight.bold,
-    marginTop: -2,
-  },
-  brand: {
-    color: colors.text,
-    fontSize: fontSize.xl,
-    fontWeight: fontWeight.heavy,
-    letterSpacing: -0.3,
   },
   searchBtn: {
     width: 36,
