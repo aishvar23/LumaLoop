@@ -110,6 +110,35 @@ describe('CardFeedback score chip (RN)', () => {
     expect(screen.queryByText(/pts/)).toBeNull();
   });
 
+  // ── Engagement §4.4: per-card personal best ────────────────────────────────
+  it('celebrates a new best when isNewBest and points were earned', () => {
+    render(
+      <CardFeedback
+        resolution={makeResolution('correct')}
+        explanation={explanation}
+        cardScore={{ points: 132, correct: true, streak: 1, combo: 1 }}
+        personalBest={132}
+        isNewBest
+      />,
+    );
+    expect(screen.getByText(/New best/)).toBeTruthy();
+    expect(screen.queryByTestId('feedback-best')).toBeNull();
+  });
+
+  it('shows the subtle prior best when no new best was set', () => {
+    render(
+      <CardFeedback
+        resolution={makeResolution('correct')}
+        explanation={explanation}
+        cardScore={{ points: 100, correct: true, streak: 1, combo: 1 }}
+        personalBest={300}
+        isNewBest={false}
+      />,
+    );
+    expect(screen.getByText('Best: 300')).toBeTruthy();
+    expect(screen.queryByTestId('feedback-newbest')).toBeNull();
+  });
+
   // ── Engagement §4.3: performance tags ──────────────────────────────────────
   it('renders a "Perfect" tag for a correct, first-attempt, fast resolution', () => {
     render(

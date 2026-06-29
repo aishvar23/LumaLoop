@@ -187,6 +187,37 @@ describe('CardFeedback', () => {
     expect(screen.queryByText(/pts/)).not.toBeInTheDocument();
   });
 
+  // ── Engagement §4.4: per-card personal best ────────────────────────────────
+  it('celebrates a new best when isNewBest and points were earned', () => {
+    render(
+      <CardFeedback
+        resolution={makeResolution('correct')}
+        explanation={explanation}
+        cardScore={{ points: 132, correct: true, streak: 1, combo: 1 }}
+        personalBest={132}
+        isNewBest
+        onContinue={() => {}}
+      />,
+    );
+    expect(screen.getByTestId('feedback-newbest')).toHaveTextContent('New best');
+    expect(screen.queryByTestId('feedback-best')).not.toBeInTheDocument();
+  });
+
+  it('shows the subtle prior best when no new best was set', () => {
+    render(
+      <CardFeedback
+        resolution={makeResolution('correct')}
+        explanation={explanation}
+        cardScore={{ points: 100, correct: true, streak: 1, combo: 1 }}
+        personalBest={300}
+        isNewBest={false}
+        onContinue={() => {}}
+      />,
+    );
+    expect(screen.getByTestId('feedback-best')).toHaveTextContent('Best: 300');
+    expect(screen.queryByTestId('feedback-newbest')).not.toBeInTheDocument();
+  });
+
   // ── Engagement §4.3: performance tags ──────────────────────────────────────
   it('renders a "Perfect" tag for a correct, first-attempt, fast resolution', () => {
     render(

@@ -56,6 +56,17 @@ export type CardFeedbackProps = {
    */
   cardScore?: CardScore | null;
   /**
+   * The player's LOCAL best game-points for THIS card so far (engagement §4.4 —
+   * "something to chase"). Shown as a subtle "Best: N" beside the score chip when
+   * no new best was set this play. Omitted ≡ no stored best to show.
+   */
+  personalBest?: number;
+  /**
+   * True when this play STRICTLY beat the card's prior best — shows a celebratory
+   * "🏆 New best!" instead of the subtle best line. GAME framing only (Design §7).
+   */
+  isNewBest?: boolean;
+  /**
    * The card's time limit (ms), used to derive the FAST performance tag
    * (engagement §4.3). Omitted/non-finite ≡ no time pressure → never "Fast".
    */
@@ -99,6 +110,8 @@ export default function CardFeedback({
   resolution,
   explanation,
   cardScore,
+  personalBest,
+  isNewBest,
   timeLimitMs,
   footer,
   onReplay,
@@ -221,6 +234,24 @@ export default function CardFeedback({
           current streak/combo. Shown only when a score was supplied (feed runs);
           omitted in standalone renders. */}
       {cardScore ? <ScoreChip cardScore={cardScore} accent={accent} /> : null}
+
+      {/* Engagement §4.4: the LOCAL per-card personal best — "something to chase".
+          Shown only when points were earned this play (the score chip is up). A
+          new best gets a celebratory chip; otherwise the prior best is a subtle
+          line. GAME framing only — "best", never skill/ability (Design §7). */}
+      {cardScore && cardScore.points > 0 ? (
+        isNewBest ? (
+          <View style={[styles.newBestChip, { borderColor: colors.success }]}>
+            <Text style={[styles.newBestChipLabel, { color: colors.success }]} testID="feedback-newbest">
+              🏆 New best!
+            </Text>
+          </View>
+        ) : personalBest && personalBest > 0 ? (
+          <Text style={styles.bestLine} testID="feedback-best">
+            Best: {personalBest}
+          </Text>
+        ) : null
+      ) : null}
 
       {failureReason ? (
         <View testID="feedback-failure-reason" style={styles.failureReason}>
@@ -450,6 +481,27 @@ const styles = StyleSheet.create({
     fontWeight: fontWeight.bold,
   },
   scoreMeta: {
+    color: colors.textMuted,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.semibold,
+  },
+  // Engagement §4.4: the celebratory "New best!" pill — success-tinted, sits
+  // just under the points chip. GAME framing only.
+  newBestChip: {
+    alignSelf: 'flex-start',
+    paddingVertical: space.xs,
+    paddingHorizontal: space.md,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    backgroundColor: colors.successSurface,
+  },
+  newBestChipLabel: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold,
+  },
+  // The subtle "Best: N" line — shown when no new best was set this play.
+  bestLine: {
+    alignSelf: 'flex-start',
     color: colors.textMuted,
     fontSize: fontSize.sm,
     fontWeight: fontWeight.semibold,

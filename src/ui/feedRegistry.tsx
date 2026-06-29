@@ -28,6 +28,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -39,6 +40,7 @@ import type {
 } from '../session/rendererRegistry';
 import { defaultRendererRegistry } from '../session/rendererRegistry';
 import { useCardScoreLookup } from '../feed/cardScoreContext';
+import { recordCardBest } from '../feed/cardBestStore';
 import type { CardResolution, TemplateProps } from '../templates/contract';
 import CardShareButton from '../social/CardShareButton';
 import CardFeedback from './CardFeedback';
@@ -152,6 +154,31 @@ export function withFeedbackGate(
     const scoreLookup = useCardScoreLookup();
     const cardScore = scoreLookup ? scoreLookup(context.cardIndex) : null;
 
+    // Engagement §4.4: the LOCAL per-card personal best — "something to chase".
+    // When a scored resolution becomes visible, record its points against this
+    // card's stored best ONCE (a ref latch guards re-renders), and surface the
+    // outcome so CardFeedback can celebrate a "New best!" or show the prior best.
+    // The latch resets when `resolution` returns to null on "Play again", so the
+    // NEXT attempt records again. Best-effort, never throws into the feed.
+    const [cardBest, setCardBest] = useState<{
+      personalBest: number;
+      isNewBest: boolean;
+    } | null>(null);
+    const bestRecordedRef = useRef(false);
+    useEffect(() => {
+      if (!resolution) {
+        bestRecordedRef.current = false;
+        setCardBest(null);
+        return;
+      }
+      if (bestRecordedRef.current) return;
+      if (cardScore && cardScore.points > 0) {
+        bestRecordedRef.current = true;
+        const { best, isNewBest } = recordCardBest(card.cardId, cardScore.points);
+        setCardBest({ personalBest: best, isNewBest });
+      }
+    }, [resolution, cardScore, card.cardId]);
+
     if (resolution) {
       // KNOWN TRADEOFF (tracked: ADO #99). Because we delay the controller's
       // `onResolve` until "Next", the controller still considers this card
@@ -167,6 +194,8 @@ export function withFeedbackGate(
           resolution={resolution}
           explanation={card.explanation}
           cardScore={cardScore}
+          personalBest={cardBest?.personalBest}
+          isNewBest={cardBest?.isNewBest}
           timeLimitMs={card.config.timeLimitMs}
           // Inject the social Share-to-status action (a feed-layer concern keyed
           // by cardId; renders nothing without a social provider, so the engine

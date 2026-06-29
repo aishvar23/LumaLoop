@@ -47,6 +47,7 @@ import {
 import type { LiquidCard, TemplateType } from '../core/cards/types';
 import type { CardResolution, TemplateProps } from '../core/templates/contract';
 import { useCardScoreLookup } from './cardScoreContext';
+import { recordCardBest } from './cardBestStore';
 import CardShareButton from '../social/CardShareButton';
 import CardFeedback from './CardFeedback';
 import { defaultRendererRegistry } from './rendererRegistry';
@@ -176,12 +177,49 @@ export function withFeedbackGate(
     const scoreLookup = useCardScoreLookup();
     const cardScore = scoreLookup ? scoreLookup(context.cardIndex) : null;
 
+    // Engagement §4.4: the LOCAL per-card personal best — "something to chase".
+    // When a scored feedback step becomes visible, record its points against this
+    // card's stored best ONCE (a ref latch guards re-renders), and surface the
+    // outcome so CardFeedback can celebrate a "New best!" or show the prior best.
+    // The latch resets when `resolution` returns to null on "Play again", so the
+    // NEXT attempt records again. Best-effort; recordCardBest never rejects.
+    const [cardBest, setCardBest] = useState<{
+      personalBest: number;
+      isNewBest: boolean;
+    } | null>(null);
+    const bestRecordedRef = useRef(false);
+    useEffect(() => {
+      if (resolution === null) {
+        bestRecordedRef.current = false;
+        setCardBest(null);
+        return undefined;
+      }
+      if (!showFeedback || bestRecordedRef.current) return undefined;
+      if (cardScore && cardScore.points > 0) {
+        bestRecordedRef.current = true;
+        let cancelled = false;
+        void (async () => {
+          const { best, isNewBest } = await recordCardBest(
+            card.cardId,
+            cardScore.points,
+          );
+          if (!cancelled) setCardBest({ personalBest: best, isNewBest });
+        })();
+        return () => {
+          cancelled = true;
+        };
+      }
+      return undefined;
+    }, [resolution, showFeedback, cardScore, card.cardId]);
+
     if (showFeedback && resolution) {
       return (
         <CardFeedback
           resolution={resolution}
           explanation={card.explanation}
           cardScore={cardScore}
+          personalBest={cardBest?.personalBest}
+          isNewBest={cardBest?.isNewBest}
           timeLimitMs={card.config.timeLimitMs}
           // Inject the social Share-to-status action (a feed-layer concern keyed
           // by cardId; renders nothing without a social provider, so the engine

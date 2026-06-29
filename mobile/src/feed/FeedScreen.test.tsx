@@ -701,7 +701,7 @@ describe('FeedScreen (native)', () => {
     expect(onCardExplanationViewed).toHaveBeenCalledWith(0, 'b0-0');
   });
 
-  it('shows the uniform feedback + explanation after a real game resolves through the gated default registry (#133)', () => {
+  it('shows the uniform feedback + explanation after a real game resolves through the gated default registry (#133)', async () => {
     const onCardResolved = jest.fn();
     const onCardExplanationViewed = jest.fn();
     render(
@@ -719,6 +719,9 @@ describe('FeedScreen (native)', () => {
     // Resolve the active spot_it game (its single cell is the anomaly).
     const activeGame = within(screen.getByTestId('feed-game-0'));
     fireEvent.press(activeGame.getByTestId('spot-cell-0-0'));
+    // Flush the gate's best-effort async per-card-best recording (engagement
+    // §4.4) so its post-resolution state update settles inside act().
+    await act(async () => {});
 
     // The gate replaces the game with the uniform feedback step + the explanation.
     const feedback = within(screen.getByTestId('feed-game-0'));

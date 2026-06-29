@@ -41,6 +41,17 @@ export type CardFeedbackProps = {
    */
   cardScore?: CardScore | null;
   /**
+   * The player's LOCAL best game-points for THIS card so far (engagement §4.4 —
+   * "something to chase"). Shown as a subtle "Best: N" beside the score chip when
+   * no new best was set this play. Omitted ≡ no stored best to show.
+   */
+  personalBest?: number;
+  /**
+   * True when this play STRICTLY beat the card's prior best — shows a celebratory
+   * "🏆 New best!" instead of the subtle best line. GAME framing only (Design §7).
+   */
+  isNewBest?: boolean;
+  /**
    * The card's time limit (ms), used to derive the FAST performance tag
    * (engagement §4.3). Omitted/non-finite ≡ no time pressure → never "Fast".
    */
@@ -90,6 +101,8 @@ export default function CardFeedback({
   resolution,
   explanation,
   cardScore,
+  personalBest,
+  isNewBest,
   timeLimitMs,
   footer,
   onContinue,
@@ -182,6 +195,26 @@ export default function CardFeedback({
             the current streak/combo — themed with the slide accent. Shown only
             when a score was supplied (feed runs); omitted in standalone renders. */}
         {cardScore ? <ScoreChip cardScore={cardScore} /> : null}
+
+        {/* Engagement §4.4: the LOCAL per-card personal best — "something to
+            chase". Shown only when points were earned this play (the score chip is
+            up). A new best gets a celebratory chip; otherwise the prior best is a
+            subtle line. GAME framing only — "best", never skill/ability (Design §7). */}
+        {cardScore && cardScore.points > 0
+          ? isNewBest
+            ? (
+                <span style={newBestChipStyle} data-testid="feedback-newbest">
+                  🏆 New best!
+                </span>
+              )
+            : personalBest && personalBest > 0
+              ? (
+                  <span style={bestChipStyle} data-testid="feedback-best">
+                    Best: {personalBest}
+                  </span>
+                )
+              : null
+          : null}
 
         {/* Explanation state — headed copy, not a second live region, so the
             outcome above is not double-announced. */}
@@ -291,6 +324,29 @@ const scorePointsStyle = {
   fontSize: 'var(--font-size-lg)',
   fontWeight: 'var(--font-weight-bold)',
   color: 'var(--color-text)',
+} as const;
+
+/** The celebratory "New best!" chip (engagement §4.4) — a success-tinted pill
+ * that pops just under the points chip when the player beats their prior best on
+ * this card. GAME framing only. */
+const newBestChipStyle = {
+  alignSelf: 'flex-start',
+  padding: 'var(--space-1) var(--space-3)',
+  borderRadius: 'var(--radius-pill)',
+  border: '1px solid var(--color-success-border)',
+  background: 'var(--color-success-surface)',
+  color: 'var(--color-success-bright)',
+  fontSize: 'var(--font-size-sm)',
+  fontWeight: 'var(--font-weight-bold)',
+} as const;
+
+/** The subtle "Best: N" line (engagement §4.4) — shown when no new best was set,
+ * so the player still sees the bar to chase. Muted, non-pressuring. */
+const bestChipStyle = {
+  alignSelf: 'flex-start',
+  fontSize: 'var(--font-size-sm)',
+  fontWeight: 'var(--font-weight-semibold)',
+  color: 'var(--color-text-muted)',
 } as const;
 
 /** The performance-tags row (engagement §4.3) — small accent-tinted chips that
