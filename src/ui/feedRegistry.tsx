@@ -43,6 +43,7 @@ import { useCardScoreLookup } from '../feed/cardScoreContext';
 import { recordCardBest } from '../feed/cardBestStore';
 import type { CardResolution, TemplateProps } from '../templates/contract';
 import CardShareButton from '../social/CardShareButton';
+import CardChallengeButton from '../social/CardChallengeButton';
 import CardFeedback from './CardFeedback';
 
 /**
@@ -197,15 +198,25 @@ export function withFeedbackGate(
           personalBest={cardBest?.personalBest}
           isNewBest={cardBest?.isNewBest}
           timeLimitMs={card.config.timeLimitMs}
-          // Inject the social Share-to-status action (a feed-layer concern keyed
-          // by cardId; renders nothing without a social provider, so the engine
-          // stays auth-free). It captures the game + result (outcome + points).
+          // Inject the social Share-to-status action AND the "Challenge a friend"
+          // viral-loop action (both feed-layer concerns keyed by cardId; the share
+          // button renders nothing without a social provider, so the engine stays
+          // auth-free). The challenge button only shows when the player scored
+          // (there's a score to beat).
           footer={
-            <CardShareButton
-              cardId={card.cardId}
-              outcome={resolution.resolutionType}
-              points={cardScore?.points ?? 0}
-            />
+            <>
+              <CardShareButton
+                cardId={card.cardId}
+                outcome={resolution.resolutionType}
+                points={cardScore?.points ?? 0}
+              />
+              {cardScore && cardScore.points > 0 ? (
+                <CardChallengeButton
+                  cardId={card.cardId}
+                  points={cardScore.points}
+                />
+              ) : null}
+            </>
           }
           // Advancing is the controller's job: only now do we fire its real
           // `onResolve`, which records the result and auto-advances the feed.

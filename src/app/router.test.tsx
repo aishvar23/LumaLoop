@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import { AppRoutes } from './router';
 import { buildCardDeepLink } from './routes';
+import { catalog } from '../cards/catalog';
 import { AuthProvider } from '../auth/AuthProvider';
 import {
   createFakeAuthClient,
@@ -86,18 +87,22 @@ describe('AppRoutes', () => {
     );
   });
 
-  it('renders the deep-link placeholder and exposes the decoded cardId', () => {
-    renderAt('/c/card-42');
+  it('renders the public challenge arrival surface for a known cardId', () => {
+    // `/c/:cardId` is the PUBLIC, playable challenge surface (engagement §4.6) —
+    // a real catalog card resolves to its banner with no auth gate involved.
+    renderAt(buildCardDeepLink(catalog[0].cardId));
+    expect(screen.getByTestId('challenge-banner')).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: 'Shared card' }),
+      screen.getByRole('heading', { name: 'Take on this challenge' }),
     ).toBeInTheDocument();
-    expect(screen.getByTestId('deep-link-card-id')).toHaveTextContent('card-42');
   });
 
-  it('decodes an encoded cardId param from a built deep link', () => {
-    const cardId = 'a/b?c#d';
-    renderAt(buildCardDeepLink(cardId));
-    expect(screen.getByTestId('deep-link-card-id')).toHaveTextContent(cardId);
+  it('shows the "not available" panel for an unknown cardId', () => {
+    renderAt('/c/does-not-exist');
+    expect(
+      screen.getByRole('heading', { name: /this challenge isn’t available/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId('challenge-banner')).not.toBeInTheDocument();
   });
 
   it('renders the not-found placeholder for an unknown path', () => {

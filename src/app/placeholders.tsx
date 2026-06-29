@@ -9,38 +9,10 @@
  * feed/session progression (CLAUDE.md §4). Keep that boundary when swapping
  * these out.
  */
-import { Link, useParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import Screen from '../ui/Screen';
 import Stack from '../ui/Stack';
 import { ROUTES } from './routes';
-
-/**
- * `/c/:cardId` placeholder. Reads and exposes the (already-decoded) `cardId`
- * route param. React Router decodes path params, so `params.cardId` is the
- * raw id that `buildCardDeepLink` encoded — no manual decode needed.
- * The real single-card share surface (#69-72) replaces this.
- */
-export function CardDeepLinkRoutePlaceholder() {
-  const { cardId } = useParams<'cardId'>();
-
-  return (
-    <Screen aria-labelledby="deep-link-heading">
-      <Stack gap={3}>
-        <h1 id="deep-link-heading" style={{ margin: 0 }}>
-          Shared card
-        </h1>
-        <p style={{ margin: 0, color: 'var(--color-text-muted)' }}>
-          Single-card deep-link placeholder — the real share surface is task
-          #69-72.
-        </p>
-        {/* Surface the decoded id so the share target is verifiable. */}
-        <p style={{ margin: 0 }}>
-          Card id: <code data-testid="deep-link-card-id">{cardId}</code>
-        </p>
-      </Stack>
-    </Screen>
-  );
-}
 
 /**
  * Catch-all placeholder for unknown paths. Renders a minimal not-found surface

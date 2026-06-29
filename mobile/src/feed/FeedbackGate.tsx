@@ -48,7 +48,10 @@ import type { LiquidCard, TemplateType } from '../core/cards/types';
 import type { CardResolution, TemplateProps } from '../core/templates/contract';
 import { useCardScoreLookup } from './cardScoreContext';
 import { recordCardBest } from './cardBestStore';
+import { View } from 'react-native';
+
 import CardShareButton from '../social/CardShareButton';
+import CardChallengeButton from '../social/CardChallengeButton';
 import CardFeedback from './CardFeedback';
 import { defaultRendererRegistry } from './rendererRegistry';
 import type { RendererRegistry, TemplateRenderer } from './rendererRegistry';
@@ -221,15 +224,24 @@ export function withFeedbackGate(
           personalBest={cardBest?.personalBest}
           isNewBest={cardBest?.isNewBest}
           timeLimitMs={card.config.timeLimitMs}
-          // Inject the social Share-to-status action (a feed-layer concern keyed
-          // by cardId; renders nothing without a social provider, so the engine
-          // stays auth-free). Captures the game + result (outcome + points).
+          // Inject the social Share-to-status action AND the "Challenge a friend"
+          // viral-loop action (both feed-layer concerns keyed by cardId; the share
+          // button renders nothing without a social provider, so the engine stays
+          // auth-free). The challenge button only shows when the player scored.
           footer={
-            <CardShareButton
-              cardId={card.cardId}
-              outcome={resolution.resolutionType}
-              points={cardScore?.points ?? 0}
-            />
+            <View style={{ gap: 8 }}>
+              <CardShareButton
+                cardId={card.cardId}
+                outcome={resolution.resolutionType}
+                points={cardScore?.points ?? 0}
+              />
+              {cardScore && cardScore.points > 0 ? (
+                <CardChallengeButton
+                  cardId={card.cardId}
+                  points={cardScore.points}
+                />
+              ) : null}
+            </View>
           }
           // "Play again": remount the same card fresh. Recording is done at
           // resolve time (see `handleResolve`), so this only resets the gate.

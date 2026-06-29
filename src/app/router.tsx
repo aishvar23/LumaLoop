@@ -19,10 +19,8 @@ import RequireAuth from '../auth/RequireAuth';
 import ProfilePage from '../profile/ProfilePage';
 import PeopleSearchPage from '../social/PeopleSearchPage';
 import UserProfilePage from '../social/UserProfilePage';
-import {
-  CardDeepLinkRoutePlaceholder,
-  NotFoundRoutePlaceholder,
-} from './placeholders';
+import ChallengeRoute from '../social/ChallengeRoute';
+import { NotFoundRoutePlaceholder } from './placeholders';
 
 /** The route table. Mount under a router (BrowserRouter / MemoryRouter). */
 export function AppRoutes() {
@@ -83,10 +81,10 @@ export function AppRoutes() {
           </RequireAuth>
         }
       />
-      <Route
-        path={ROUTES.cardDeepLink}
-        element={<CardDeepLinkRoutePlaceholder />}
-      />
+      {/* `/c/:cardId` — the PUBLIC, no-auth, playable challenge arrival surface
+          (engagement strategy §4.6). Deliberately mounted OUTSIDE RequireAuth so
+          a shared "beat my score" link is openable with no account. */}
+      <Route path={ROUTES.cardDeepLink} element={<ChallengeRoute />} />
       {/* Catch-all → minimal not-found surface. */}
       <Route path="*" element={<NotFoundRoutePlaceholder />} />
     </Routes>
