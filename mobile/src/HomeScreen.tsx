@@ -37,6 +37,8 @@ import {
   formatAccuracy,
   type ProfileStats,
 } from './core/profile/computeStats';
+import { readStreak as defaultReadStreak } from './feed/streakStore';
+import { INITIAL_STREAK_STATE, type StreakState } from './core/feed/dailyStreak';
 import { fetchRecentShares } from './social/gameShareApi';
 import { fetchFollowing } from './social/followApi';
 import { groupSharesByUser, type UserStatus } from './social/statusFeed';
@@ -67,6 +69,8 @@ export interface HomeScreenProps {
   statuses?: readonly UserStatus[];
   /** Test seam: cardId → card resolver for status game titles + accents. */
   getCardById?: (cardId: string) => LiquidCard | undefined;
+  /** Test seam: read the persisted daily streak. Defaults to the local store. */
+  readStreak?: () => Promise<StreakState>;
 }
 
 /** Ring colors cycled across story bubbles for an Instagram-like accent. */
@@ -108,6 +112,7 @@ export default function HomeScreen({
   featuredGames,
   statuses: statusesProp,
   getCardById = defaultGetCardById,
+  readStreak = defaultReadStreak,
 }: HomeScreenProps) {
   const auth = useAuth();
   const { user, profile } = auth;
@@ -119,6 +124,18 @@ export default function HomeScreen({
   const [loading, setLoading] = useState(true);
   const [statuses, setStatuses] = useState<readonly UserStatus[]>(statusesProp ?? []);
   const [openStatus, setOpenStatus] = useState<UserStatus | null>(null);
+  // Daily streak (engagement — consecutive days played). Async store, so read it
+  // in an effect. Hidden until current > 0 — no streak, no badge, no shame copy.
+  const [streak, setStreak] = useState<StreakState>(INITIAL_STREAK_STATE);
+  useEffect(() => {
+    let active = true;
+    void readStreak().then((value) => {
+      if (active) setStreak(value);
+    });
+    return () => {
+      active = false;
+    };
+  }, [readStreak]);
   // "Upload puzzle" isn't built yet — pressing it shows a "coming soon" notice
   // that auto-dismisses after 2s.
   const [uploadNotice, setUploadNotice] = useState(false);
@@ -290,6 +307,17 @@ export default function HomeScreen({
       <View style={styles.hero}>
         <Text style={styles.greeting}>Hi {profile.display_name}! 🎮</Text>
         <Text style={styles.subtitle}>Ready for today’s puzzles?</Text>
+        {streak.current > 0 && (
+          <View style={styles.streakRow} testID="home-streak">
+            <View style={styles.streakPill}>
+              <Text style={styles.streakIcon}>🔥</Text>
+              <Text style={styles.streakCount}>{streak.current}-day streak</Text>
+            </View>
+            {streak.longest > streak.current && (
+              <Text style={styles.streakBest}>Best {streak.longest}</Text>
+            )}
+          </View>
+        )}
         <View style={styles.heroCta}>
           <Pressable
             accessibilityRole="button"
@@ -614,6 +642,36 @@ const styles = StyleSheet.create({
   subtitle: {
     color: 'rgba(255,255,255,0.85)',
     fontSize: fontSize.md,
+  },
+  // Daily-streak badge — a warm "days played in a row" pill (engagement, not a
+  // skill claim). Only rendered when there's a live streak.
+  streakRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: space.sm,
+  },
+  streakPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: space.md,
+    paddingVertical: space.xs,
+    borderRadius: radius.pill,
+    backgroundColor: '#ff6f61',
+  },
+  streakIcon: {
+    fontSize: fontSize.sm,
+  },
+  streakCount: {
+    color: '#fff',
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold,
+  },
+  streakBest: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.semibold,
   },
   // Slim stat strip (on the colored hero).
   statStrip: {

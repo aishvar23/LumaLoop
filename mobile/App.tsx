@@ -23,8 +23,9 @@ import ProfilePage from './src/profile/ProfilePage';
 import HomeScreen from './src/HomeScreen';
 import PeopleSearchScreen from './src/PeopleSearchScreen';
 import UserProfileScreen from './src/UserProfileScreen';
-import { useRecordGamePlay } from './src/feed/useRecordGamePlay';
+import { useRecordGamePlay, type RecordGamePlay } from './src/feed/useRecordGamePlay';
 import { usePlayedCardIds } from './src/feed/usePlayedCardIds';
+import { recordPlayToday } from './src/feed/streakStore';
 import { SocialConfigProvider } from './src/social/SocialContext';
 import { supabase } from './src/auth/supabaseClient';
 import { getCardById as getCatalogCardById } from './src/core/cards/catalog';
@@ -244,6 +245,18 @@ function TelemetryFeed({
     client: effectiveClient,
   });
 
+  // Engagement: every scored card also counts as "played today" for the daily
+  // streak (the NYT/Duolingo habit loop). Local-only, idempotent per day, and
+  // best-effort — `recordPlayToday` never rejects; fire-and-forget so it can
+  // never break the feed.
+  const recordScored = useCallback<RecordGamePlay>(
+    (index, resolution, score) => {
+      recordGamePlay(index, resolution, score);
+      void recordPlayToday();
+    },
+    [recordGamePlay],
+  );
+
   // "Play again" replays the same card; each replayed attempt is recorded as its
   // own play (product decision 2026-06). The first attempt records on resolve via
   // the latched `onCardScored` path; the feed's per-index latch would drop a
@@ -306,7 +319,7 @@ function TelemetryFeed({
           onCardSkipped={handlers.onCardSkipped}
           onCardAbandoned={handlers.onCardAbandoned}
           onCardExplanationViewed={handlers.onCardExplanationViewed}
-          onCardScored={recordGamePlay}
+          onCardScored={recordScored}
         />
       </CardReplayProvider>
     </SocialConfigProvider>

@@ -380,6 +380,39 @@
   font-size: var(--font-size-md);
 }
 
+/* Daily-streak badge — a warm "days played in a row" pill (engagement, not a
+   skill claim). Only shown when there's a live streak. */
+.home-streak {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: calc(var(--space-1) * -1);
+}
+
+.home-streak__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 4px 12px;
+  border-radius: var(--radius-pill, 999px);
+  background: linear-gradient(135deg, #ff9d4d 0%, #ff5d8f 100%);
+  color: #fff;
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-sm);
+  box-shadow: 0 6px 16px rgba(255, 93, 143, 0.35);
+}
+
+.home-streak__count {
+  letter-spacing: -0.01em;
+}
+
+.home-streak__best {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium, 600);
+}
+
 /* Color-tinted stat chips. */
 .home-stat-strip {
   display: flex;

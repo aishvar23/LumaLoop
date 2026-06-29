@@ -55,7 +55,14 @@ const STATUSES: UserStatus[] = [
   },
 ];
 
-function renderHome(statuses?: UserStatus[]) {
+function renderHome(
+  statuses?: UserStatus[],
+  readStreak?: () => Promise<{
+    current: number;
+    longest: number;
+    lastPlayedDate: string | null;
+  }>,
+) {
   const onStart = jest.fn();
   const onOpenProfile = jest.fn();
   const onOpenSearch = jest.fn();
@@ -72,6 +79,7 @@ function renderHome(statuses?: UserStatus[]) {
         onOpenSearch={onOpenSearch}
         featuredGames={FEATURED}
         statuses={statuses}
+        readStreak={readStreak}
       />
     </AuthProvider>,
   );
@@ -93,6 +101,27 @@ describe('HomeScreen', () => {
     fireEvent.press(screen.getByTestId('home-start'));
     // Generic "Play now" enters the feed with no pinned game.
     expect(onStart).toHaveBeenCalledWith();
+  });
+
+  it('shows the daily-streak badge when there is a live streak', async () => {
+    renderHome(undefined, async () => ({
+      current: 3,
+      longest: 7,
+      lastPlayedDate: '2026-06-25',
+    }));
+    await screen.findByTestId('home-streak');
+    expect(screen.getByText('3-day streak')).toBeTruthy();
+    expect(screen.getByText('Best 7')).toBeTruthy();
+  });
+
+  it('hides the streak badge when there is no streak yet', async () => {
+    renderHome(undefined, async () => ({
+      current: 0,
+      longest: 0,
+      lastPlayedDate: null,
+    }));
+    await waitFor(() => expect(screen.getByText(/hi player one/i)).toBeTruthy());
+    expect(screen.queryByTestId('home-streak')).toBeNull();
   });
 
   it('opens the profile from the avatar button', async () => {

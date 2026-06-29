@@ -31,6 +31,8 @@ import type { GamePlay } from '../auth/types';
 import { getCardById as defaultGetCardById } from '../cards/catalog';
 import { selectFeaturedGames, templateLabel, type FeaturedGame } from '../cards/featured';
 import type { LiquidCard } from '../cards/types';
+import { readStreak as defaultReadStreak } from '../feed/streakStore';
+import type { StreakState } from '../feed/dailyStreak';
 import { fetchRecentShares } from '../social/gameShareApi';
 import { fetchFollowing } from '../social/followApi';
 import { groupSharesByUser, type UserStatus } from '../social/statusFeed';
@@ -57,6 +59,8 @@ export interface HomePageProps {
   statuses?: readonly UserStatus[];
   /** Test seam: cardId → card resolver for status game titles + accents. */
   getCardById?: (cardId: string) => LiquidCard | undefined;
+  /** Test seam: read the persisted daily streak. Defaults to the local store. */
+  readStreak?: () => StreakState;
 }
 
 /** Format a category id ("visual_attention") into a label ("Visual attention"). */
@@ -81,6 +85,7 @@ export default function HomePage({
   featuredGames,
   statuses: statusesProp,
   getCardById = defaultGetCardById,
+  readStreak = defaultReadStreak,
 }: HomePageProps = {}) {
   const auth = useAuth();
   const { user, profile } = auth;
@@ -90,6 +95,10 @@ export default function HomePage({
 
   const [stats, setStats] = useState<ProfileStats>(EMPTY_PROFILE_STATS);
   const [loading, setLoading] = useState(true);
+  // Daily streak (engagement — consecutive days played). Read once from the local
+  // store; sync so it's ready on the first paint. Hidden until the player has a
+  // live streak (current > 0) — no streak, no badge, and never any shame copy.
+  const [streak] = useState<StreakState>(() => readStreak());
   const [statuses, setStatuses] = useState<readonly UserStatus[]>(statusesProp ?? []);
   // The open status story (null when the viewer is closed).
   const [openStatus, setOpenStatus] = useState<UserStatus | null>(null);
@@ -254,6 +263,19 @@ export default function HomePage({
           Hi {profile.display_name}! <span aria-hidden="true">🎮</span>
         </h1>
         <p className="home-subtitle">Ready for today’s puzzles?</p>
+        {streak.current > 0 && (
+          <div className="home-streak" data-testid="home-streak">
+            <span className="home-streak__pill">
+              <span aria-hidden="true">🔥</span>
+              <span className="home-streak__count">
+                {streak.current}-day streak
+              </span>
+            </span>
+            {streak.longest > streak.current && (
+              <span className="home-streak__best">Best {streak.longest}</span>
+            )}
+          </div>
+        )}
         <div className="home-hero__cta">
           <Link to={ROUTES.feed} className="home-cta-btn">
             <span className="home-cta-icon home-cta-icon--play" aria-hidden="true">

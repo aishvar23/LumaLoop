@@ -49,8 +49,9 @@ import { ROUTES } from '../app/routes';
 import type { FeedBatchSource } from './feedDeck';
 import FeedScreen from './FeedScreen';
 import FirstRunNotice from './FirstRunNotice';
-import { useRecordGamePlay } from './useRecordGamePlay';
+import { useRecordGamePlay, type RecordGamePlay } from './useRecordGamePlay';
 import { usePlayedCardIds } from './usePlayedCardIds';
+import { recordPlayToday } from './streakStore';
 
 export interface FeedRouteProps {
   /** Test seam: telemetry client. Defaults to the real `/api/event` client. */
@@ -173,6 +174,17 @@ export default function FeedRoute({
     client: effectiveClient,
   });
 
+  // Engagement: every scored card also counts as "played today" for the daily
+  // streak (the NYT/Duolingo habit loop). Local-only, idempotent per day, and
+  // best-effort — `recordPlayToday` never throws, so it can never break the feed.
+  const recordScored = useCallback<RecordGamePlay>(
+    (index, resolution, score) => {
+      recordGamePlay(index, resolution, score);
+      recordPlayToday();
+    },
+    [recordGamePlay],
+  );
+
   // "Play again" replays the same card; each replayed attempt is recorded as its
   // own `game_plays` row (product decision 2026-06). The engine's per-index
   // resolution latch deliberately ignores repeat resolutions of one slide, so we
@@ -234,7 +246,7 @@ export default function FeedRoute({
             onCardSkipped={telemetry.onCardSkipped}
             onCardAbandoned={telemetry.onCardAbandoned}
             onCardResolved={telemetry.onCardResolved}
-            onCardScored={recordGamePlay}
+            onCardScored={recordScored}
           />
           )}
         </SocialConfigProvider>

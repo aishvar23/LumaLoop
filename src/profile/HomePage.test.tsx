@@ -57,7 +57,11 @@ const STATUSES: UserStatus[] = [
   },
 ];
 
-function renderHome(plays: GamePlay[] = [], statuses?: UserStatus[]) {
+function renderHome(
+  plays: GamePlay[] = [],
+  statuses?: UserStatus[],
+  readStreak?: () => { current: number; longest: number; lastPlayedDate: string | null },
+) {
   const auth = createFakeAuthClient({
     session: makeSession(),
     profile: makeProfile(),
@@ -66,7 +70,7 @@ function renderHome(plays: GamePlay[] = [], statuses?: UserStatus[]) {
   render(
     <AuthProvider client={auth.client}>
       <MemoryRouter>
-        <HomePage featuredGames={FEATURED} statuses={statuses} />
+        <HomePage featuredGames={FEATURED} statuses={statuses} readStreak={readStreak} />
       </MemoryRouter>
     </AuthProvider>,
   );
@@ -98,6 +102,28 @@ describe('HomePage', () => {
     expect(await screen.findByText('Accuracy')).toBeInTheDocument();
     expect(await screen.findByText('Streak')).toBeInTheDocument();
     expect(await screen.findByText('Points')).toBeInTheDocument();
+  });
+
+  it('shows the daily-streak badge when there is a live streak', async () => {
+    renderHome([], undefined, () => ({
+      current: 3,
+      longest: 7,
+      lastPlayedDate: '2026-06-25',
+    }));
+    const badge = await screen.findByTestId('home-streak');
+    expect(badge).toHaveTextContent('3-day streak');
+    // Longest beats current → a subtle "Best" hint accompanies it.
+    expect(badge).toHaveTextContent('Best 7');
+  });
+
+  it('hides the streak badge when there is no streak yet', async () => {
+    renderHome([], undefined, () => ({
+      current: 0,
+      longest: 0,
+      lastPlayedDate: null,
+    }));
+    await screen.findByRole('heading', { name: /hi player one/i });
+    expect(screen.queryByTestId('home-streak')).not.toBeInTheDocument();
   });
 
   it('deep-links each featured tile to its specific game', async () => {
