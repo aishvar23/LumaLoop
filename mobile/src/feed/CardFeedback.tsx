@@ -31,7 +31,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import type { CardScore } from '../core/feed/scoring';
+import { performanceTags, type CardScore } from '../core/feed/scoring';
 import type { CardResolution, ResolutionType } from '../core/templates/contract';
 import { useReducedMotion } from './useReducedMotion';
 import {
@@ -55,6 +55,11 @@ export type CardFeedbackProps = {
    * chip. GAME language only (Design §7/§21.8).
    */
   cardScore?: CardScore | null;
+  /**
+   * The card's time limit (ms), used to derive the FAST performance tag
+   * (engagement §4.3). Omitted/non-finite ≡ no time pressure → never "Fast".
+   */
+  timeLimitMs?: number;
   /**
    * Optional presentational slot rendered below the explanation — used by the feed
    * to inject the social Share action (kept OUT of this component so it stays pure /
@@ -94,10 +99,13 @@ export default function CardFeedback({
   resolution,
   explanation,
   cardScore,
+  timeLimitMs,
   footer,
   onReplay,
 }: CardFeedbackProps) {
   const { resolutionType } = resolution;
+  // Game-framing performance tags (engagement §4.3) — empty for a miss/timeout.
+  const tags = performanceTags(resolution, timeLimitMs ?? Number.POSITIVE_INFINITY);
   const heading = OUTCOME_HEADING[resolutionType];
   const detail = OUTCOME_DETAIL[resolutionType];
   const positive = resolutionType === 'correct';
@@ -193,6 +201,21 @@ export default function CardFeedback({
           <Text style={styles.outcomeDetail}>{detail}</Text>
         </View>
       </View>
+
+      {/* Engagement §4.3: game-framing performance tags (Perfect/Fast/Clean/
+          Recovered) above the points chip — a small reward flourish. Empty for a
+          miss/timeout → nothing rendered. GAME words only (Design §7/§21.8). */}
+      {tags.length > 0 ? (
+        <View style={styles.tagsRow} testID="feedback-tags">
+          {tags.map((tag) => (
+            <View key={tag} style={[styles.tagChip, { borderColor: accent }]}>
+              <Text style={[styles.tagChipLabel, { color: accent }]} testID="feedback-tag">
+                {tag}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
 
       {/* Phase 4: the per-resolution GAME-POINTS chip — points earned plus the
           current streak/combo. Shown only when a score was supplied (feed runs);
@@ -407,8 +430,24 @@ const styles = StyleSheet.create({
   },
   scorePoints: {
     color: colors.text,
-    fontSize: fontSize.md,
+    fontSize: fontSize.lg,
     fontWeight: fontWeight.heavy,
+  },
+  tagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: space.sm,
+  },
+  tagChip: {
+    paddingVertical: space.xs,
+    paddingHorizontal: space.sm,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+  },
+  tagChipLabel: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold,
   },
   scoreMeta: {
     color: colors.textMuted,

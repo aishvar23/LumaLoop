@@ -182,6 +182,7 @@ export function withFeedbackGate(
           resolution={resolution}
           explanation={card.explanation}
           cardScore={cardScore}
+          timeLimitMs={card.config.timeLimitMs}
           // Inject the social Share-to-status action (a feed-layer concern keyed
           // by cardId; renders nothing without a social provider, so the engine
           // stays auth-free). Captures the game + result (outcome + points).

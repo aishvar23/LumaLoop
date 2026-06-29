@@ -186,4 +186,34 @@ describe('CardFeedback', () => {
     expect(screen.getByTestId('card-score-reset')).toHaveTextContent('Streak reset');
     expect(screen.queryByText(/pts/)).not.toBeInTheDocument();
   });
+
+  // ── Engagement §4.3: performance tags ──────────────────────────────────────
+  it('renders a "Perfect" tag for a correct, first-attempt, fast resolution', () => {
+    render(
+      <CardFeedback
+        resolution={{
+          ...makeResolution('correct'),
+          interactionElapsedMs: 800,
+          attemptCount: 1,
+        }}
+        explanation={explanation}
+        timeLimitMs={60_000}
+        onContinue={() => {}}
+      />,
+    );
+    expect(screen.getByTestId('feedback-tags')).toBeInTheDocument();
+    expect(screen.getByTestId('feedback-tag')).toHaveTextContent('Perfect');
+  });
+
+  it('renders no performance tags on a miss', () => {
+    render(
+      <CardFeedback
+        resolution={makeResolution('incorrect')}
+        explanation={explanation}
+        timeLimitMs={60_000}
+        onContinue={() => {}}
+      />,
+    );
+    expect(screen.queryByTestId('feedback-tags')).not.toBeInTheDocument();
+  });
 });

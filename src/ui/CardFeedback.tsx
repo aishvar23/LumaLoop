@@ -24,7 +24,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 
-import type { CardScore } from '../feed/scoring';
+import { performanceTags, type CardScore } from '../feed/scoring';
 import type { CardResolution, ResolutionType } from '../templates/contract';
 import Button from './Button';
 import Stack from './Stack';
@@ -40,6 +40,11 @@ export type CardFeedbackProps = {
    * renders, tests) → the chip is not shown. GAME language only (Design §7/§21.8).
    */
   cardScore?: CardScore | null;
+  /**
+   * The card's time limit (ms), used to derive the FAST performance tag
+   * (engagement §4.3). Omitted/non-finite ≡ no time pressure → never "Fast".
+   */
+  timeLimitMs?: number;
   /**
    * Optional presentational slot rendered just above "Next" — used by the feed to
    * inject the social Share action (kept OUT of this component so it stays pure /
@@ -85,11 +90,14 @@ export default function CardFeedback({
   resolution,
   explanation,
   cardScore,
+  timeLimitMs,
   footer,
   onContinue,
   onReplay,
 }: CardFeedbackProps) {
   const { resolutionType } = resolution;
+  // Game-framing performance tags (engagement §4.3) — empty for a miss/timeout.
+  const tags = performanceTags(resolution, timeLimitMs ?? Number.POSITIVE_INFINITY);
   const heading = OUTCOME_HEADING[resolutionType];
   const detail = OUTCOME_DETAIL[resolutionType];
   const glyph = OUTCOME_GLYPH[resolutionType];
@@ -156,6 +164,19 @@ export default function CardFeedback({
             <p style={outcomeDetailStyle}>{detail}</p>
           </div>
         </div>
+
+        {/* Engagement §4.3: game-framing performance tags (Perfect/Fast/Clean/
+            Recovered) above the points chip — a small reward flourish. Empty for a
+            miss/timeout → nothing rendered. GAME words only (Design §7/§21.8). */}
+        {tags.length > 0 ? (
+          <div style={tagsRowStyle} data-testid="feedback-tags">
+            {tags.map((tag) => (
+              <span key={tag} style={tagChipStyle} data-testid="feedback-tag">
+                {tag}
+              </span>
+            ))}
+          </div>
+        ) : null}
 
         {/* Phase-4 slot: the per-resolution GAME-POINTS chip — points earned plus
             the current streak/combo — themed with the slide accent. Shown only
@@ -267,9 +288,27 @@ const scoreChipStyle = {
 } as const;
 
 const scorePointsStyle = {
-  fontSize: 'var(--font-size-md)',
+  fontSize: 'var(--font-size-lg)',
   fontWeight: 'var(--font-weight-bold)',
   color: 'var(--color-text)',
+} as const;
+
+/** The performance-tags row (engagement §4.3) — small accent-tinted chips that
+ * sit just above the points chip. Accent-aware via the slide's `--accent`. */
+const tagsRowStyle = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 'var(--space-2)',
+} as const;
+
+const tagChipStyle = {
+  padding: 'var(--space-1) var(--space-2)',
+  borderRadius: 'var(--radius-pill)',
+  border: '1px solid var(--accent, var(--color-accent))',
+  background: 'var(--accent-tint, var(--color-surface-overlay))',
+  color: 'var(--accent, var(--color-accent))',
+  fontSize: 'var(--font-size-sm)',
+  fontWeight: 'var(--font-weight-bold)',
 } as const;
 
 const scoreMetaStyle = {

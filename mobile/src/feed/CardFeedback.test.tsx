@@ -109,4 +109,32 @@ describe('CardFeedback score chip (RN)', () => {
     expect(screen.getByTestId('card-score-reset')).toBeTruthy();
     expect(screen.queryByText(/pts/)).toBeNull();
   });
+
+  // ── Engagement §4.3: performance tags ──────────────────────────────────────
+  it('renders a "Perfect" tag for a correct, first-attempt, fast resolution', () => {
+    render(
+      <CardFeedback
+        resolution={{
+          ...makeResolution('correct'),
+          interactionElapsedMs: 800,
+          attemptCount: 1,
+        }}
+        explanation={explanation}
+        timeLimitMs={60_000}
+      />,
+    );
+    expect(screen.getByTestId('feedback-tags')).toBeTruthy();
+    expect(screen.getByTestId('feedback-tag')).toHaveTextContent('Perfect');
+  });
+
+  it('renders no performance tags on a miss', () => {
+    render(
+      <CardFeedback
+        resolution={makeResolution('incorrect')}
+        explanation={explanation}
+        timeLimitMs={60_000}
+      />,
+    );
+    expect(screen.queryByTestId('feedback-tags')).toBeNull();
+  });
 });
