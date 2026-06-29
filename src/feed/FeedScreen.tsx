@@ -46,6 +46,7 @@ import {
 } from 'react';
 
 import { getCardById as getCatalogCardById } from '../cards/catalog';
+import { hookForCard } from '../cards/cardHook';
 import type { LiquidCard } from '../cards/types';
 import { resolveRenderer } from '../session/rendererRegistry';
 import type {
@@ -614,6 +615,12 @@ const FeedSlide = memo(function FeedSlide({
           difficulty={card.difficulty}
           timeLimitMs={card.config.timeLimitMs}
         />
+        {/* The card's HOOK — the bold first-read promise before the player
+            engages (engagement strategy §4.1). Falls back to a per-template
+            default so every slide has one. */}
+        <p className="feed-slide__hook" data-testid="feed-hook">
+          {hookForCard(card)}
+        </p>
         <div
           className="feed-slide__game"
           data-testid={`feed-game-${index}`}

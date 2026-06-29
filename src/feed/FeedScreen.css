@@ -191,6 +191,21 @@
  * a scroll container pushes overflow PAST the start edge where it can't be
  * scrolled to (clipping the prompt's top); `safe` falls back to start-alignment
  * the moment content overflows, so tall games stay fully scrollable. */
+/* The card HOOK — the bold first-read promise above the game (engagement
+   strategy §4.1). Accent-tinted, generously sized so it reads first. */
+.feed-slide__hook {
+  position: relative;
+  z-index: 1;
+  margin: 0 0 clamp(8px, 2vw, 14px) 0;
+  padding: 0 2px;
+  font-size: clamp(1.05rem, 4.4vw, 1.5rem);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-snug);
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+  text-wrap: balance;
+}
+
 .feed-slide__game {
   position: relative;
   z-index: 1;

@@ -105,6 +105,14 @@ export type LiquidCardBase = {
   reviewStatus: 'unreviewed' | 'manual_reviewed';
   estimatedSeconds: number;
   prompt: string;
+  /**
+   * Optional punchy "hook" — a one-line promise shown as the bold first-read on
+   * the feed slide BEFORE the player engages (engagement strategy §4.1: every
+   * card needs a hook). When omitted, the feed falls back to a per-template
+   * default (see `./cardHook`). Keep it short and concrete, within the
+   * positioning guardrails (game framing only — no IQ/skill/assessment claims).
+   */
+  hook?: string;
   puzzleDna: PuzzleDna;
   explanation: {
     title: string;

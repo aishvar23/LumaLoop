@@ -77,6 +77,7 @@ import {
 import { GameThemeProvider } from './templates/GameTheme';
 import { useReducedMotion } from './useReducedMotion';
 import { getCardById as getCatalogCardById } from '../core/cards/catalog';
+import { hookForCard } from '../core/cards/cardHook';
 import type { LiquidCard } from '../core/cards/types';
 import type {
   CardResolution,
@@ -646,6 +647,12 @@ const FeedSlide = memo(function FeedSlide({
           difficulty={card.difficulty}
           timeLimitMs={card.config.timeLimitMs}
         />
+        {/* The card's HOOK — the bold first-read promise before the player
+            engages (engagement strategy §4.1). Per-template fallback so every
+            slide has one. */}
+        <Text style={styles.hook} testID="feed-hook">
+          {hookForCard(card)}
+        </Text>
         {/* MP2 (#134): center the game (and, via the gate, the feedback step)
             vertically + horizontally in the slide. The full-width inner wrapper
             keeps games spanning the padded content box rather than collapsing to
@@ -1190,6 +1197,15 @@ const styles = StyleSheet.create({
   // MP2 (#134): center the game content in the middle of the viewport, not pinned
   // to the top — TikTok/Reels-style. Template-agnostic: centering happens here at
   // the slide/feed level, never per game.
+  // The card HOOK — bold first-read promise above the game (engagement §4.1).
+  hook: {
+    color: colors.text,
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.bold,
+    lineHeight: fontSize.lg * 1.2,
+    marginBottom: space.md,
+    paddingHorizontal: 2,
+  },
   game: {
     flex: 1,
     minHeight: 0,
