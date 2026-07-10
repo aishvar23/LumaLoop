@@ -22,7 +22,7 @@
  * outcome is announced exactly once; the explanation is plain headed copy too.
  */
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 
 import { performanceTags, type CardScore } from '../feed/scoring';
 import type { CardResolution, ResolutionType } from '../templates/contract';
@@ -150,10 +150,19 @@ export default function CardFeedback({
       data-outcome={resolutionType}
       style={{
         ...cardStyle,
+        position: 'relative',
         background: tint.surface,
         borderColor: tint.border,
+        // Juice: a correct answer POPS in; a miss SHAKES in. (Both auto-disable
+        // under prefers-reduced-motion via the global rule.)
+        animation: positive
+          ? 'card-feedback-pop var(--motion-base) var(--ease-pop) both'
+          : 'card-shake 400ms ease both',
       }}
     >
+      {/* Juice: a ✦ spark burst radiates from the badge on a correct answer
+          (on-brand, decorative). Hidden from assistive tech. */}
+      {positive ? <SparkBurst /> : null}
       <Stack gap={3}>
         {/* Dedicated polite live region — empty on first paint, set post-mount
             (above) so the outcome reliably announces. Visually hidden; the
@@ -261,6 +270,42 @@ export default function CardFeedback({
         ) : null}
       </Stack>
     </section>
+  );
+}
+
+/** Angles (deg) the celebratory sparks radiate along from the badge. */
+const BURST_ANGLES = [0, 55, 120, 180, 240, 305];
+
+/**
+ * A one-shot ✦ spark burst radiating from the outcome badge on a correct answer
+ * (engagement "juice", on-brand). Purely decorative; each spark sets its own
+ * `--dx`/`--dy` direction and the shared `card-spark-burst` keyframe (global.css)
+ * flies it outward + fades. Disabled under prefers-reduced-motion by the global
+ * rule.
+ */
+function SparkBurst() {
+  return (
+    <div aria-hidden="true" style={burstStyle}>
+      {BURST_ANGLES.map((deg) => {
+        const rad = (deg * Math.PI) / 180;
+        const dx = `${Math.round(Math.cos(rad) * 50)}px`;
+        const dy = `${Math.round(Math.sin(rad) * 50)}px`;
+        return (
+          <span
+            key={deg}
+            style={
+              {
+                ...sparkStyle,
+                '--dx': dx,
+                '--dy': dy,
+              } as CSSProperties
+            }
+          >
+            ✦
+          </span>
+        );
+      })}
+    </div>
   );
 }
 
@@ -391,6 +436,26 @@ const cardStyle = {
   border: '1px solid var(--color-border)',
   boxShadow: 'var(--shadow-md)',
   animation: 'card-feedback-pop var(--motion-base) var(--ease-pop) both',
+} as const;
+
+/* Spark-burst origin — centered over the outcome badge (top-left of the card). */
+const burstStyle = {
+  position: 'absolute',
+  top: 'calc(var(--space-4) + 22px)',
+  left: 'calc(var(--space-4) + 22px)',
+  width: 0,
+  height: 0,
+  pointerEvents: 'none',
+  zIndex: 2,
+} as const;
+
+const sparkStyle = {
+  position: 'absolute',
+  fontSize: 'var(--font-size-md)',
+  lineHeight: 1,
+  color: '#ffd76a',
+  textShadow: '0 0 10px rgba(255, 215, 106, 0.7)',
+  animation: 'card-spark-burst 620ms var(--ease-out, ease-out) both',
 } as const;
 
 const outcomeRowStyle = {

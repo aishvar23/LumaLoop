@@ -10,6 +10,7 @@
     "expo-apple-authentication": "~56.0.4",
     "expo-auth-session": "~56.0.14",
     "expo-crypto": "~56.0.4",
+    "expo-haptics": "~56.0.3",
     "expo-linear-gradient": "~56.0.4",
     "expo-linking": "~56.0.14",
     "expo-standard-web-crypto": "^56.0.3",

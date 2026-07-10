@@ -156,12 +156,44 @@ export default function CardFeedback({
     animation.start();
     return () => animation.stop();
   }, [reducedMotion, anim]);
+
+  // Juice: a celebratory ✦ spark BURST on a correct answer; a quick SHAKE on a
+  // miss. Both are decorative and disabled under reduce-motion.
+  const burst = useRef(new Animated.Value(0)).current;
+  const shake = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (reducedMotion) return undefined;
+    if (positive) {
+      burst.setValue(0);
+      const a = Animated.timing(burst, {
+        toValue: 1,
+        duration: 620,
+        useNativeDriver: true,
+      });
+      a.start();
+      return () => a.stop();
+    }
+    shake.setValue(0);
+    const a = Animated.timing(shake, {
+      toValue: 1,
+      duration: 360,
+      useNativeDriver: true,
+    });
+    a.start();
+    return () => a.stop();
+  }, [reducedMotion, positive, burst, shake]);
+  const shakeTranslate = shake.interpolate({
+    inputRange: [0, 0.2, 0.4, 0.6, 0.8, 1],
+    outputRange: [0, -8, 8, -6, 6, 0],
+  });
+
   const animatedStyle = {
     opacity: anim.interpolate({
       inputRange: [0, 0.6, 1],
       outputRange: [0, 1, 1],
     }),
     transform: [
+      { translateX: shakeTranslate },
       {
         translateY: anim.interpolate({
           inputRange: [0, 1],
@@ -190,6 +222,11 @@ export default function CardFeedback({
         animatedStyle,
       ]}
     >
+      {/* Juice: sparks radiate from the badge on a correct answer (on-brand ✦). */}
+      {positive && !reducedMotion ? (
+        <SparkBurst progress={burst} color={accent} />
+      ) : null}
+
       {/* Outcome badge: a tinted glyph chip + the outcome word. The word itself
           carries meaning (not colour-only); a polite live region announces it. */}
       <View style={styles.outcomeRow}>
@@ -307,6 +344,74 @@ export default function CardFeedback({
 }
 CardFeedback.displayName = 'CardFeedback';
 
+/** Angles (deg) the celebratory sparks radiate along from the badge. */
+const BURST_ANGLES = [0, 55, 120, 180, 240, 305];
+
+/**
+ * A one-shot ✦ spark burst radiating from the outcome badge on a correct answer
+ * (engagement "juice", on-brand). Purely decorative + a11y-hidden; the caller
+ * gates it on reduce-motion.
+ */
+function SparkBurst({
+  progress,
+  color,
+}: {
+  progress: Animated.Value;
+  color: string;
+}) {
+  return (
+    <View
+      pointerEvents="none"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={styles.burst}
+    >
+      {BURST_ANGLES.map((deg) => {
+        const rad = (deg * Math.PI) / 180;
+        const dx = Math.cos(rad) * 48;
+        const dy = Math.sin(rad) * 48;
+        return (
+          <Animated.Text
+            key={deg}
+            style={[
+              styles.burstSpark,
+              {
+                color,
+                opacity: progress.interpolate({
+                  inputRange: [0, 0.6, 1],
+                  outputRange: [0, 1, 0],
+                }),
+                transform: [
+                  {
+                    translateX: progress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, dx],
+                    }),
+                  },
+                  {
+                    translateY: progress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, dy],
+                    }),
+                  },
+                  {
+                    scale: progress.interpolate({
+                      inputRange: [0, 0.5, 1],
+                      outputRange: [0.3, 1.2, 0.7],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            ✦
+          </Animated.Text>
+        );
+      })}
+    </View>
+  );
+}
+
 /**
  * The per-resolution GAME-POINTS chip (Phase 4). Shows points earned and, on a
  * streak, the current run length + combo multiplier. GAME language only — "pts",
@@ -356,6 +461,21 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     borderWidth: 1,
     ...elevation.card,
+  },
+  // Spark burst origin — centered over the outcome badge (top-left of the card).
+  burst: {
+    position: 'absolute',
+    top: space.xl + 22,
+    left: space.xl + 22,
+    width: 0,
+    height: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  burstSpark: {
+    position: 'absolute',
+    fontSize: 15,
   },
   outcomeRow: {
     flexDirection: 'row',

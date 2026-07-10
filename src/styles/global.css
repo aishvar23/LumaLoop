@@ -104,6 +104,42 @@ button {
   }
 }
 
+/* Juice: a ✦ spark flies outward + fades from the outcome badge on a correct
+ * answer. Each spark sets its own `--dx`/`--dy` direction inline. */
+@keyframes card-spark-burst {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.3);
+  }
+  55% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--dx, 0), var(--dy, 0)) scale(0.8);
+  }
+}
+
+/* Juice: a quick horizontal shake — the entrance for a MISS result card. */
+@keyframes card-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-8px);
+  }
+  40% {
+    transform: translateX(8px);
+  }
+  60% {
+    transform: translateX(-6px);
+  }
+  80% {
+    transform: translateX(6px);
+  }
+}
+
 /* Respect users who ask for less motion: disable non-essential animation and
  * transitions, and make programmatic scrolling instant. Essential motion (if
  * any) should opt back in explicitly. This also neutralises every Phase 5

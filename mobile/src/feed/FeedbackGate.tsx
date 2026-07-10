@@ -47,6 +47,7 @@ import {
 import type { LiquidCard, TemplateType } from '../core/cards/types';
 import type { CardResolution, TemplateProps } from '../core/templates/contract';
 import { useCardScoreLookup } from './cardScoreContext';
+import { errorBuzz, selectionTick, successBuzz } from './haptics';
 import { recordCardBest } from './cardBestStore';
 import { View } from 'react-native';
 
@@ -139,12 +140,31 @@ export function withFeedbackGate(
     const recordReplayRef = useRef(recordReplay);
     recordReplayRef.current = recordReplay;
 
+    // Juice: a light selection tick on the first meaningful interaction with the
+    // card (template-agnostic — every renderer calls `onAttempt` once on engage).
+    const onAttemptRef = useRef(onAttempt);
+    onAttemptRef.current = onAttempt;
+    const handleAttempt = useCallback(
+      (signals?: Record<string, number | string | boolean>) => {
+        selectionTick();
+        onAttemptRef.current(signals);
+      },
+      [],
+    );
+
     const onResolveRef = useRef(onResolve);
     onResolveRef.current = onResolve;
     const handleResolve = useCallback(
       (next: CardResolution) => {
         setResolution(next);
-        if (isActiveRef.current !== false) setPlayed(true);
+        if (isActiveRef.current !== false) {
+          setPlayed(true);
+          // Juice: a celebratory buzz on a correct answer, a softer error buzz on
+          // a miss/timeout (best-effort; no-ops on the simulator). Only for a real
+          // played resolution, never an off-screen abandoned timeout.
+          if (next.isCorrect) successBuzz();
+          else errorBuzz();
+        }
         // First play (replayKey 0) records through the normal latched path. A
         // REPLAY's resolution would be dropped by the feed's per-index latch, so
         // record it here off that path — at resolve time, so it still counts even
@@ -261,7 +281,7 @@ export function withFeedbackGate(
         card={card}
         context={context}
         isActive={isActive}
-        onAttempt={onAttempt}
+        onAttempt={handleAttempt}
         // Capture + forward — but DO NOT show its own explanation; the gate owns
         // the uniform explanation step now.
         onResolve={handleResolve}
