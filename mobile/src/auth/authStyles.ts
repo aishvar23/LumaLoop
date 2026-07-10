@@ -41,6 +41,17 @@ export const authStyles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: space.md,
   },
+  /** A subtle centered "Sign out" escape on the profile-creation screen. */
+  signOutLink: {
+    alignSelf: 'center',
+    marginTop: space.lg,
+    paddingVertical: space.sm,
+  },
+  signOutText: {
+    color: colors.textMuted,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.semibold,
+  },
   tagline: {
     color: colors.textMuted,
     fontSize: fontSize.md,

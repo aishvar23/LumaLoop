@@ -41,7 +41,7 @@ export interface ProfileCreationScreenProps {
 export default function ProfileCreationScreen({
   client = supabase,
 }: ProfileCreationScreenProps) {
-  const { user, refreshProfile } = useAuth();
+  const { user, refreshProfile, signOut } = useAuth();
   const [handle, setHandle] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
@@ -150,6 +150,16 @@ export default function ProfileCreationScreen({
             {error}
           </p>
         )}
+
+        {/* Escape hatch: a stale/expired session can land here with no way out.
+            Signing out clears it so the player can sign in fresh. */}
+        <button
+          type="button"
+          className="auth-signout-link"
+          onClick={() => void signOut()}
+        >
+          Wrong account? Sign out
+        </button>
       </div>
     </div>
   );

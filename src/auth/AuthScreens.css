@@ -43,6 +43,24 @@
   font-size: 0.95rem;
 }
 
+/* A subtle centered "Sign out" escape on the profile-creation screen (so a stale
+   session isn't a dead end). */
+.auth-signout-link {
+  display: block;
+  margin: var(--space-3) auto 0;
+  padding: var(--space-2);
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+.auth-signout-link:hover {
+  color: var(--color-text);
+  text-decoration: underline;
+}
+
 .auth-providers {
   display: flex;
   flex-direction: column;
