@@ -225,7 +225,10 @@ export default function SignalSetCard({
                   <span key={index}>{GLYPHS[tile.shape][tile.fill]}</span>
                 ))}
               </span>
-              <span style={tileMetaStyle}>{tile.fill}</span>
+              {/* No visible fill label: the glyph itself shows fill (solid ●,
+                  striped ◉, outline ○). Printing "solid"/"striped"/"outline"
+                  telegraphed the puzzle; the full description stays on the tile's
+                  aria-label for screen readers. */}
             </button>
           );
         })}
@@ -387,12 +390,6 @@ const glyphRowStyle = {
   gap: 4,
   fontSize: 28,
   lineHeight: 1,
-} as const;
-const tileMetaStyle = {
-  color: 'var(--color-text-muted)',
-  fontSize: 11,
-  textTransform: 'uppercase',
-  letterSpacing: '0.09em',
 } as const;
 const footerStyle = {
   display: 'flex',

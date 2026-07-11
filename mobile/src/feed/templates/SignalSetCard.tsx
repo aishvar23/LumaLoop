@@ -264,7 +264,10 @@ export default function SignalSetCard({
                   () => GLYPHS[tile.shape][tile.fill],
                 ).join(' ')}
               </Text>
-              <Text style={styles.meta}>{tile.fill.toUpperCase()}</Text>
+              {/* No visible fill label: the glyph itself shows fill (solid ●,
+                  striped ◉, outline ○). Printing "SOLID"/"STRIPED"/"OUTLINE"
+                  telegraphed the puzzle; the full description stays on the tile's
+                  accessibilityLabel for screen readers. */}
             </Pressable>
           );
         })}
@@ -436,7 +439,6 @@ const styles = StyleSheet.create({
     ...elevation.tile,
   },
   glyph: { fontSize: 26, fontWeight: fontWeight.bold },
-  meta: { color: colors.textMuted, fontSize: 10, letterSpacing: 1 },
   footer: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -3938,7 +3938,7 @@ const signalSetCards: SignalSetCard[] = [
     evidenceTier: 'mechanic_mapped',
     reviewStatus: 'manual_reviewed',
     estimatedSeconds: 25,
-    prompt: 'Find the trio with one shared feature and two changing features.',
+    prompt: 'Find a valid trio — each feature all the same, or all different.',
     puzzleDna: {
       mechanic: 'attribute-triad',
       inputMode: 'choice',
@@ -3970,7 +3970,7 @@ const signalSetCards: SignalSetCard[] = [
     evidenceTier: 'mechanic_mapped',
     reviewStatus: 'manual_reviewed',
     estimatedSeconds: 18,
-    prompt: 'Pick the three solid signals that change shape and count.',
+    prompt: 'Pick three signals where every feature is all same or all different.',
     puzzleDna: {
       mechanic: 'attribute-triad',
       inputMode: 'choice',
@@ -4002,7 +4002,7 @@ const signalSetCards: SignalSetCard[] = [
     evidenceTier: 'mechanic_mapped',
     reviewStatus: 'manual_reviewed',
     estimatedSeconds: 22,
-    prompt: 'Find three striped signals with no repeated shape or count.',
+    prompt: 'Spot the trio where shape, fill, and count each match or all differ.',
     puzzleDna: {
       mechanic: 'attribute-triad',
       inputMode: 'choice',
@@ -4034,7 +4034,7 @@ const signalSetCards: SignalSetCard[] = [
     evidenceTier: 'mechanic_mapped',
     reviewStatus: 'manual_reviewed',
     estimatedSeconds: 22,
-    prompt: 'Find the trio where every feature is all different.',
+    prompt: 'Build a valid trio: each feature all same, or all different.',
     puzzleDna: {
       mechanic: 'attribute-triad',
       inputMode: 'choice',
