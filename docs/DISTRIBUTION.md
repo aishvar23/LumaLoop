@@ -11,6 +11,28 @@ step (see §3); the web link (§4) is the lowest-friction option of all.
 
 ---
 
+## 0. ⛳ Before the NEXT tester rollout (open action items)
+
+Do these before handing the app to any more Android/iOS users:
+
+- [ ] **Deploy the web app so challenge links resolve.** "Challenge a friend"
+      shares `https://witzy.app/c/<cardId>?s=<score>` (hardcoded `CHALLENGE_BASE_URL`
+      in `src/social/challengeLink.ts` / mobile mirror). Until the web app is
+      deployed to **witzy.app** (Vercel) and the domain is pointed there, those
+      links open nothing. Deploying also lights up the public `/c/:cardId` play
+      surface and the daily-reminder cron.
+- [ ] **Turn on the daily-reminder email** (optional): deploy `/api/daily-reminder`
+      to Vercel and set `RESEND_API_KEY`, `CRON_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`
+      + a verified Resend sending domain. Cron is already declared in `vercel.json`.
+- [ ] **Keep Supabase unpaused.** The free-tier project auto-paused once and broke
+      login (stale sessions strand users at profile creation). Confirm it's active
+      before a rollout; consider a tiny scheduled keep-warm ping.
+- [ ] **Rebuild the APK from `task/likes-comments`** so the current feature set
+      (new games, longer timers, hooks, streak, best, challenge links, juice, spark
+      brand) actually ships — not the older `codex/…` branch / other EAS project.
+
+---
+
 ## 1. What's already configured
 
 - **`mobile/app.json`** — name `LumaLoop`, `scheme: lumaloop` (the OAuth deep-link
