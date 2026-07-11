@@ -3,8 +3,8 @@
  * `src/auth/LoginScreen.tsx`).
  *
  * The gate before the feed for signed-out users (see {@link RequireAuth}): a
- * TikTok/IG-style "sign in to start playing" surface with OAuth buttons (Google /
- * Apple / Facebook) and an email magic-link fallback. On-brand with the token
+ * TikTok/IG-style "sign in to start playing" surface with a Google OAuth button
+ * and an email magic-link fallback. On-brand with the token
  * system. Unlike the web version (which navigates away), native OAuth opens the
  * system auth browser and resolves inline — so the buttons stay disabled while the
  * sheet is up and re-enable when it returns.
@@ -20,10 +20,11 @@ import { useAuth } from './AuthProvider';
 import type { OAuthProvider } from './authClient';
 import { authStyles as s } from './authStyles';
 
+// Only Google OAuth + the email magic link are wired up (Apple/Facebook are not
+// configured in Supabase, so they only error). The AuthProvider still supports
+// them mechanically, so re-adding a button here is all it takes to re-enable one.
 const PROVIDERS: { id: OAuthProvider; label: string }[] = [
   { id: 'google', label: 'Continue with Google' },
-  { id: 'apple', label: 'Continue with Apple' },
-  { id: 'facebook', label: 'Continue with Facebook' },
 ];
 
 export default function LoginScreen() {
