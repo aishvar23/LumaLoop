@@ -101,13 +101,16 @@ pole; start the enrollment first.
 
 ### Build + submit (run from `mobile/`)
 ```bash
-eas build -p ios --profile production   # log in with Apple; EAS auto-creates certs + provisioning
-eas submit -p ios                       # uploads the .ipa to App Store Connect
+EXPO_TOKEN=<token> npx eas-cli@latest build -p ios --profile production   # Apple login; EAS auto-creates certs + provisioning
+EXPO_TOKEN=<token> npx eas-cli@latest submit -p ios                       # uploads the .ipa to App Store Connect → TestFlight
 ```
-> Note: the current `eas.json` `production` profile targets Android (`app-bundle`).
-> Before the iOS build, add an iOS section/profile (e.g. an `ios` build with
-> `distribution: store`) or a dedicated `ios` profile. Ping the maintainer to add
-> it when you're ready.
+> Repo is iOS-build-ready: the `production` profile has the `EXPO_PUBLIC_*` env and
+> defaults to **store** distribution (the `android.buildType` key only affects
+> Android builds — iOS under the same profile produces a TestFlight-ready `.ipa`).
+> `app.json` sets the bundle id (`app.lumaloop.mobile`), the 1024² icon, and
+> `ITSAppUsesNonExemptEncryption: false` (skips the export-compliance prompt).
+> `eas submit -p ios` will prompt for the Apple account / App Store Connect app the
+> first time (or create the app record). No `eas.json` change needed.
 
 ### Distribute via TestFlight
 - In **App Store Connect → TestFlight**, create an **External** testing group and
