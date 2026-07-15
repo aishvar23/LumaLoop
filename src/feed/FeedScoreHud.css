@@ -6,7 +6,9 @@
 
 .feed-hud {
   position: absolute;
-  top: calc(var(--space-3) + var(--safe-top));
+  /* Drop below the top-left Home/You escape nav strip so brand + points share a
+   * row that clears the nav (see `--feed-nav-h` on `.feed-screen`). */
+  top: calc(var(--space-3) + var(--safe-top) + var(--feed-nav-h, 0px));
   right: var(--space-3);
   z-index: 2;
   display: flex;

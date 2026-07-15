@@ -18,6 +18,10 @@
   height: 100dvh;
   max-height: 100dvh;
   overflow: hidden;
+  /* Vertical strip reserved at the top for the absolute Home/You escape nav, so
+   * the slide's own top bar (brand + points) drops below it instead of colliding
+   * with the Witzy wordmark. Read by `.feed-slide__top` and `.feed-hud`. */
+  --feed-nav-h: 44px;
 }
 
 /*
@@ -536,6 +540,8 @@
   flex-direction: column;
   gap: var(--space-3);
   margin-bottom: var(--space-3);
+  /* Clear the top-right points HUD and the top-left Home/You escape nav. */
+  padding-top: var(--feed-nav-h, 0px);
   padding-right: 88px;
 }
 
