@@ -133,22 +133,48 @@ EXPO_TOKEN=<token> npx eas-cli@latest submit -p ios                       # uplo
 
 ---
 
-## 4. Web (lowest friction — a shareable link)
+## 4. Web (RECOMMENDED for the prototype — a shareable link)
 
-The web app already deploys to Vercel (`EXPO_PUBLIC_API_BASE_URL` points at a
-Vercel URL). A URL beats any install for 50 testers — mobile-first, works in any
-phone browser, "Add to Home Screen" makes it app-like, instant updates.
+A URL beats any install for 50 testers: mobile-first, works in any phone browser
+(iOS + Android), free, instant updates, no $99/App Store/TestFlight. "Add to Home
+Screen" gives an app icon + standalone chrome (the PWA manifest + apple-touch-icon
+ship in `public/`). This is the fastest way to get prototype feedback.
 
+### 4a. Deploy it PUBLICLY (from repo root, run locally — no GitHub push needed)
 ```bash
-npm i -g vercel
-vercel            # link/auth (works from local — no GitHub push needed)
-vercel --prod
+npx vercel          # first time: link/auth the project
+npx vercel --prod   # deploy production → prints your public URL
 ```
-Set Vercel env: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (client, build-time),
-`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (server, for `/api`), `CRON_SECRET`
-(+ `RESEND_API_KEY` / `REMINDER_FROM` only if enabling the daily reminder email).
-Then add the Vercel domain to Supabase **Auth → Site URL + redirect allowlist** and
-to the **Google OAuth** authorized origins/redirects.
+> **Make sure it's public.** Vercel "Deployment Protection" (Vercel Authentication)
+> puts the site behind a login wall — testers would hit `vercel.com/sso-api`. In
+> the Vercel project → **Settings → Deployment Protection**, set Vercel
+> Authentication to **Disabled** (or Preview-only) for Production. A fresh
+> `npx vercel --prod` project is public by default.
+
+### 4b. Vercel env vars (Project → Settings → Environment Variables)
+- `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` — client (build-time; the anon key
+  is public by design, RLS is the boundary).
+- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` — server-only, for `/api/event`
+  telemetry inserts (telemetry is best-effort — omit and the app still works).
+- `CRON_SECRET` (+ `RESEND_API_KEY`, `REMINDER_FROM`) — only if enabling the daily
+  reminder email.
+
+### 4c. Tell Supabase the web URL is allowed (Auth → URL Configuration)
+- **Site URL**: your public web URL (e.g. `https://witzy.vercel.app`).
+- **Redirect URLs**: add `https://<your-web-url>/**` AND keep `http://localhost:5173/**`
+  for local dev. Without this, Google OAuth + magic link fail with
+  "PKCE code verifier not found" (Supabase falls back to a different origin).
+- **Google Cloud OAuth client**: add the web URL to Authorized JavaScript origins +
+  `https://<project>.supabase.co/auth/v1/callback` stays the redirect (Supabase
+  proxies OAuth), so usually no Google change is needed beyond the Supabase config.
+
+### 4d. Verify + share
+- Open the URL on an iPhone (Safari) and an Android (Chrome): sign in with Google
+  or magic link, play a game, tap **Share → Add to Home Screen**.
+- "Challenge a friend" links from the web app automatically use the deployed origin
+  (they build from `window.location.origin`), so they work with no code change.
+- Send testers the URL + "Add to Home Screen" one-liner (see the message template
+  below in §7).
 
 ---
 
@@ -219,9 +245,14 @@ Links**, add basic **rate-limiting** on social writes, and publish a real
 
 ## 7. Quick recommendation
 
-For "just 50 testers, prototype, iOS-priority":
-1. **Now:** ship the **Android APK** (§2) — same day, zero per-tester setup.
-2. **In parallel:** start the **Apple Developer** enrollment so **iOS TestFlight**
-   (§3) is unblocked in 1–2 days.
-3. **Optional:** the **web link** (§4) is the fastest way to get *everyone* trying
-   it immediately while the native builds bake.
+For "just 50 testers, prototype, fast feedback": **ship the web link (§4).** It's
+free, instant, works on every iPhone + Android with no store/$99/review, and one
+URL reaches everyone. Native (Android APK §2 / iOS TestFlight §3) is the follow-up
+once the concept is validated.
+
+### Tester message template (web)
+> **Try Witzy** 🎯 — a feed of quick puzzle games.
+> Open on your phone: **<your-web-url>**
+> Sign in with Google (or "email magic link"), then just swipe and play.
+> Tip: tap **Share → Add to Home Screen** for an app icon.
+> Takes 5 min — tell me what felt fun, what didn't, and if you'd come back.

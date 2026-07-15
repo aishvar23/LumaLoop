@@ -7,10 +7,28 @@
       content="width=device-width, initial-scale=1, viewport-fit=cover"
     />
     <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#0b0d13" />
     <meta
       name="description"
       content="Witzy — a feed of quick puzzle games."
     />
+
+    <!-- App icons + PWA manifest so "Add to Home Screen" (iOS/Android) gets a
+         real Witzy icon and opens standalone (no browser chrome). -->
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Witzy" />
+
+    <!-- Social share preview (challenge links, shared URLs). -->
+    <meta property="og:title" content="Witzy" />
+    <meta property="og:description" content="A feed of quick puzzle games — can you beat the score?" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/icon-512.png" />
+    <meta name="twitter:card" content="summary" />
+
     <title>Witzy</title>
   </head>
   <body>
