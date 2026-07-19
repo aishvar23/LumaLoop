@@ -160,6 +160,28 @@ describe('watch phase', () => {
     expect(screen.queryByTestId('ms-watch-tile-0-0')).not.toBeInTheDocument();
     expect(screen.queryAllByRole('button')).toHaveLength(4); // 2×2 grid
   });
+
+  it('uses a compact centered grid for five-row memory boards so the last row stays visible', () => {
+    renderCard({
+      card: memorySequenceCard({
+        rows: 5,
+        columns: 4,
+        sequence: [
+          { row: 0, column: 0 },
+          { row: 4, column: 3 },
+        ],
+      }),
+    });
+
+    expect(screen.getByTestId('ms-watch-grid')).toHaveStyle({
+      maxWidth: '22.5rem',
+      marginInline: 'auto',
+      gap: 'var(--space-1)',
+      padding: 'var(--space-1)',
+      gridTemplateColumns: 'repeat(4, 1fr)',
+    });
+    expect(screen.getByTestId('ms-watch-tile-4-3')).toBeInTheDocument();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -313,6 +335,25 @@ describe('reproducing the sequence', () => {
     clock = 3_300;
     tapTile(0, 0);
     expect(screen.getByRole('status')).toHaveTextContent('Tapped 1 of 2');
+  });
+
+  it('keeps every selected tile colored and numbered during reproduction', () => {
+    let clock = 1_000;
+    renderCard({ now: () => clock });
+
+    clock = 3_000;
+    advanceWatch();
+    tapTile(0, 0);
+
+    const selected = screen.getByTestId('ms-tile-0-0');
+    const untouched = screen.getByTestId('ms-tile-0-1');
+    expect(selected).toHaveStyle({
+      background: 'var(--accent, var(--color-accent))',
+      borderColor: 'var(--accent, var(--color-accent))',
+    });
+    expect(selected).toHaveAttribute('aria-pressed', 'true');
+    expect(selected).toHaveTextContent('1');
+    expect(untouched).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('ignores taps after the card has already resolved', () => {

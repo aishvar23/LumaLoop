@@ -23,14 +23,26 @@ import type { ComponentType, ReactNode } from 'react';
 import type { LiquidCard, TemplateType } from '../cards/types';
 import type { TemplateProps } from '../templates/contract';
 import CodeBreakCard from '../templates/codeBreak/CodeBreakCard';
+import CircuitFlowCard from '../templates/circuitFlow/CircuitFlowCard';
 import MemorySequenceCard from '../templates/memorySequence/MemorySequenceCard';
 import PatternChainCard from '../templates/patternChain/PatternChainCard';
 import PrismPathCard from '../templates/prismPath/PrismPathCard';
 import RuleFlipCard from '../templates/ruleFlip/RuleFlipCard';
+import SignalSetCard from '../templates/signalSet/SignalSetCard';
 import SpotItCard from '../templates/spotIt/SpotItCard';
 import StepLogicCard from '../templates/stepLogic/StepLogicCard';
 import TinyLogicCard from '../templates/tinyLogic/TinyLogicCard';
 import WhatChangedCard from '../templates/whatChanged/WhatChangedCard';
+import WordUnscrambleCard from '../templates/wordUnscramble/WordUnscrambleCard';
+import QuickMathCard from '../templates/quickMath/QuickMathCard';
+import ColorWordCard from '../templates/colorWord/ColorWordCard';
+import NBackCard from '../templates/nBack/NBackCard';
+import OddOneOutCard from '../templates/oddOneOut/OddOneOutCard';
+import SchulteOrderCard from '../templates/schulteOrder/SchulteOrderCard';
+import MatrixReasoningCard from '../templates/matrixReasoning/MatrixReasoningCard';
+import GearsRotationCard from '../templates/gearsRotation/GearsRotationCard';
+import MemoryMatchCard from '../templates/memoryMatch/MemoryMatchCard';
+import MazePathCard from '../templates/mazePath/MazePathCard';
 
 /**
  * A template renderer: a component that accepts {@link TemplateProps} for its
@@ -101,4 +113,16 @@ export const defaultRendererRegistry: RendererRegistry = {
   step_logic: StepLogicCard,
   code_break: CodeBreakCard,
   prism_path: PrismPathCard,
+  signal_set: SignalSetCard,
+  circuit_flow: CircuitFlowCard,
+  word_unscramble: WordUnscrambleCard,
+  quick_math: QuickMathCard,
+  color_word: ColorWordCard,
+  n_back: NBackCard,
+  odd_one_out: OddOneOutCard,
+  schulte_order: SchulteOrderCard,
+  matrix_reasoning: MatrixReasoningCard,
+  gears_rotation: GearsRotationCard,
+  memory_match: MemoryMatchCard,
+  maze_path: MazePathCard,
 };

@@ -1,0 +1,121 @@
+/** People search — token-driven, mobile-first list. */
+.people-page {
+  min-height: 100dvh;
+  box-sizing: border-box;
+  background: var(--color-bg);
+  color: var(--color-text);
+  padding: calc(var(--safe-top) + var(--space-3)) var(--space-3)
+    calc(var(--safe-bottom) + var(--space-5));
+  max-width: 640px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.people-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.people-back {
+  color: var(--color-accent);
+  text-decoration: none;
+  font-weight: var(--font-weight-semibold);
+}
+
+.people-title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+}
+
+.people-search {
+  appearance: none;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+}
+
+.people-search:focus-visible {
+  border-color: var(--color-accent);
+  outline: none;
+}
+
+.people-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.people-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.people-row__main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  text-decoration: none;
+  color: var(--color-text);
+  flex: 1;
+  min-width: 0;
+}
+
+.people-avatar {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  background: linear-gradient(135deg, #ff7eb6, #9d7bff);
+  color: #fff;
+  font-weight: var(--font-weight-bold);
+}
+
+.people-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.people-id {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.people-name {
+  font-weight: var(--font-weight-semibold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.people-handle {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.people-empty {
+  padding: var(--space-4) 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  text-align: center;
+}

@@ -26,9 +26,9 @@
  *     dayKey, mode])`, which drives one seeded Fisher-Yates shuffle of the
  *     eligible pool.
  *   - Length = `MODE_DEFAULTS[mode].maxCards` where the catalog allows.
- *   - Difficulty ramp (easy -> medium): slots are filled in ascending
+ *   - Difficulty ramp (extremely easy -> easy -> medium): slots are filled in ascending
  *     difficulty so the emitted sequence is non-decreasing in difficulty. A
- *     quota front-loads easy cards and ramps into medium; `hard` is used only
+ *     quota front-loads extremely-easy/easy cards and ramps into medium; `hard` is used only
  *     as fallback to reach the target length (Design §19 ramps "toward medium",
  *     not into hard).
  *   - Category balance: at each slot the lowest-used category is preferred, so
@@ -87,6 +87,22 @@ export type ComposeSessionParams = {
    * reads only `card.difficulty`. */
   difficultyBias?: number;
   /**
+   * Cards to keep OUT of the composition — used by the endless feed to skip
+   * games the signed-in user has already played (D2). Template-agnostic: this is
+   * a plain id set, never a `templateType` switch.
+   *
+   * EXHAUSTION FALLBACK (the feed is ENDLESS and must never empty): exclusion is
+   * applied ONLY while at least one eligible card survives it. If excluding the
+   * set would leave the eligible pool EMPTY, the exclusion is dropped for this
+   * composition and the full eligible pool is used (replays allowed) — a
+   * documented, deterministic, pure fallback. Excluding down to a *small* pool is
+   * fine and intentional (a short batch is still endless via re-composition).
+   *
+   * Accepts a `Set` or array; order/duplicates do not matter. Out-of-pool ids are
+   * ignored. When omitted/empty, behaviour is byte-identical to before.
+   */
+  excludeCardIds?: ReadonlySet<string> | readonly string[];
+  /**
    * UTC day key (`yyyy-mm-dd`). When provided this fully determines the "day"
    * dimension of the seed and `now` is ignored. Prefer passing this in tests.
    */
@@ -103,13 +119,21 @@ export type ComposeSessionParams = {
 
 /** Ascending difficulty rank used to enforce the non-decreasing ramp. */
 const DIFFICULTY_RANK: Readonly<Record<Difficulty, number>> = Object.freeze({
-  easy: 0,
-  medium: 1,
-  hard: 2,
+  extremely_easy: 0,
+  easy: 1,
+  medium: 2,
+  hard: 3,
+  extremely_hard: 4,
 });
 
 /** Difficulty tiers in ascending order — the spill order for tier fallback. */
-const DIFFICULTY_ORDER: readonly Difficulty[] = ['easy', 'medium', 'hard'];
+const DIFFICULTY_ORDER: readonly Difficulty[] = [
+  'extremely_easy',
+  'easy',
+  'medium',
+  'hard',
+  'extremely_hard',
+];
 
 /** Clamp a number into `[0, 1]` (NaN -> 0). Used to harden the difficulty bias. */
 function clamp01(value: number): number {
@@ -124,13 +148,13 @@ function clamp01(value: number): number {
  * a progressive `bias` in `[0, 1]`. Pure and deterministic — the ramp curve is
  * a function of (maxCards, bias) only.
  *
- * Shape: an easy block, then a medium block, then a hard block (so the result
- * is NON-DECREASING by construction). The block sizes slide with the bias:
+ * Shape: an introductory block, then a medium block, then a hard block (so the
+ * result is NON-DECREASING by construction). The block sizes slide with bias:
  *
- *   - `bias = 0` reproduces the original quota EXACTLY — `ceil(maxCards/2)` easy
- *     slots, the remainder medium, zero hard (verified by the existing
- *     composeSession ramp tests).
- *   - As `bias` rises, the easy block shrinks (`(1 - bias)` of its base size)
+ *   - `bias = 0` reserves `ceil(maxCards/2)` introductory slots. They request
+ *     `extremely_easy` first and spill upward to `easy` when that small authored
+ *     tier is exhausted; the remainder request medium, with zero hard.
+ *   - As `bias` rises, the introductory block shrinks (`(1 - bias)` of its size)
  *     and a hard block grows from the tail (`bias` of all slots); medium fills
  *     whatever sits between them. At `bias = 1` every slot wants `hard`.
  *
@@ -143,16 +167,16 @@ function rampDesiredDifficulties(
   bias: number,
 ): Difficulty[] {
   const b = clamp01(bias);
-  // Base easy block is half the slots (the original easy quota), shrinking with
-  // bias. Hard block grows from zero with bias. Round so bias 0 -> 0 hard and
-  // bias 1 -> all hard / no easy.
+  // Base introductory block is half the slots, shrinking with bias. It starts at
+  // extremely_easy and naturally spills into easy. Round so bias 0 -> 0 hard
+  // and bias 1 -> all hard / no introductory cards.
   const baseEasy = Math.ceil(maxCards / 2);
   const easyCount = Math.min(Math.round(baseEasy * (1 - b)), maxCards);
   const hardCount = Math.min(Math.round(maxCards * b), maxCards - easyCount);
   const mediumCount = maxCards - easyCount - hardCount;
 
   const desired: Difficulty[] = [];
-  for (let i = 0; i < easyCount; i++) desired.push('easy');
+  for (let i = 0; i < easyCount; i++) desired.push('extremely_easy');
   for (let i = 0; i < mediumCount; i++) desired.push('medium');
   for (let i = 0; i < hardCount; i++) desired.push('hard');
   return desired;
@@ -315,6 +339,34 @@ function spillOrder(start: Difficulty): readonly Difficulty[] {
   return DIFFICULTY_ORDER.slice(DIFFICULTY_RANK[start]);
 }
 
+/** Normalise the `excludeCardIds` input to a `Set` for O(1) membership. */
+function toExcludeSet(
+  exclude: ReadonlySet<string> | readonly string[] | undefined,
+): ReadonlySet<string> {
+  if (exclude == null) return EMPTY_EXCLUDE;
+  return exclude instanceof Set ? exclude : new Set(exclude);
+}
+
+/** Shared empty exclusion set — avoids per-call allocation in the common case. */
+const EMPTY_EXCLUDE: ReadonlySet<string> = new Set<string>();
+
+/**
+ * Apply the already-played exclusion to the eligible pool, honouring the
+ * endless-feed exhaustion fallback. Pure: returns `eligible` unchanged when the
+ * exclusion is empty or would empty the pool (replays allowed rather than an
+ * empty feed). See {@link ComposeSessionParams.excludeCardIds}.
+ */
+function applyExclusion(
+  eligible: readonly LiquidCard[],
+  exclude: ReadonlySet<string>,
+): readonly LiquidCard[] {
+  if (exclude.size === 0) return eligible;
+  const filtered = eligible.filter((card) => !exclude.has(card.cardId));
+  // Exhaustion fallback: never return an empty pool just because everything was
+  // played — fall back to the full eligible pool so the endless feed continues.
+  return filtered.length > 0 ? filtered : eligible;
+}
+
 /**
  * Composes a deterministic, ordered list of `cardId`s for one session.
  *
@@ -332,8 +384,13 @@ export function composeSession(params: ComposeSessionParams): readonly string[] 
   const { maxCards, maxDurationMs } = MODE_DEFAULTS[mode];
   const timeBudgetSeconds = maxDurationMs / 1000;
 
-  const eligible = sourceCatalog.filter(isEligible);
-  if (eligible.length === 0) return [];
+  const allEligible = sourceCatalog.filter(isEligible);
+  if (allEligible.length === 0) return [];
+  // D2: drop already-played cards, with the endless-feed exhaustion fallback
+  // (see applyExclusion / excludeCardIds). Done before the seeded shuffle so the
+  // surviving pool is what gets ordered; the ramp/no-repeat/category rules below
+  // are unchanged — they simply operate on a smaller, template-agnostic pool.
+  const eligible = applyExclusion(allEligible, toExcludeSet(params.excludeCardIds));
 
   // One seeded shuffle establishes the per-(user, day, mode) base order; every
   // downstream tiebreak is a stable index into this order, so the whole result
@@ -346,15 +403,17 @@ export function composeSession(params: ComposeSessionParams): readonly string[] 
 
   // Bucket the shuffled pool by difficulty, preserving seeded order within each.
   const tiers: Record<Difficulty, LiquidCard[]> = {
+    extremely_easy: [],
     easy: [],
     medium: [],
     hard: [],
+    extremely_hard: [],
   };
   for (const card of shuffled) tiers[card.difficulty].push(card);
 
-  // Ramp quota: front-load easy, ramp into medium (and, under a positive
+  // Ramp quota: front-load extremely easy/easy, ramp into medium (and, under a positive
   // difficulty bias, into hard). At the default bias 0 this is exactly the
-  // original quota — front-loaded easy ramping into medium with `hard` reached
+  // introductory quota — extremely easy/easy ramping into medium, with `hard` reached
   // only via tier spill (Design §19). The endless feed raises the bias batch
   // over batch so later batches skew harder (FEED_DIRECTION §3.1).
   const desired = rampDesiredDifficulties(maxCards, params.difficultyBias ?? 0);
@@ -365,8 +424,24 @@ export function composeSession(params: ComposeSessionParams): readonly string[] 
     totalSeconds: 0,
   };
 
+  // Realized-difficulty FLOOR: the rank of the previous slot's actual card. The
+  // ramp's `wantedDifficulty` is non-decreasing, but a slot can SPILL upward into
+  // a harder tier when its wanted tier is exhausted (or blocked by the
+  // no-3-in-a-row hard constraint). Without a floor, a *later* slot whose wanted
+  // tier still has stock could then drop BELOW that spilled card and break the
+  // non-decreasing guarantee — a case the new `extremely_easy` tier + the D2
+  // exclusion filter can produce. Clamping each slot's spill start to this floor
+  // makes the realized sequence non-decreasing BY CONSTRUCTION, independent of
+  // exhaustion/exclusion. Template-agnostic — it reads only `card.difficulty`.
+  let floor: Difficulty = DIFFICULTY_ORDER[0];
+
   for (const wantedDifficulty of desired) {
-    const order = spillOrder(wantedDifficulty);
+    // Never request a tier below what we've already realized (the floor).
+    const slotStart =
+      DIFFICULTY_RANK[wantedDifficulty] >= DIFFICULTY_RANK[floor]
+        ? wantedDifficulty
+        : floor;
+    const order = spillOrder(slotStart);
 
     // Pass 1: honor the no-3-in-a-row hard constraint, spilling into harder
     // tiers (only) when the wanted tier is empty.
@@ -386,6 +461,10 @@ export function composeSession(params: ComposeSessionParams): readonly string[] 
       (state.categoryCount.get(card.category) ?? 0) + 1,
     );
     state.totalSeconds += card.estimatedSeconds;
+    // Raise the floor to the realized difficulty — never lower it.
+    if (DIFFICULTY_RANK[card.difficulty] > DIFFICULTY_RANK[floor]) {
+      floor = card.difficulty;
+    }
   }
 
   return state.selected.map((card) => card.cardId);

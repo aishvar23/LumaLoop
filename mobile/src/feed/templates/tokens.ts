@@ -1,6 +1,6 @@
 /**
  * Shared design tokens for the native feed — the one cohesive dark theme applied
- * across the slide shell, all four game renderers, the post-answer feedback step,
+ * across the slide shell, every game renderer, the post-answer feedback step,
  * and the first-run notice (ADO #128, extended for MP3 #135 "TikTok/Instagram look
  * & feel").
  *
@@ -73,17 +73,59 @@ export const colors = {
  * parallel. {@link categoryAccent} resolves a card's category to its accent with a
  * safe fallback, so the feed stays category- and template-agnostic.
  */
-export const categoryAccents = {
-  visual_attention: { accent: '#3fd6c9', tint: 'rgba(63, 214, 201, 0.16)' },
-  working_memory: { accent: '#9d7bff', tint: 'rgba(157, 123, 255, 0.16)' },
-  logical_reasoning: { accent: '#5b8cff', tint: 'rgba(91, 140, 255, 0.16)' },
-  cognitive_flexibility: { accent: '#f5a84c', tint: 'rgba(245, 168, 76, 0.16)' },
-  pattern_recognition: { accent: '#ff6fae', tint: 'rgba(255, 111, 174, 0.16)' },
-  processing_speed: { accent: '#7ed957', tint: 'rgba(126, 217, 87, 0.16)' },
-} as const;
+/** One category's complete game palette. */
+export type CategoryAccent = {
+  /** Bright identifying hue used for glyphs, active outlines, and primary actions. */
+  accent: string;
+  /** Darker companion hue used for gradients and pressed primary actions. */
+  deep: string;
+  /** Ambient slide/chip wash. */
+  tint: string;
+  /** Recessed game-board surface. */
+  surface: string;
+  /** Default tile/option surface. */
+  surfaceRaised: string;
+  /** Pressed/selected tile surface. */
+  surfaceStrong: string;
+  /** Category-colored structural border. */
+  border: string;
+  /** Soft ambient glow. */
+  glow: string;
+};
 
-/** One category's accent theme (accent + chip tint). */
-export type CategoryAccent = { accent: string; tint: string };
+function categoryPalette(
+  accent: string,
+  deep: string,
+  rgb: string,
+): CategoryAccent {
+  return {
+    accent,
+    deep,
+    tint: `rgba(${rgb}, 0.16)`,
+    surface: `rgba(${rgb}, 0.08)`,
+    surfaceRaised: `rgba(${rgb}, 0.16)`,
+    surfaceStrong: `rgba(${rgb}, 0.27)`,
+    border: `rgba(${rgb}, 0.44)`,
+    glow: `rgba(${rgb}, 0.24)`,
+  };
+}
+
+export const categoryAccents = {
+  visual_attention: categoryPalette('#3fd6c9', '#1b9f98', '63, 214, 201'),
+  working_memory: categoryPalette('#9d7bff', '#684cc7', '157, 123, 255'),
+  logical_reasoning: categoryPalette('#5b8cff', '#355fca', '91, 140, 255'),
+  cognitive_flexibility: categoryPalette(
+    '#f5a84c',
+    '#bd6f1d',
+    '245, 168, 76',
+  ),
+  pattern_recognition: categoryPalette(
+    '#ff6fae',
+    '#c83f7d',
+    '255, 111, 174',
+  ),
+  processing_speed: categoryPalette('#7ed957', '#459f2b', '126, 217, 87'),
+} as const;
 
 /**
  * Safe fallback accent (unknown/absent category) — the shared brand blue
@@ -93,7 +135,13 @@ export type CategoryAccent = { accent: string; tint: string };
  */
 export const FALLBACK_CATEGORY_ACCENT: CategoryAccent = {
   accent: '#6c7bff',
+  deep: '#4655c8',
   tint: 'rgba(108, 123, 255, 0.16)',
+  surface: 'rgba(108, 123, 255, 0.08)',
+  surfaceRaised: 'rgba(108, 123, 255, 0.16)',
+  surfaceStrong: 'rgba(108, 123, 255, 0.27)',
+  border: 'rgba(108, 123, 255, 0.44)',
+  glow: 'rgba(108, 123, 255, 0.24)',
 };
 
 /**

@@ -32,9 +32,10 @@
  * plus a polite live region — never colour alone.
  */
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { orderOptions } from '../../core/cards/optionOrder';
 import type { TinyLogicCard as TinyLogicCardType } from '../../core/cards/types';
 import type { CardResolution, TemplateProps } from '../../core/templates/contract';
 import { useCardTimer } from '../../core/templates/useCardTimer';
@@ -49,6 +50,7 @@ import {
   space,
   TAP_TARGET_MIN,
 } from './tokens';
+import { useGameTheme } from './GameTheme';
 
 /**
  * The renderer accepts the shared {@link TemplateProps} plus an optional injectable
@@ -67,6 +69,7 @@ export default function TinyLogicCard({
   now = Date.now,
 }: TinyLogicCardProps) {
   const { config } = card;
+  const theme = useGameTheme();
 
   // Interaction bookkeeping lives in refs so selections don't depend on render
   // timing. `selectedId` is mirrored into state purely to drive the pressed
@@ -169,6 +172,14 @@ export default function TinyLogicCard({
       ? `Correct: ${selectedLabel}`
       : `Incorrect: ${selectedLabel}.`;
 
+  // Present options in a deterministic, card-seeded order so the correct answer
+  // is not positionally guessable (keyed by `correctOptionId`, not slot). Stable
+  // across renders and identical on web↔mobile.
+  const orderedOptions = useMemo(
+    () => orderOptions(card.cardId, config.options),
+    [card.cardId, config.options],
+  );
+
   return (
     <View style={styles.section} accessibilityLabel="Tiny logic">
       <Text testID="tl-stem" style={styles.stem}>
@@ -179,7 +190,7 @@ export default function TinyLogicCard({
         accessibilityLabel="Pick the correct answer"
         style={styles.options}
       >
-        {config.options.map((option) => {
+        {orderedOptions.map((option) => {
           const isSelected = option.id === selectedId;
           return (
             <Pressable
@@ -191,13 +202,24 @@ export default function TinyLogicCard({
               onPress={() => handleSelect(option.id)}
               style={({ pressed }) => [
                 styles.option,
-                pressed && styles.optionPressed,
-                isSelected && styles.optionSelected,
+                {
+                  backgroundColor: theme.surfaceRaised,
+                  borderColor: theme.border,
+                },
+                pressed && { backgroundColor: theme.surfaceStrong },
+                isSelected && {
+                  backgroundColor: theme.surfaceStrong,
+                  borderColor: theme.accent,
+                },
               ]}
             >
               {/* Non-colour selected cue: an explicit ▸ marker, not hue alone. */}
               <Text
-                style={[styles.optionText, isSelected && styles.optionTextSelected]}
+                style={[
+                  styles.optionText,
+                  isSelected && styles.optionTextSelected,
+                  isSelected && { color: theme.accent },
+                ]}
               >
                 {isSelected ? '▸ ' : ''}
                 {option.label}

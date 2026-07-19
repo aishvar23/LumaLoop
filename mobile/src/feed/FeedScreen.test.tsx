@@ -16,10 +16,22 @@ import {
   screen,
   within,
 } from '@testing-library/react-native';
-import { FlatList, StyleSheet, type ViewToken } from 'react-native';
+import { useState } from 'react';
+import {
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  type ViewToken,
+} from 'react-native';
 
-import type { LiquidCard, SpotItCard } from '../core/cards/types';
+import type {
+  LiquidCard,
+  PrismPathCard,
+  SpotItCard,
+} from '../core/cards/types';
 import type { CardResolution, TemplateProps } from '../core/templates/contract';
+import type { CardScore } from '../core/feed/scoring';
 import { useCardTimer } from '../core/templates/useCardTimer';
 import type { FeedBatchSource } from '../core/feed/feedDeck';
 import FeedScreen from './FeedScreen';
@@ -27,6 +39,7 @@ import type { RendererRegistry } from './rendererRegistry';
 import { defaultRendererRegistry } from './rendererRegistry';
 import { feedRegistry } from './FeedbackGate';
 import { StubRenderer, stubRendererRegistry } from './stubRenderer';
+import { categoryAccents } from './templates/tokens';
 
 // --- Deterministic feed source + cards ----------------------------------------
 
@@ -44,7 +57,7 @@ function makeCard(cardId: string): LiquidCard {
     creatorHandle: `@creator_${cardId}`,
     templateType: 'spot_it',
     category: 'visual_attention',
-    difficulty: 'easy',
+    difficulty: 'extremely_easy',
     evidenceTier: 'entertainment_only',
     reviewStatus: 'unreviewed',
     estimatedSeconds: 10,
@@ -64,6 +77,39 @@ function makeCard(cardId: string): LiquidCard {
   return card;
 }
 
+function makePrismPathCard(cardId: string): PrismPathCard {
+  return {
+    cardId,
+    creatorHandle: `@creator_${cardId}`,
+    templateType: 'prism_path',
+    category: 'logical_reasoning',
+    difficulty: 'hard',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 28,
+    prompt: 'Route the beam',
+    puzzleDna: {
+      mechanic: 'mirror-beam-routing',
+      inputMode: 'tap',
+      measuredSignals: [],
+    },
+    explanation: { title: 'Why', body: 'Because.' },
+    config: {
+      rows: 2,
+      columns: 3,
+      entry: { row: 1, column: 0 },
+      entryDirection: 'right',
+      target: { row: 0, column: 2 },
+      mirrors: [
+        { id: 'm1', row: 1, column: 1, initialOrientation: 'slash' },
+      ],
+      blockers: [],
+      solution: [{ mirrorId: 'm1', orientation: 'slash' }],
+      timeLimitMs: 10_000,
+    },
+  };
+}
+
 const fakeGetCardById = (cardId: string): LiquidCard | undefined => makeCard(cardId);
 
 // The default M3 registry is the stub (all templates → stub).
@@ -71,9 +117,9 @@ const stubRegistry: RendererRegistry = stubRendererRegistry;
 
 /**
  * A SINGLE-TAP renderer: one press ENGAGES and RESOLVES in the same tick (e.g.
- * what_changed / tiny_logic). The engaging tap flips the card's `timeLimitMs`
- * ∞→finite, re-arming a fresh timer on an already-resolved slide; the feed-level
- * dedup must keep `onCardResolved` to a single `correct` with NO phantom timeout.
+ * what_changed / tiny_logic). The timer is already armed (the countdown started
+ * on activation); resolving disarms it, and the feed-level dedup keeps
+ * `onCardResolved` to a single `correct` with NO phantom timeout from a re-arm.
  */
 function SingleTapRenderer({ card, context, onAttempt, onResolve }: TemplateProps<LiquidCard>) {
   const timer = useCardTimer({ card, context, onResolve });
@@ -106,6 +152,46 @@ const singleTapRegistry = {
 } as unknown as RendererRegistry;
 
 /**
+ * A PRE-PHASE renderer mirroring the real ones (memory_sequence / what_changed /
+ * n_back / color_word / rule_flip): it mounts the shared {@link useCardTimer} ONLY
+ * inside an answer-phase subtree that renders AFTER the pre-phase ends (a "begin"
+ * button). So even though the feed makes `timeLimitMs` finite the moment the card
+ * activates, the inner timer does not exist — and cannot count — until the real
+ * round-start. The answer-phase timer is handed the same `card`, so it arms a
+ * fresh full-duration countdown from the answer phase.
+ */
+function PrePhaseRenderer({ card, context, onResolve }: TemplateProps<LiquidCard>) {
+  const [phase, setPhase] = useState<'pre' | 'answer'>('pre');
+  if (phase === 'pre') {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        testID={`begin-${card.cardId}`}
+        onPress={() => setPhase('answer')}
+      >
+        <Text>begin:{card.cardId}</Text>
+      </Pressable>
+    );
+  }
+  return <PrePhaseAnswer card={card} context={context} onResolve={onResolve} />;
+}
+
+function PrePhaseAnswer({
+  card,
+  context,
+  onResolve,
+}: Pick<TemplateProps<LiquidCard>, 'card' | 'context' | 'onResolve'>) {
+  // Mounted only after the pre-phase → its useCardTimer counts `timeLimitMs` from
+  // the answer phase, not from card activation (real round-start semantics).
+  useCardTimer({ card, context, onResolve });
+  return <Text testID={`answer-${card.cardId}`}>answer:{card.cardId}</Text>;
+}
+
+const prePhaseRegistry = {
+  spot_it: PrePhaseRenderer,
+} as unknown as RendererRegistry;
+
+/**
  * A renderer that reveals an explanation: its engage tap fires the optional
  * `onExplanationViewed` seam (mirrors `tiny_logic` on a wrong commit). Used to
  * verify the feed forwards the renderer seam to its `onCardExplanationViewed`.
@@ -135,6 +221,7 @@ type LifecycleHandlers = {
   onCardAbandoned?: (i: number, cardId: string) => void;
   onCardResolved?: (i: number, r: CardResolution) => void;
   onCardExplanationViewed?: (i: number, cardId: string) => void;
+  onCardScored?: (i: number, r: CardResolution, score: CardScore) => void;
 };
 
 function renderFeed(
@@ -153,6 +240,7 @@ function renderFeed(
       onCardAbandoned={extra?.onCardAbandoned}
       onCardResolved={extra?.onCardResolved}
       onCardExplanationViewed={extra?.onCardExplanationViewed}
+      onCardScored={extra?.onCardScored}
       // Phase 4: disable best-run persistence so tests don't race an async store
       // read/write (no AsyncStorage side effects across cases).
       scoreStore={null}
@@ -197,9 +285,33 @@ describe('FeedScreen (native)', () => {
     expect(gameStyle).toEqual(
       expect.objectContaining({
         flex: 1,
+        minHeight: 0,
         justifyContent: 'center',
         alignItems: 'center',
       }),
+    );
+  });
+
+  it('bounds tall games between the header and creator chrome', () => {
+    renderFeed();
+    const scroller = screen.getByTestId('feed-game-scroll-0');
+
+    expect(StyleSheet.flatten(scroller.props.style)).toEqual(
+      expect.objectContaining({
+        width: '100%',
+        maxHeight: '100%',
+        flexShrink: 1,
+      }),
+    );
+    expect(scroller.props.scrollEnabled).toBe(false);
+
+    act(() => {
+      scroller.props.onLayout({ nativeEvent: { layout: { height: 300 } } });
+      scroller.props.onContentSizeChange(320, 500);
+    });
+
+    expect(screen.getByTestId('feed-game-scroll-0').props.scrollEnabled).toBe(
+      true,
     );
   });
 
@@ -228,6 +340,37 @@ describe('FeedScreen (native)', () => {
     renderFeed();
     // category `visual_attention` → "Visual attention" (no IQ/trait language).
     expect(screen.getAllByText('Visual attention').length).toBeGreaterThan(0);
+  });
+
+  it('gives each game its own template, mechanic, and difficulty identity', () => {
+    renderFeed();
+    const game = within(screen.getByTestId('feed-game-0'));
+    expect(game.queryByText('PLAYABLE')).toBeNull();
+    expect(game.getByText('Spot it')).toBeOnTheScreen();
+    expect(game.getByText('Scan')).toBeOnTheScreen();
+    expect(game.getByLabelText('Extremely easy difficulty')).toBeOnTheScreen();
+    expect(screen.getAllByText('Extremely easy').length).toBeGreaterThan(0);
+  });
+
+  it('surfaces a helpful Prism Path description on the template label', () => {
+    const prismCard = makePrismPathCard('prism-0');
+    render(
+      <FeedScreen
+        anonymousUserId="anon"
+        source={() => ['prism-0']}
+        registry={{
+          prism_path: StubRenderer as unknown as RendererRegistry['prism_path'],
+        }}
+        getCardById={() => prismCard}
+        scoreStore={null}
+      />,
+    );
+
+    expect(
+      screen.getAllByLabelText(
+        /Prism path\. Rotate mirrors to guide a beam from IN to the star/,
+      ).length,
+    ).toBeGreaterThan(0);
   });
 
   it('windows the mount: off-window slides render the placeholder, not the stub', () => {
@@ -277,20 +420,69 @@ describe('FeedScreen (native)', () => {
     expect(screen.getByTestId('feed-game-0')).toBeOnTheScreen();
   });
 
-  it('does NOT arm a game timer until the player engages it (#106)', () => {
+  it("arms an immediate-play game's countdown on ACTIVATION, not on engage", () => {
     jest.useFakeTimers();
     try {
       const onCardResolved = jest.fn();
       renderFeed({ onCardResolved });
 
-      // Active but untouched: advancing past its 1000ms limit must NOT time out —
-      // the timer is gated off until engagement.
+      // Active and untouched — but the countdown now arms the moment the card
+      // APPEARS (becomes active). Advancing past its 1000ms limit with NO
+      // interaction must resolve it as a TIMEOUT (countdown ran on appear).
+      act(() => jest.advanceTimersByTime(1000));
+
+      expect(onCardResolved).toHaveBeenCalledTimes(1);
+      expect(onCardResolved).toHaveBeenCalledWith(
+        0,
+        expect.objectContaining({ cardId: 'b0-0', resolutionType: 'timeout' }),
+      );
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('does NOT run a pre-mounted NEIGHBOUR slide timer (only the active arms)', () => {
+    jest.useFakeTimers();
+    try {
+      const onCardResolved = jest.fn();
+      renderFeed({ onCardResolved });
+
+      // Index 0 is active; index 1 is windowed (pre-mounted) but NOT focused, so it
+      // carries a non-finite limit and its timer never arms. Advancing the clock
+      // must only ever resolve index 0 — never the off-screen neighbour.
+      act(() => jest.advanceTimersByTime(1000));
+      expect(onCardResolved).toHaveBeenCalledTimes(1);
+      expect(onCardResolved).toHaveBeenCalledWith(
+        0,
+        expect.objectContaining({ cardId: 'b0-0', resolutionType: 'timeout' }),
+      );
+
+      // Push far past the limit: the neighbour (index 1) must still never resolve.
+      act(() => jest.advanceTimersByTime(10_000));
+      expect(onCardResolved).toHaveBeenCalledTimes(1);
+      expect(onCardResolved.mock.calls.some(([i]) => i === 1)).toBe(false);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("does NOT start a pre-phase game's countdown during its pre-phase", () => {
+    jest.useFakeTimers();
+    try {
+      const onCardResolved = jest.fn();
+      renderFeed({ onCardResolved }, prePhaseRegistry);
+
+      // The card is active, so the feed's override makes its limit finite — but a
+      // PRE-PHASE renderer mounts its useCardTimer ONLY after the pre-phase ends
+      // (here, the "begin" button). While still in the pre-phase, advancing well
+      // past the 1000ms limit must NOT time it out.
       act(() => jest.advanceTimersByTime(5000));
       expect(onCardResolved).not.toHaveBeenCalled();
 
-      // Engaging arms a FRESH full-duration countdown from the engage instant.
+      // Ending the pre-phase mounts the answer-phase timer, arming a FRESH
+      // full-duration countdown from the real round-start.
       act(() => {
-        fireEvent.press(screen.getByTestId('engage-b0-0'));
+        fireEvent.press(screen.getByTestId('begin-b0-0'));
       });
       expect(onCardResolved).not.toHaveBeenCalled();
       act(() => jest.advanceTimersByTime(1000));
@@ -360,6 +552,30 @@ describe('FeedScreen (native)', () => {
     expect(onCardAbandoned).not.toHaveBeenCalled();
   });
 
+  it('accounts pivot: onCardScored fires after a resolution with that card\'s score (#106)', () => {
+    const onCardResolved = jest.fn();
+    const onCardScored = jest.fn();
+    renderFeed({ onCardResolved, onCardScored });
+
+    fireEvent.press(screen.getByTestId('engage-b0-0'));
+    fireEvent.press(screen.getByTestId('resolve-b0-0'));
+
+    expect(onCardResolved).toHaveBeenCalledTimes(1);
+    expect(onCardScored).toHaveBeenCalledTimes(1);
+    const [index, resolution, score] = onCardScored.mock.calls[0] as [
+      number,
+      CardResolution,
+      CardScore,
+    ];
+    expect(index).toBe(0);
+    expect(resolution).toEqual(
+      expect.objectContaining({ cardId: 'b0-0', isCorrect: true }),
+    );
+    // A correct resolution earns points; the score object shape is forwarded.
+    expect(score.correct).toBe(true);
+    expect(typeof score.points).toBe('number');
+  });
+
   it('single-tap engage+resolve fires onCardResolved EXACTLY once — no phantom timeout (#106)', () => {
     jest.useFakeTimers();
     try {
@@ -403,9 +619,12 @@ describe('FeedScreen (native)', () => {
       expect(onCardAbandoned).toHaveBeenCalledTimes(1);
       expect(onCardAbandoned).toHaveBeenCalledWith(0, 'b0-0');
 
-      // Past the time limit: the abandoned game must NOT now resolve.
+      // Past the time limit: the ABANDONED game (index 0) must NOT now resolve via
+      // its still-armed timer — the feed-level dedup drops it (already classified
+      // as abandoned on leave). (The now-active index 1's countdown also runs and
+      // may time out; that is correct and separate.)
       act(() => jest.advanceTimersByTime(5000));
-      expect(onCardResolved).not.toHaveBeenCalled();
+      expect(onCardResolved.mock.calls.some(([i]) => i === 0)).toBe(false);
       expect(onCardAbandoned).toHaveBeenCalledTimes(1);
     } finally {
       jest.useRealTimers();
@@ -452,7 +671,12 @@ describe('FeedScreen (native)', () => {
     // The real renderer is mounted (its grid cell, not the stub affordances).
     // Scope to the active slide — windowed neighbours mount their own grids too.
     const activeGame = within(screen.getByTestId('feed-game-0'));
-    expect(activeGame.getByTestId('spot-cell-0-0')).toBeOnTheScreen();
+    const spotCell = activeGame.getByTestId('spot-cell-0-0');
+    expect(spotCell).toBeOnTheScreen();
+    expect(spotCell).toHaveStyle({
+      backgroundColor: categoryAccents.visual_attention.surfaceRaised,
+      borderColor: categoryAccents.visual_attention.border,
+    });
     expect(screen.queryByTestId('engage-b0-0')).toBeNull();
 
     // Tapping the anomaly engages (first interaction) AND resolves the game.
@@ -477,7 +701,7 @@ describe('FeedScreen (native)', () => {
     expect(onCardExplanationViewed).toHaveBeenCalledWith(0, 'b0-0');
   });
 
-  it('shows the uniform feedback + explanation after a real game resolves through the gated default registry (#133)', () => {
+  it('shows the uniform feedback + explanation after a real game resolves through the gated default registry (#133)', async () => {
     const onCardResolved = jest.fn();
     const onCardExplanationViewed = jest.fn();
     render(
@@ -495,6 +719,9 @@ describe('FeedScreen (native)', () => {
     // Resolve the active spot_it game (its single cell is the anomaly).
     const activeGame = within(screen.getByTestId('feed-game-0'));
     fireEvent.press(activeGame.getByTestId('spot-cell-0-0'));
+    // Flush the gate's best-effort async per-card-best recording (engagement
+    // §4.4) so its post-resolution state update settles inside act().
+    await act(async () => {});
 
     // The gate replaces the game with the uniform feedback step + the explanation.
     const feedback = within(screen.getByTestId('feed-game-0'));

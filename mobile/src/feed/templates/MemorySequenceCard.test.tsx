@@ -12,6 +12,7 @@ import { fireEvent, render, screen, act } from '@testing-library/react-native';
 import type { MemorySequenceCard as MemorySequenceCardType } from '../../core/cards/types';
 import type { CardResolution, CardStartContext } from '../../core/templates/contract';
 import MemorySequenceCard from './MemorySequenceCard';
+import { FALLBACK_CATEGORY_ACCENT, space } from './tokens';
 
 const ACTIVE_AT = 1000;
 const FLASH_MS = 600;
@@ -21,7 +22,9 @@ const TIME_LIMIT_MS = 12000;
 // A 3-tile diagonal on a 3×3 grid. Total watch window = 3 flashes + 3 gaps.
 const WATCH_MS = 3 * FLASH_MS + 3 * GAP_MS;
 
-function makeCard(): MemorySequenceCardType {
+function makeCard(
+  overrides: Partial<MemorySequenceCardType['config']> = {},
+): MemorySequenceCardType {
   return {
     cardId: 'ms-1',
     creatorHandle: '@memory',
@@ -49,6 +52,7 @@ function makeCard(): MemorySequenceCardType {
       flashMs: FLASH_MS,
       gapMs: GAP_MS,
       timeLimitMs: TIME_LIMIT_MS,
+      ...overrides,
     },
   };
 }
@@ -236,6 +240,86 @@ it('does not resolve until the full sequence length is entered', () => {
     fireEvent.press(screen.getByTestId('ms-tile-1-1'));
     expect(onResolve).not.toHaveBeenCalled();
     expect(screen.getByTestId('ms-status')).toHaveTextContent('Tapped 2 of 3');
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+it('keeps every selected tile colored and numbered during reproduction', () => {
+  jest.useFakeTimers();
+  try {
+    let t = ACTIVE_AT;
+    render(
+      <MemorySequenceCard
+        card={makeCard()}
+        context={context()}
+        onAttempt={jest.fn()}
+        onResolve={jest.fn()}
+        now={() => t}
+      />,
+    );
+
+    t = runWatch();
+    fireEvent.press(screen.getByTestId('ms-tile-0-0'));
+    fireEvent.press(screen.getByTestId('ms-tile-1-1'));
+
+    const first = screen.getByTestId('ms-tile-0-0');
+    const second = screen.getByTestId('ms-tile-1-1');
+    const untouched = screen.getByTestId('ms-tile-0-1');
+    expect(first).toHaveStyle({
+      backgroundColor: FALLBACK_CATEGORY_ACCENT.accent,
+      borderColor: FALLBACK_CATEGORY_ACCENT.accent,
+    });
+    expect(second).toHaveStyle({
+      backgroundColor: FALLBACK_CATEGORY_ACCENT.accent,
+      borderColor: FALLBACK_CATEGORY_ACCENT.accent,
+    });
+    expect(first.props.accessibilityState).toEqual({ selected: true });
+    expect(second.props.accessibilityState).toEqual({ selected: true });
+    expect(untouched.props.accessibilityState).toEqual({ selected: false });
+    expect(first).toHaveTextContent('1');
+    expect(second).toHaveTextContent('2');
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+it('uses a compact centered grid for five-row memory boards so the last row stays visible', () => {
+  jest.useFakeTimers();
+  try {
+    let t = ACTIVE_AT;
+    render(
+      <MemorySequenceCard
+        card={makeCard({ rows: 5, columns: 4 })}
+        context={context()}
+        onAttempt={jest.fn()}
+        onResolve={jest.fn()}
+        now={() => t}
+      />,
+    );
+
+    expect(screen.getByTestId('ms-watch-grid')).toHaveStyle({
+      maxWidth: 360,
+      alignSelf: 'center',
+      gap: space.xs,
+      padding: space.xs,
+    });
+    expect(screen.getByTestId('ms-watch-row-4')).toHaveStyle({
+      gap: space.xs,
+    });
+    expect(screen.getByTestId('ms-watch-tile-4-3')).toBeOnTheScreen();
+
+    t = runWatch();
+    expect(screen.getByTestId('ms-reproduce-grid')).toHaveStyle({
+      maxWidth: 360,
+      alignSelf: 'center',
+      gap: space.xs,
+      padding: space.xs,
+    });
+    expect(screen.getByTestId('ms-reproduce-row-4')).toHaveStyle({
+      gap: space.xs,
+    });
+    expect(screen.getByTestId('ms-tile-4-3')).toBeOnTheScreen();
   } finally {
     jest.useRealTimers();
   }

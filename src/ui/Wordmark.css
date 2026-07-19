@@ -1,0 +1,43 @@
+/* The Witzy wordmark — gradient ink with a bright spark dotting the "i".
+   Surfaces set the font-size via their own class; the look lives here so every
+   placement matches. */
+.wordmark {
+  display: inline-flex;
+  align-items: baseline;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  background: linear-gradient(95deg, #b6a6ff 0%, #ff9ed1 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  white-space: nowrap;
+}
+
+/* The "i" stem (dotless ı) with the spark sitting where the dot would be. */
+.wordmark__i {
+  position: relative;
+  display: inline-block;
+}
+
+.wordmark__spark {
+  position: absolute;
+  left: 50%;
+  top: -0.34em;
+  transform: translateX(-50%);
+  font-size: 0.52em;
+  line-height: 1;
+  /* The spark is the bright accent — opt OUT of the text-gradient clip so it
+     renders as a solid pop of pink with a soft glow, not transparent. */
+  -webkit-text-fill-color: #ff8ecb;
+  color: #ff8ecb;
+  background: none;
+  text-shadow: 0 0 10px rgba(255, 142, 203, 0.65);
+}
+
+/* The spark glow respects reduced-motion users implicitly (it is static), and
+   the gradient degrades gracefully if background-clip is unsupported: */
+@supports not ((-webkit-background-clip: text) or (background-clip: text)) {
+  .wordmark {
+    color: #d9ccff;
+  }
+}

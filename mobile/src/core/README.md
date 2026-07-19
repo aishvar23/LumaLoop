@@ -25,11 +25,12 @@ rely on the ported unit tests below to catch behavioural drift.
 | Area | Ported here | NOT ported (rebuilt later) |
 | --- | --- | --- |
 | Cards | `cards/types.ts` (incl. `templateCategoryMap`), `cards/catalog.ts` (the full authored catalog + `getCardById`), `cards/validation.ts` | — |
-| Templates | `templates/contract.ts` (types), the 8 pure evaluators (incl. `codeBreak`), `templates/timeoutResolution.ts`, `templates/useCardTimer.ts` | React renderers (rebuilt natively under `mobile/src/feed/templates/`) |
+| Templates | `templates/contract.ts` (types), all 11 pure evaluators (including `signalSet` and `circuitFlow`), `templates/timeoutResolution.ts`, `templates/useCardTimer.ts` | React renderers (rebuilt natively under `mobile/src/feed/templates/`) |
 | Session | `session/sessionTypes.ts` (dependency of the composer) | session reducer / controller / summary |
 | Composition | `session/composeSession.ts`, `feed/feedDeck.ts` | `useFeedController` (RN feed → M3) |
 | Scoring (Phase 4) | `feed/scoring.ts` (pure game-points + streak/combo core) | `useFeedScore` hook + `scoreStore` (RN, in `mobile/src/feed/`) |
 | Telemetry | `telemetry/telemetryEvents.ts` (names + payload types) | telemetry client, `anonymousUser` (RN client → M5) |
+| Accounts (pivot) | `auth/types.ts` (profiles/game_plays/`user_game_scores` row models), `auth/gamePlayFromResolution.ts` (resolution→row mapper), `profile/computeStats.ts` (pure /you stats), `profile/yourGames.ts` (pure per-game "Your games" shaping, D3), `profile/profileCharts.ts` (pure /you chart-shaping — accuracy/points bars + points-share distribution) | Supabase client, AuthProvider, screens, data helpers incl. `feed/playedCardsApi.ts`+`feed/usePlayedCardIds.ts` (D2 already-played skip) and `profile/gameScoresApi.ts` (D3) (RN, in `mobile/src/auth/`, `mobile/src/feed/`, `mobile/src/profile/`) |
 
 The layout mirrors the web `src/` so internal relative imports are unchanged.
 

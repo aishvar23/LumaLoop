@@ -10,10 +10,51 @@
  */
 
 .feed-screen {
+  position: relative;
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+  /* Vertical strip reserved at the top for the absolute Home/You escape nav, so
+   * the slide's own top bar (brand + points) drops below it instead of colliding
+   * with the Witzy wordmark. Read by `.feed-slide__top` and `.feed-hud`. */
+  --feed-nav-h: 44px;
+}
+
+/*
+ * Overlay nav (top-left, clear of the top-right score HUD): escape the immersive
+ * feed back to Home / the profile. Token-driven; sits above the slides.
+ */
+.feed-nav {
+  position: absolute;
+  top: calc(var(--safe-top) + var(--space-2));
+  left: calc(var(--safe-left) + var(--space-2));
+  z-index: 5;
+  display: inline-flex;
+  gap: var(--space-1);
+}
+
+.feed-nav__link {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: rgba(12, 13, 18, 0.55);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  text-decoration: none;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  backdrop-filter: blur(6px);
+}
+
+.feed-nav__link:hover,
+.feed-nav__link:focus-visible {
+  border-color: var(--color-accent);
+  outline: none;
 }
 
 /*
@@ -24,7 +65,8 @@
 .feed-screen__scroller {
   flex: 1;
   min-height: 0;
-  height: 100dvh;
+  height: 100%;
+  max-height: 100dvh;
   overflow-y: auto;
   scroll-snap-type: y mandatory;
   -webkit-overflow-scrolling: touch;
@@ -44,6 +86,16 @@
  * bottom chrome overlay. The slide is the accent scope: descendants read the
  * `--accent*` aliases set on it. */
 .feed-slide {
+  --game-surface: color-mix(in srgb, var(--accent) 9%, #11151f);
+  --game-surface-raised: color-mix(in srgb, var(--accent) 17%, #1d202b);
+  --game-surface-strong: color-mix(in srgb, var(--accent) 28%, #252936);
+  --game-border: color-mix(
+    in srgb,
+    var(--accent) 44%,
+    rgba(255, 255, 255, 0.14)
+  );
+  --game-board: color-mix(in srgb, var(--accent) 8%, rgba(4, 8, 17, 0.78));
+
   position: relative;
   box-sizing: border-box;
   height: 100dvh;
@@ -55,13 +107,86 @@
   padding: calc(var(--space-3) + var(--safe-top)) var(--space-3)
     calc(var(--space-3) + var(--safe-bottom));
   background:
+    radial-gradient(
+      circle at 78% 14%,
+      color-mix(in srgb, var(--accent, var(--color-accent)) 30%, transparent) 0%,
+      transparent 32%
+    ),
+    radial-gradient(
+      circle at 8% 82%,
+      color-mix(
+          in srgb,
+          var(--accent-deep, var(--color-accent)) 22%,
+          transparent
+        )
+        0%,
+      transparent 35%
+    ),
     linear-gradient(
       180deg,
-      var(--accent-tint, transparent) 0%,
-      transparent 42%,
-      rgba(0, 0, 0, 0.28) 100%
+      color-mix(in srgb, var(--accent-tint, transparent) 78%, #11131b) 0%,
+      #0d1018 46%,
+      #080a10 100%
     ),
     var(--color-bg);
+}
+
+.feed-slide__ambient {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.feed-slide__orb {
+  position: absolute;
+  display: block;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--accent, var(--color-accent)) 70%, transparent) 0%,
+    transparent 72%
+  );
+  opacity: 0.2;
+}
+
+.feed-slide__orb--one {
+  top: 7%;
+  right: -90px;
+}
+
+.feed-slide__orb--two {
+  bottom: 4%;
+  left: -130px;
+  width: 260px;
+  height: 260px;
+  opacity: 0.12;
+}
+
+.feed-slide__grid-texture {
+  position: absolute;
+  inset: 35% -20% -15% 15%;
+  opacity: 0.16;
+  transform: perspective(420px) rotateX(60deg) rotateZ(-8deg);
+  background-image:
+    linear-gradient(
+      color-mix(in srgb, var(--accent) 28%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--accent) 28%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 34px 34px;
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 28%,
+    transparent 88%
+  );
 }
 
 /* The mounted game (or its feedback gate) is centered in the slide (TikTok/Reels
@@ -70,13 +195,257 @@
  * a scroll container pushes overflow PAST the start edge where it can't be
  * scrolled to (clipping the prompt's top); `safe` falls back to start-alignment
  * the moment content overflows, so tall games stay fully scrollable. */
+/* The card HOOK — the bold first-read promise above the game (engagement
+   strategy §4.1). Accent-tinted, generously sized so it reads first. */
+.feed-slide__hook {
+  position: relative;
+  z-index: 1;
+  margin: 0 0 clamp(8px, 2vw, 14px) 0;
+  padding: 0 2px;
+  font-size: clamp(1.05rem, 4.4vw, 1.5rem);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-snug);
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+  text-wrap: balance;
+}
+
 .feed-slide__game {
+  position: relative;
+  z-index: 1;
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
   justify-content: safe center;
   overflow-y: auto;
+  width: 100%;
+  padding: clamp(16px, 4.5vw, 24px);
+  border: 1px solid
+    color-mix(in srgb, var(--accent) 24%, rgba(255, 255, 255, 0.12));
+  border-radius: 28px;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(255, 255, 255, 0.075),
+      rgba(255, 255, 255, 0.018)
+    ),
+    #11141d;
+  box-shadow:
+    0 28px 70px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 0 0 1px rgba(0, 0, 0, 0.24),
+    0 0 50px color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.feed-slide__game-light {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.feed-slide__game-orbit {
+  position: absolute;
+  top: -124px;
+  right: -74px;
+  width: 210px;
+  height: 210px;
+  border: 1px solid color-mix(in srgb, var(--accent) 42%, transparent);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 24px color-mix(in srgb, var(--accent) 5%, transparent),
+    0 0 58px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.feed-slide__game-sweep {
+  position: absolute;
+  top: -45%;
+  left: -20%;
+  width: 42%;
+  height: 190%;
+  opacity: 0;
+  transform: rotate(18deg);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.09),
+    transparent
+  );
+}
+
+.feed-slide__game[data-active='true'] .feed-slide__game-sweep {
+  animation: feed-game-sweep 700ms var(--ease-out) 120ms both;
+}
+
+@keyframes feed-game-sweep {
+  from {
+    left: -38%;
+    opacity: 0;
+  }
+  35% {
+    opacity: 0.8;
+  }
+  to {
+    left: 118%;
+    opacity: 0;
+  }
+}
+
+.feed-slide__game-kicker {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  margin-bottom: var(--space-3);
+}
+
+.feed-slide__template-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 0 0 auto;
+  width: 54px;
+  height: 38px;
+  padding: 0 7px;
+  border: 1px solid color-mix(in srgb, var(--accent) 58%, transparent);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.045);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.feed-slide__template-monogram {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.feed-slide__fingerprint {
+  display: grid;
+  grid-template-columns: repeat(3, 3px);
+  gap: 2px;
+  width: 13px;
+}
+
+.feed-slide__fingerprint > span {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.feed-slide__fingerprint > span[data-filled='true'] {
+  background: var(--accent);
+  box-shadow: 0 0 5px color-mix(in srgb, var(--accent) 48%, transparent);
+}
+
+.feed-slide__template-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.feed-slide__template-label {
+  position: relative;
+  min-width: 0;
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.feed-slide__template-label[data-has-description='true'] {
+  cursor: help;
+  outline: none;
+}
+
+.feed-slide__template-label[data-has-description='true']::after {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  left: 0;
+  z-index: 20;
+  width: min(280px, 72vw);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--accent) 48%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-surface) 94%, black);
+  box-shadow: var(--shadow-md);
+  color: var(--color-text);
+  content: attr(data-description);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-normal);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition:
+    opacity var(--motion-fast) var(--ease-out),
+    transform var(--motion-fast) var(--ease-out);
+  white-space: normal;
+}
+
+.feed-slide__template-label[data-has-description='true']:hover::after,
+.feed-slide__template-label[data-has-description='true']:focus-visible::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.feed-slide__template-label[data-has-description='true']:focus-visible {
+  border-radius: var(--radius-sm);
+  outline: 2px solid color-mix(in srgb, var(--accent) 78%, white);
+  outline-offset: 3px;
+}
+
+.feed-slide__mechanic-label {
+  color: var(--color-text-faint, #71717f);
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.feed-slide__level {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 3px;
+  min-height: 13px;
+}
+
+.feed-slide__level > span {
+  width: 4px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.feed-slide__level > span:nth-child(1) {
+  height: 6px;
+}
+
+.feed-slide__level > span:nth-child(2) {
+  height: 9px;
+}
+
+.feed-slide__level > span:nth-child(3) {
+  height: 12px;
+}
+
+.feed-slide__level > span[data-filled='true'] {
+  background: var(--accent);
+  box-shadow: 0 0 9px color-mix(in srgb, var(--accent) 52%, transparent);
+}
+
+.feed-slide__game-content {
+  position: relative;
+  z-index: 1;
+  width: 100%;
 }
 
 /* ── Active-card entrance (Phase 5) ─────────────────────────────────────────
@@ -124,12 +493,30 @@
     transform var(--motion-fast) var(--ease-out),
     box-shadow var(--motion-fast) var(--ease-out),
     filter var(--motion-fast) var(--ease-out);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 8px 20px color-mix(in srgb, var(--accent) 9%, transparent);
 }
 
 .feed-slide__game button:active {
   transform: scale(0.96);
   box-shadow: 0 0 0 4px
     color-mix(in srgb, var(--accent, var(--color-accent)) 26%, transparent);
+}
+
+.feed-slide__game button:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 78%, white);
+  outline-offset: 3px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .feed-slide__game button:hover {
+    filter: brightness(1.08) saturate(1.08);
+    transform: translateY(-1px);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.12),
+      0 10px 24px color-mix(in srgb, var(--accent) 16%, transparent);
+  }
 }
 
 /* Lightweight stand-in for out-of-window slides: keeps the slide's height (so
@@ -147,8 +534,56 @@
  * Accent-tinted pill naming the performance category (guardrail-safe copy). The
  * chip TEXT carries the meaning — colour only reinforces it. */
 .feed-slide__top {
+  position: relative;
+  z-index: 3;
   display: flex;
-  margin-bottom: var(--space-2);
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+  /* Clear the top-right points HUD and the top-left Home/You escape nav. */
+  padding-top: var(--feed-nav-h, 0px);
+  padding-right: 88px;
+}
+
+.feed-slide__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 34px;
+}
+
+/* The Witzy logo — a spark (✦) badge with the brand gradient (matches Home). */
+.feed-slide__brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 11px;
+  color: #fff;
+  background: linear-gradient(135deg, #6c7bff 0%, #9d7bff 45%, #ff7eb6 100%);
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.45);
+  box-shadow: 0 8px 20px rgba(124, 110, 255, 0.45);
+}
+
+/* The "Witzy" wordmark — size only; the gradient + spark live in `.wordmark`. */
+.feed-slide__brand-name {
+  font-size: var(--font-size-lg);
+}
+
+.feed-slide__brand-mode {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.feed-slide__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
 }
 
 .feed-slide__chip {
@@ -156,18 +591,40 @@
   align-items: center;
   padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-pill);
-  border: 1px solid var(--accent, var(--color-accent));
-  background: var(--accent-tint, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  background: color-mix(in srgb, var(--accent) 16%, rgba(8, 10, 16, 0.78));
   color: var(--color-text);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
   letter-spacing: 0.01em;
 }
 
+.feed-slide__meta-pill {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  text-transform: capitalize;
+}
+
+/* ── Per-card social surface (likes + comments) ─────────────────────────────
+ * Sits between the game and the bottom chrome, flex-none so it never steals the
+ * game's space; its own comments sheet is height-capped (CardSocialRail.css) so
+ * it can't overlap the game above. Feed-layer only — keyed by cardId, never
+ * per-template. */
+.feed-slide__social {
+  flex: 0 0 auto;
+  margin-top: var(--space-2);
+}
+
 /* ── Bottom chrome: creator byline + swipe-up cue ───────────────────────────
  * The social author row (avatar monogram + @handle) on the left and an animated
  * "Swipe up" affordance on the right, mirroring the mobile feed. */
 .feed-slide__chrome {
+  position: relative;
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -189,14 +646,23 @@
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  width: 34px;
-  height: 34px;
+  width: 42px;
+  height: 42px;
   border-radius: var(--radius-pill);
   background: var(--accent, var(--color-accent));
   color: var(--color-accent-on);
   font-size: var(--font-size-md);
   font-weight: var(--font-weight-bold);
   line-height: 1;
+  border: 2px solid rgba(255, 255, 255, 0.78);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
+.feed-slide__author-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
 }
 
 /* The byline naming the card's creator (data already on every card). */
@@ -210,6 +676,14 @@
   white-space: nowrap;
 }
 
+.feed-slide__creator-caption {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* The animated swipe-up affordance — a faint cue that bobs upward to invite the
  * next-game gesture. Decorative (aria-hidden); the feed landmark already names
  * the swipe instruction for assistive tech. */
@@ -221,6 +695,33 @@
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-pill);
+  background: rgba(6, 8, 13, 0.48);
+}
+
+@media (max-width: 360px), (max-height: 720px) {
+  .feed-slide {
+    padding-left: var(--space-2);
+    padding-right: var(--space-2);
+  }
+
+  .feed-slide__top {
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+  }
+
+  .feed-slide__game {
+    padding: var(--space-3);
+    border-radius: var(--radius-lg);
+  }
+
+  .feed-slide__creator-caption,
+  .feed-slide__brand-mode,
+  .feed-slide__meta-pill:last-child {
+    display: none;
+  }
 }
 
 .feed-slide__swipe-chevron {

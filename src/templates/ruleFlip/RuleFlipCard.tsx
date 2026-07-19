@@ -78,6 +78,81 @@ export type RuleFlipCardProps = TemplateProps<RuleFlipCardType> & {
 };
 
 type Phase = 'gate' | 'stream';
+type DemoStep = 0 | 1 | 2;
+
+const DEMO_TIME_HINT =
+  'Watching the demo adds about 5 seconds to your overall solve time.';
+const DEMO_STEP_MS = 1500;
+const DEMO_CLOSE_MS = 5000;
+const RULE_FLIP_DEMO_STEPS = [
+  {
+    rule: 'Filled circles match',
+    stimulus: '●',
+    answer: 'Match',
+    note: 'The item fits the first rule.',
+  },
+  {
+    rule: 'Rule changed: outlined squares match',
+    stimulus: '○',
+    answer: 'No-match',
+    note: 'The rule flipped, so the old circle rule no longer applies.',
+  },
+  {
+    rule: 'Rule changed: outlined squares match',
+    stimulus: '□',
+    answer: 'Match',
+    note: 'Now the item fits the new rule.',
+  },
+] as const;
+
+function responseCopy(response: RuleFlipResponseKind): string {
+  return response === 'match' ? 'Match' : 'No-match';
+}
+
+function actionLogFor(
+  config: RuleFlipCardType['config'],
+  evaluation: RuleFlipEvaluation,
+): string {
+  return JSON.stringify(
+    evaluation.outcomes.map((outcome) => {
+      const stimulus = config.stimuli[outcome.stimulusIndex];
+      return {
+        step: outcome.stimulusIndex + 1,
+        stimulusId: outcome.stimulusId,
+        stimulus: stimulus?.label ?? outcome.stimulusId,
+        phase: outcome.phase,
+        activeRule: outcome.activeRule,
+        expected: outcome.expectedResponse,
+        response: outcome.response ?? 'omitted',
+        correct: outcome.isCorrect,
+        responseTimeMs: outcome.responseTimeMs ?? -1,
+      };
+    }),
+  );
+}
+
+function firstFailureFor(
+  config: RuleFlipCardType['config'],
+  evaluation: RuleFlipEvaluation,
+) {
+  const outcome = evaluation.outcomes.find((candidate) => !candidate.isCorrect);
+  if (!outcome) {
+    return { failedStep: -1, failureReason: '' };
+  }
+  const stimulus = config.stimuli[outcome.stimulusIndex];
+  const label = stimulus?.label ?? outcome.stimulusId;
+  const ruleLabel =
+    outcome.activeRule === 'initial'
+      ? config.initialRuleLabel
+      : config.flippedRuleLabel;
+  const expected = responseCopy(outcome.expectedResponse);
+  const failureReason = outcome.responded
+    ? `Step ${outcome.stimulusIndex + 1} (${label}) was answered ${responseCopy(
+        outcome.response as RuleFlipResponseKind,
+      )}, but "${ruleLabel}" expected ${expected}.`
+    : `Step ${outcome.stimulusIndex + 1} (${label}) was not answered; "${ruleLabel}" expected ${expected}.`;
+  return { failedStep: outcome.stimulusIndex + 1, failureReason };
+}
 
 export default function RuleFlipCard({
   card,
@@ -92,13 +167,42 @@ export default function RuleFlipCard({
   // lives in a ref so it survives without forcing a render (mirrors what_changed).
   const [phase, setPhase] = useState<Phase>('gate');
   const streamStartRef = useRef<number | null>(null);
+  const [demoOpen, setDemoOpen] = useState(false);
+  const [demoStep, setDemoStep] = useState<DemoStep>(0);
+  const [showYourTurn, setShowYourTurn] = useState(false);
 
   // The clock lives in a ref so the gate→stream transition reads the LATEST
   // `now` at the moment Start is pressed, guarding against stale closures.
   const nowRef = useRef(now);
   nowRef.current = now;
 
+  const finishDemo = useCallback(() => {
+    setDemoOpen(false);
+    setDemoStep(0);
+    setShowYourTurn(true);
+  }, []);
+
+  useEffect(() => {
+    if (!demoOpen) return undefined;
+    setDemoStep(0);
+    const secondTimer = setTimeout(() => setDemoStep(1), DEMO_STEP_MS);
+    const thirdTimer = setTimeout(() => setDemoStep(2), DEMO_STEP_MS * 2);
+    const closeTimer = setTimeout(finishDemo, DEMO_CLOSE_MS);
+    return () => {
+      clearTimeout(secondTimer);
+      clearTimeout(thirdTimer);
+      clearTimeout(closeTimer);
+    };
+  }, [demoOpen, finishDemo]);
+
+  const handleDemo = useCallback(() => {
+    setShowYourTurn(false);
+    setDemoStep(0);
+    setDemoOpen(true);
+  }, []);
+
   const handleStart = useCallback(() => {
+    setShowYourTurn(false);
     streamStartRef.current = nowRef.current();
     setPhase('stream');
   }, []);
@@ -109,6 +213,8 @@ export default function RuleFlipCard({
       {phase === 'gate' ? (
         <RuleFlipGate
           initialRuleLabel={config.initialRuleLabel}
+          showYourTurn={showYourTurn}
+          onDemo={handleDemo}
           onStart={handleStart}
         />
       ) : (
@@ -123,6 +229,9 @@ export default function RuleFlipCard({
           now={now}
         />
       )}
+      {demoOpen ? (
+        <RuleFlipDemo step={demoStep} onClose={finishDemo} />
+      ) : null}
     </section>
   );
 }
@@ -136,9 +245,13 @@ export default function RuleFlipCard({
  */
 function RuleFlipGate({
   initialRuleLabel,
+  showYourTurn,
+  onDemo,
   onStart,
 }: {
   initialRuleLabel: string;
+  showYourTurn: boolean;
+  onDemo: () => void;
   onStart: () => void;
 }) {
   return (
@@ -149,6 +262,26 @@ function RuleFlipGate({
       <p style={instructionStyle}>
         Tap Match when the item fits the rule, No-match when it does not.
       </p>
+      {showYourTurn ? (
+        <p
+          data-testid="rf-your-turn"
+          role="status"
+          aria-live="polite"
+          style={yourTurnStyle}
+        >
+          Your turn — answer each item under the active rule.
+        </p>
+      ) : null}
+      <button
+        type="button"
+        data-testid="rf-demo-button"
+        aria-label={`Watch Rule Flip demo. ${DEMO_TIME_HINT}`}
+        title={DEMO_TIME_HINT}
+        onClick={onDemo}
+        style={demoButtonStyle}
+      >
+        Watch demo
+      </button>
       <button
         type="button"
         data-testid="rf-start"
@@ -157,6 +290,67 @@ function RuleFlipGate({
       >
         Start
       </button>
+    </div>
+  );
+}
+
+function RuleFlipDemo({
+  step,
+  onClose,
+}: {
+  step: DemoStep;
+  onClose: () => void;
+}) {
+  const item = RULE_FLIP_DEMO_STEPS[step];
+  return (
+    <div style={demoBackdropStyle}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Rule Flip demonstration"
+        style={demoPanelStyle}
+      >
+        <h2 style={demoTitleStyle}>How Rule Flip works</h2>
+        <p
+          data-testid="rf-demo-rule"
+          aria-live="polite"
+          style={ruleLabelStyle}
+        >
+          {item.rule}
+        </p>
+        <div data-testid="rf-demo-stimulus" style={demoStimulusStyle}>
+          {item.stimulus}
+        </div>
+        <p data-testid="rf-demo-answer" style={demoAnswerStyle}>
+          Demo taps: {item.answer}
+        </p>
+        <p data-testid="rf-demo-note" style={demoInstructionStyle}>
+          {item.note}
+        </p>
+        <p style={demoCaptionStyle}>
+          Demo uses a separate pattern, not this card’s answer stream.
+        </p>
+        <div aria-hidden="true" style={demoProgressStyle}>
+          {[0, 1, 2].map((itemIndex) => (
+            <span
+              key={itemIndex}
+              style={{
+                ...demoDotStyle,
+                background:
+                  itemIndex <= step ? 'var(--accent)' : 'var(--color-border)',
+              }}
+            />
+          ))}
+        </div>
+        <button
+          type="button"
+          data-testid="rf-demo-skip"
+          onClick={onClose}
+          style={demoSkipStyle}
+        >
+          Skip demo
+        </button>
+      </div>
     </div>
   );
 }
@@ -249,21 +443,27 @@ function RuleFlipStream({
   // timeout paths so the two never drift; `correct` is forced by the caller (a
   // timeout is incorrect by contract regardless of partial accuracy).
   const buildSignals = useCallback(
-    (evaluation: RuleFlipEvaluation, correct: boolean, atMs: number) => ({
-      pre_flip_accuracy: evaluation.preFlipAccuracy,
-      post_flip_accuracy: evaluation.postFlipAccuracy,
-      // -1 is the "absent" sentinel (the signals map can't carry null): it means
-      // no responded post-flip stimulus, so switch latency is undefined.
-      // Downstream consumers MUST exclude -1 before averaging latencies.
-      switch_latency_ms: evaluation.switchLatencyMs ?? -1,
-      perseveration: evaluation.perseverationCount,
-      overall_accuracy: evaluation.overallAccuracy,
-      correct,
-      // -1 = no interaction at all (player never responded); exclude before averaging.
-      time_to_interaction: firstResponseRtRef.current ?? -1,
-      elapsed: atMs - streamStartMs,
-    }),
-    [streamStartMs],
+    (evaluation: RuleFlipEvaluation, correct: boolean, atMs: number) => {
+      const failure = firstFailureFor(config, evaluation);
+      return {
+        pre_flip_accuracy: evaluation.preFlipAccuracy,
+        post_flip_accuracy: evaluation.postFlipAccuracy,
+        // -1 is the "absent" sentinel (the signals map can't carry null): it means
+        // no responded post-flip stimulus, so switch latency is undefined.
+        // Downstream consumers MUST exclude -1 before averaging latencies.
+        switch_latency_ms: evaluation.switchLatencyMs ?? -1,
+        perseveration: evaluation.perseverationCount,
+        overall_accuracy: evaluation.overallAccuracy,
+        correct,
+        failed_step: failure.failedStep,
+        failure_reason: failure.failureReason,
+        step_action_log: actionLogFor(config, evaluation),
+        // -1 = no interaction at all (player never responded); exclude before averaging.
+        time_to_interaction: firstResponseRtRef.current ?? -1,
+        elapsed: atMs - streamStartMs,
+      };
+    },
+    [config, streamStartMs],
   );
 
   const timer = useCardTimer({
@@ -475,6 +675,17 @@ const instructionStyle = {
   lineHeight: 'var(--line-height-snug)',
 } as const;
 
+const yourTurnStyle = {
+  margin: 0,
+  padding: 'var(--space-2)',
+  borderRadius: 'var(--radius-md)',
+  border: '1px solid var(--accent)',
+  background: 'var(--accent-tint)',
+  color: 'var(--accent)',
+  fontSize: 'var(--font-size-sm)',
+  fontWeight: 700,
+} as const;
+
 const streamStyle = {
   display: 'flex',
   flexDirection: 'column',
@@ -494,7 +705,7 @@ const flipBannerStyle = {
   padding: 'var(--space-2) var(--space-3)',
   borderRadius: 'var(--radius-md)',
   border: '2px solid var(--color-warning)',
-  background: 'var(--color-surface-raised)',
+  background: 'var(--game-surface-raised, var(--color-surface-raised))',
   color: 'var(--color-text)',
   fontSize: 'var(--font-size-md)',
   fontWeight: 'var(--font-weight-bold)',
@@ -512,8 +723,8 @@ const stimulusStageStyle = {
   minHeight: 'calc(var(--tap-target-min) * 2)',
   width: '100%',
   borderRadius: 'var(--radius-md)',
-  border: '1px solid var(--color-border)',
-  background: 'var(--color-surface-raised)',
+  border: '1px solid var(--game-border, var(--color-border))',
+  background: 'var(--game-surface-raised, var(--color-surface-raised))',
 } as const;
 
 const stimulusStyle = {
@@ -549,8 +760,8 @@ const responseButtonStyle = {
   minHeight: 'var(--tap-target-min)',
   padding: 'var(--space-3)',
   borderRadius: 'var(--radius-md)',
-  border: '1px solid var(--color-border)',
-  background: 'var(--color-surface-raised)',
+  border: '1px solid var(--game-border, var(--color-border))',
+  background: 'var(--game-surface-raised, var(--color-surface-raised))',
   color: 'var(--color-text)',
   fontSize: 'var(--font-size-md)',
   fontFamily: 'var(--font-sans)',
@@ -573,9 +784,102 @@ const primaryButtonStyle = {
   cursor: 'pointer',
 } as const;
 
+const demoButtonStyle = {
+  ...primaryButtonStyle,
+  borderColor: 'var(--game-border, var(--color-border))',
+  background: 'var(--game-surface, transparent)',
+  color: 'var(--accent)',
+} as const;
+
 const liveRegionStyle = {
   margin: 0,
   minHeight: 'var(--font-size-md)',
   fontSize: 'var(--font-size-sm)',
   color: 'var(--color-text-muted)',
+} as const;
+
+const demoBackdropStyle = {
+  position: 'fixed',
+  inset: 0,
+  zIndex: 1000,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: 'var(--space-5)',
+  background: 'rgba(4, 6, 12, 0.88)',
+} as const;
+
+const demoPanelStyle = {
+  width: 'min(360px, 100%)',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 'var(--space-4)',
+  padding: 'var(--space-5)',
+  borderRadius: 'var(--radius-lg)',
+  border: '1px solid var(--game-border, var(--color-border))',
+  background: 'var(--color-surface)',
+  boxShadow: 'var(--shadow-lg)',
+} as const;
+
+const demoTitleStyle = {
+  margin: 0,
+  color: 'var(--color-text)',
+  fontSize: 'var(--font-size-lg)',
+  textAlign: 'center',
+} as const;
+
+const demoStimulusStyle = {
+  display: 'grid',
+  placeItems: 'center',
+  minHeight: 96,
+  borderRadius: 'var(--radius-lg)',
+  border: '1px solid color-mix(in srgb, var(--accent) 46%, transparent)',
+  background: 'var(--game-surface-raised, var(--color-surface-raised))',
+  color: 'var(--color-text)',
+  fontSize: 'var(--font-size-xl)',
+  fontWeight: 900,
+} as const;
+
+const demoAnswerStyle = {
+  margin: 0,
+  padding: 'var(--space-2) var(--space-3)',
+  borderRadius: 'var(--radius-pill)',
+  background: 'var(--accent)',
+  color: 'var(--color-accent-on)',
+  textAlign: 'center',
+  fontWeight: 800,
+} as const;
+
+const demoInstructionStyle = {
+  minHeight: 44,
+  margin: 0,
+  color: 'var(--color-text-muted)',
+  textAlign: 'center',
+} as const;
+
+const demoCaptionStyle = {
+  margin: 0,
+  color: 'var(--color-text-muted)',
+  fontSize: 'var(--font-size-xs)',
+  textAlign: 'center',
+} as const;
+
+const demoProgressStyle = {
+  display: 'flex',
+  justifyContent: 'center',
+  gap: 'var(--space-2)',
+} as const;
+
+const demoDotStyle = {
+  width: 8,
+  height: 8,
+  borderRadius: '50%',
+} as const;
+
+const demoSkipStyle = {
+  minHeight: 'var(--tap-target-min)',
+  border: 0,
+  background: 'transparent',
+  color: 'var(--color-text-muted)',
+  fontWeight: 700,
 } as const;

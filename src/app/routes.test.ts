@@ -7,8 +7,9 @@ import {
 } from './routes';
 
 describe('routes', () => {
-  it('exposes the session and deep-link path patterns', () => {
-    expect(ROUTES.session).toBe('/');
+  it('exposes the home, feed and deep-link path patterns', () => {
+    expect(ROUTES.home).toBe('/');
+    expect(ROUTES.feed).toBe('/feed');
     expect(ROUTES.cardDeepLink).toBe('/c/:cardId');
   });
 
@@ -33,15 +34,20 @@ describe('routes', () => {
   });
 
   describe('routeKindFor', () => {
-    it('maps route keys to telemetry route kinds', () => {
-      expect(routeKindFor.session).toBe('session');
+    it('maps route keys to route kinds', () => {
+      // Only the feed is a feed-telemetry surface.
+      expect(routeKindFor.feed).toBe('session');
       expect(routeKindFor.cardDeepLink).toBe('card_deep_link');
+      // Home + account routes (accounts pivot) are not feed-telemetry surfaces.
+      expect(routeKindFor.home).toBe('account');
+      expect(routeKindFor.authCallback).toBe('account');
+      expect(routeKindFor.profile).toBe('account');
     });
 
-    it('only yields the telemetry-aligned RouteKind union', () => {
+    it('only yields values from the RouteKind union', () => {
       const kinds: RouteKind[] = Object.values(routeKindFor);
       for (const kind of kinds) {
-        expect(['session', 'card_deep_link']).toContain(kind);
+        expect(['session', 'card_deep_link', 'account']).toContain(kind);
       }
     });
   });

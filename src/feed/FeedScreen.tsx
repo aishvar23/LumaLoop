@@ -20,12 +20,18 @@
  * registry's gate); the feed does NOT auto-advance — the user swipes on.
  *
  * Free-scroll semantics (#106, docs/FEED_DIRECTION.md §3.2): each game runs a
- * local lifecycle — not-engaged → engaged → resolved — and the per-game timer
- * arms on ENGAGEMENT (first interaction), not on becoming active. Swiping past an
- * un-engaged game is a SKIP (no resolution); engaging then leaving before resolve
- * is an ABANDONED attempt; a played game still resolves correct/incorrect/timeout
- * unchanged. The lifecycle callbacks below are the telemetry seam for #108 — this
- * file emits the signals but does NOT post telemetry.
+ * local lifecycle — not-engaged → engaged → resolved. The per-game COUNTDOWN now
+ * arms on ACTIVATION (the game appearing/snapping into view), not on first
+ * interaction, so an immediate-play puzzle is timed from the moment it is on
+ * screen and answerable; pre-phase games (watch/preview/Start) still start their
+ * countdown at their own answer-phase start (see `timerGatedCard`). ENGAGEMENT
+ * (first interaction) is still tracked, but only to classify leave behaviour:
+ * swiping past an un-engaged game is a SKIP (no resolution); engaging then
+ * leaving before resolve is an ABANDONED attempt; a game that resolves
+ * (correct/incorrect/timeout) is played. A game left active long enough to time
+ * out resolves as a TIMEOUT even if never engaged (the countdown runs on appear).
+ * The lifecycle callbacks below are the telemetry seam for #108 — this file emits
+ * the signals but does NOT post telemetry.
  */
 
 import {
@@ -40,14 +46,21 @@ import {
 } from 'react';
 
 import { getCardById as getCatalogCardById } from '../cards/catalog';
+import { hookForCard } from '../cards/cardHook';
+import Wordmark from '../ui/Wordmark';
 import type { LiquidCard } from '../cards/types';
 import { resolveRenderer } from '../session/rendererRegistry';
-import type { RendererRegistry, TemplateRenderer } from '../session/rendererRegistry';
+import type {
+  RendererRegistry,
+  TemplateRenderer,
+} from '../session/rendererRegistry';
 import type { CardResolution, CardStartContext } from '../templates/contract';
 import { getAnonymousUserId } from '../telemetry/anonymousUser';
 import { resolveCategoryTheme } from '../ui/categoryTheme';
 import { feedRegistry } from '../ui/feedRegistry';
+import CardSocialRail from '../social/CardSocialRail';
 import { CardScoreProvider } from './cardScoreContext';
+import type { CardScore } from './scoring';
 import type { FeedBatchSource } from './feedDeck';
 import FeedScoreHud from './FeedScoreHud';
 import type { ScoreStore } from './scoreStore';
@@ -67,6 +80,19 @@ export type FeedScreenProps = {
   registry?: RendererRegistry;
   /** Test seam: deterministic feed batch source. Defaults to seeded catalog. */
   source?: FeedBatchSource;
+  /**
+   * Already-played cardIds for the signed-in user, skipped in the endless feed
+   * (D2). Threaded into the controller's composition; ignored when an explicit
+   * `source` is supplied. Best-effort — an empty/omitted set means "skip
+   * nothing", and the composer's exhaustion fallback keeps the feed endless.
+   */
+  excludeCardIds?: ReadonlySet<string> | readonly string[];
+  /**
+   * Pin this card as the FIRST slide — a featured-game deep link (so tapping a
+   * specific game opens THAT game). Threaded into the controller; ignored when an
+   * explicit `source` is supplied (tests).
+   */
+  startCardId?: string;
   /**
    * Test seam: a fixed anonymous id for deterministic composition. When omitted
    * (real usage) it resolves to the real persisted id (Technical Design §10).
@@ -112,6 +138,15 @@ export type FeedScreenProps = {
    */
   onCardResolved?: (index: number, resolution: CardResolution) => void;
   /**
+   * Notified once per local resolution WITH the Phase-4 per-card score that the
+   * SAME resolution path just computed (the HUD's points/streak for this card).
+   * This is the accounts-pivot seam (a `game_plays` row is recorded from it) — it
+   * rides the existing `handleResolve` flow, not a parallel observer, and stays
+   * template-agnostic (the score is the universal points value, no `templateType`
+   * branch). Fires at most once per index, after `onCardResolved`.
+   */
+  onCardScored?: (index: number, resolution: CardResolution, score: CardScore) => void;
+  /**
    * Test seam: the Phase-4 best-run persistence store. Defaults to the real
    * best-effort `localStorage` store; pass `null` to disable persistence (tests).
    */
@@ -119,62 +154,54 @@ export type FeedScreenProps = {
 };
 
 /**
- * #106: gate the per-game timer on ENGAGEMENT. Until the player interacts with a
- * game we hand the renderer a card whose `timeLimitMs` is non-finite, so the
+ * Gate the per-game timer on ACTIVATION. Until a slide is the ACTIVE/focused
+ * card we hand the renderer a card whose `timeLimitMs` is non-finite, so the
  * shared {@link useCardTimer} skips arming its countdown (the hook bails on a
- * non-finite limit). On the first interaction the real card flows through and the
- * timer arms a fresh, full-duration countdown from the engage instant.
+ * non-finite limit). Once the slide becomes active the real card flows through
+ * and the timer arms a fresh, full-duration countdown from the activation
+ * instant — so the countdown starts the moment the game appears (the card snaps
+ * into view), NOT on the player's first interaction.
  *
  * This is template-AGNOSTIC: `timeLimitMs` is the one timing primitive common to
- * every {@link LiquidCard} config, so a single override works for all four
- * renderers with NO switch on `templateType`. The cast mirrors the one localized,
- * sound escape hatch documented in `rendererRegistry.ts`: the override preserves
- * the card's discriminant and every other field, so the result is the same card
+ * every {@link LiquidCard} config, so a single override works for all renderers
+ * with NO switch on `templateType`. The cast mirrors the one localized, sound
+ * escape hatch documented in `rendererRegistry.ts`: the override preserves the
+ * card's discriminant and every other field, so the result is the same card
  * variant with a swapped time limit.
  *
- * Known telemetry-only caveat (NOT a correctness bug): on multi-tap templates
- * (e.g. Spot It), the engaging tap's `markAttempt()` runs just before this ∞→
- * finite flip re-runs `useCardTimer`'s arm effect, which resets its attempt
- * counter to 0. A subsequent genuine `timeout` therefore reports one fewer
- * attempt than the player actually made. The double-resolve it could otherwise
- * cause is fully handled by `handleResolve`'s idempotency; only the timeout's
- * `attemptCount` signal is affected. Left as-is to keep this fix surgical — the
- * counter lives in the shared hook and resetting semantics there is out of scope.
+ * IMMEDIATE-PLAY vs PRE-PHASE — why activation-gating is correct for BOTH, with
+ * no per-template flag:
+ *  - IMMEDIATE-PLAY games (spot_it, tiny_logic, quick_math, …) pass `card`
+ *    straight into {@link useCardTimer} on mount, so flipping the limit finite on
+ *    activation arms their countdown the instant the card appears (the requested
+ *    behaviour).
+ *  - PRE-PHASE games (memory_sequence's watch, what_changed's preview, n_back /
+ *    color_word / rule_flip's Start→stream) mount their `useCardTimer` ONLY
+ *    inside the answer-phase subtree, which renders AFTER the pre-phase ends. So
+ *    even though this override makes the limit finite as soon as they activate,
+ *    their inner timer does not exist until the answer phase begins — it arms at
+ *    the real round-start, never during the pre-phase. The pre-phase itself is
+ *    independently held by each renderer's `isActive` gate (or its Start button),
+ *    so a pre-mounted neighbour never advances either.
+ *
+ * Neighbour safety: a windowed-but-not-focused slide stays non-finite, so its
+ * timer can never run — only the ACTIVE slide's timer arms. Per-slide latching of
+ * resolutions (see `handleResolve`) drops any phantom timeout from a re-armed
+ * timer when a slide re-activates.
  */
-function timerGatedCard(card: LiquidCard, engaged: boolean): LiquidCard {
-  if (engaged) return card;
+function timerGatedCard(card: LiquidCard, armed: boolean): LiquidCard {
+  if (armed) return card;
   return {
     ...card,
     config: { ...card.config, timeLimitMs: Number.POSITIVE_INFINITY },
   } as LiquidCard;
 }
 
-/** True when motion should be reduced; safe in non-DOM/test environments. */
-function prefersReducedMotion(): boolean {
-  try {
-    return (
-      globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
-    );
-  } catch {
-    return false;
-  }
-}
-
-/** Best-effort `scrollIntoView` — jsdom/older engines may lack it; never throws. */
-function scrollSlideIntoView(el: HTMLElement, reduceMotion: boolean): void {
-  try {
-    el.scrollIntoView?.({
-      behavior: reduceMotion ? 'auto' : 'smooth',
-      block: 'start',
-    });
-  } catch {
-    // Best-effort only — navigation already updated the controller's active index.
-  }
-}
-
 export default function FeedScreen({
   registry = feedRegistry,
   source,
+  excludeCardIds,
+  startCardId,
   anonymousUserId,
   getCardById = getCatalogCardById,
   now,
@@ -184,6 +211,7 @@ export default function FeedScreen({
   onCardSkipped,
   onCardAbandoned,
   onCardResolved,
+  onCardScored,
   scoreStore,
 }: FeedScreenProps) {
   // Resolve the real persisted anonymous id ONCE per mount (Technical Design
@@ -191,9 +219,10 @@ export default function FeedScreen({
   const [resolvedAnonymousUserId] = useState(
     () => anonymousUserId ?? getAnonymousUserId(),
   );
-  // A per-mount feed instance id + a single "active at" stamp: the `elapsedMs`
-  // origin for the card start context. The interaction timer no longer arms from
-  // here — each slide arms it from its own engage instant (#106, see FeedSlide).
+  // A per-mount feed instance id + a single "active at" stamp. This stamp is now
+  // only a FALLBACK origin for the card start context: each slide stamps its own
+  // per-activation instant and arms its timer from there (see FeedSlide), so the
+  // countdown starts when the game appears.
   const nowFn = now ?? Date.now;
   const [feedId] = useState(
     () =>
@@ -206,6 +235,8 @@ export default function FeedScreen({
   const { cards, activeIndex, setActiveIndex, next, prev } = useFeedController({
     anonymousUserId: resolvedAnonymousUserId,
     source,
+    excludeCardIds,
+    startCardId,
   });
 
   // Phase 4: the GAME-POINTS accumulator. It folds each resolution through the
@@ -269,9 +300,8 @@ export default function FeedScreen({
   }, [cards.length]);
 
   // Keyboard / non-touch navigation: ArrowDown/Space → next, ArrowUp → prev.
-  // After the controller advances we scroll the target slide into view so the
-  // visual position matches the active card (respecting reduced-motion).
-  const pendingScrollRef = useRef<number | null>(null);
+  // Scroll the already-prefetched target inside the feed container itself so
+  // the document never moves and CSS snap owns the final resting position.
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
       if (
@@ -280,24 +310,20 @@ export default function FeedScreen({
         event.key === 'Spacebar'
       ) {
         event.preventDefault();
-        pendingScrollRef.current = activeIndex + 1;
+        const target = activeIndex + 1;
+        event.currentTarget.scrollTop =
+          target * event.currentTarget.clientHeight;
         next();
       } else if (event.key === 'ArrowUp') {
         event.preventDefault();
-        pendingScrollRef.current = Math.max(0, activeIndex - 1);
+        const target = Math.max(0, activeIndex - 1);
+        event.currentTarget.scrollTop =
+          target * event.currentTarget.clientHeight;
         prev();
       }
     },
     [activeIndex, next, prev],
   );
-
-  useEffect(() => {
-    const target = pendingScrollRef.current;
-    if (target === null) return;
-    pendingScrollRef.current = null;
-    const el = slideEls.current.get(target);
-    if (el) scrollSlideIntoView(el, prefersReducedMotion());
-  }, [activeIndex]);
 
   // Per-game lifecycle (#106), tracked in refs so it never triggers a render and
   // each transition latches exactly once per game instance:
@@ -375,9 +401,21 @@ export default function FeedScreen({
       // by the time the result card mounts via the feedback gate.
       scoreOnResolvedRef.current(index, resolution);
       onCardResolved?.(index, resolution);
+      // Accounts pivot: surface the just-computed per-card score on the SAME path
+      // so a `game_plays` row can be recorded with the HUD's points. Reads it back
+      // from the score hook (set synchronously above), so points always agree.
+      const cardScore = getCardScoreRef.current(index);
+      if (cardScore) onCardScoredRef.current?.(index, resolution, cardScore);
     },
     [onCardResolved],
   );
+
+  // Stable refs for the score lookup + the accounts-pivot seam used in the stable
+  // `handleResolve` (so it never re-creates as those props change).
+  const getCardScoreRef = useRef(score.getCardScore);
+  getCardScoreRef.current = score.getCardScore;
+  const onCardScoredRef = useRef(onCardScored);
+  onCardScoredRef.current = onCardScored;
 
   // Stable handle to the score hook's resolution folder for `handleResolve`.
   const scoreOnResolvedRef = useRef(score.onCardResolved);
@@ -476,7 +514,7 @@ type FeedSlideProps = {
   getCardById: (cardId: string) => LiquidCard | undefined;
   feedId: string;
   activeAtMs: number;
-  /** Wall clock for stamping this slide's engage instant (#106). */
+  /** Wall clock for stamping this slide's activation instant (timer origin). */
   now: () => number;
   registerSlide: (el: HTMLElement | null) => void;
   /** Notify the feed that this game was engaged (first interaction). */
@@ -508,34 +546,51 @@ const FeedSlide = memo(function FeedSlide({
   const card = windowed ? getCardById(cardId) : undefined;
   const Renderer = card ? resolveRenderer(registry, card) : undefined;
 
-  // #106: the engage instant — null until the player first interacts with this
-  // game. Local to the slide so engagement (and thus timer-arming) is per-game.
+  // The per-slide ACTIVATION instant — null until this slide first becomes the
+  // focused card. The countdown now arms on activation (the game APPEARING), so
+  // this is the timing origin for the card start context AND the gate that flips
+  // `timeLimitMs` finite. Latched once so re-activating a slide keeps its
+  // original origin (and `timerGatedCard` keeps the limit finite from then on).
+  const [activatedAtMs, setActivatedAtMs] = useState<number | null>(null);
+  useEffect(() => {
+    if (!active || activatedAtMs !== null) return;
+    setActivatedAtMs(now());
+  }, [active, activatedAtMs, now]);
+
+  // The engage instant is still tracked, but ONLY to drive the skip-vs-abandon
+  // telemetry classification (first interaction) — it no longer gates the timer.
   // A ref guards the one-time engage notification independently of render timing.
-  const [engageAtMs, setEngageAtMs] = useState<number | null>(null);
   const engagedOnceRef = useRef(false);
   const handleAttempt = useCallback(
     (_signals?: Record<string, number | string | boolean>) => {
       if (engagedOnceRef.current) return;
       engagedOnceRef.current = true;
-      setEngageAtMs(now());
       onEngage(index, cardId);
     },
-    [now, onEngage, index, cardId],
+    [onEngage, index, cardId],
   );
 
   // Mount the game only inside the window AND when the card + renderer resolve;
   // a missing card/renderer falls back to the placeholder (fail-safe, never a
   // crash — mirrors the controller's missing-renderer guard).
   if (card && Renderer) {
-    const engaged = engageAtMs !== null;
+    // Arm the timer once the slide has activated (the countdown starts on
+    // appear). Until then the card carries a non-finite limit so a pre-mounted
+    // neighbour's timer never runs. `armed` latches on first activation.
+    const armed = activatedAtMs !== null;
+    // The timing origin is the slide's own activation instant (not the stale
+    // per-feed mount stamp), so `elapsedMs` measures from when THIS game appeared
+    // and equals the countdown duration on timeout. For IMMEDIATE-PLAY games the
+    // puzzle is answerable on appear, so `interactionEnabledAtMs` is also the
+    // activation instant (TTI measures from appear). PRE-PHASE renderers override
+    // `interactionEnabledAtMs` themselves with their answer-phase start, so their
+    // TTI / `interactionElapsedMs` still exclude the pre-phase.
+    const originMs = activatedAtMs ?? activeAtMs;
     const context: CardStartContext = {
       sessionId: feedId,
       cardIndex: index,
-      activeAtMs,
-      // #106: timing origin is the engage instant. Before engagement it falls
-      // back to `activeAtMs`, but the timer is gated off anyway (`timerGatedCard`
-      // hands the renderer a non-finite limit until the player interacts).
-      interactionEnabledAtMs: engageAtMs ?? activeAtMs,
+      activeAtMs: originMs,
+      interactionEnabledAtMs: originMs,
     };
     return (
       <div
@@ -551,10 +606,27 @@ const FeedSlide = memo(function FeedSlide({
         style={slideAccentStyle(card.category)}
         ref={registerSlide}
       >
-        <SlideTopChrome category={card.category} />
+        <div className="feed-slide__ambient" aria-hidden="true">
+          <span className="feed-slide__orb feed-slide__orb--one" />
+          <span className="feed-slide__orb feed-slide__orb--two" />
+          <span className="feed-slide__grid-texture" />
+        </div>
+        <SlideTopChrome
+          category={card.category}
+          difficulty={card.difficulty}
+          timeLimitMs={card.config.timeLimitMs}
+        />
+        {/* The card's HOOK — the bold first-read promise before the player
+            engages (engagement strategy §4.1). Falls back to a per-template
+            default so every slide has one. */}
+        <p className="feed-slide__hook" data-testid="feed-hook">
+          {hookForCard(card)}
+        </p>
         <div
           className="feed-slide__game"
           data-testid={`feed-game-${index}`}
+          data-template={card.templateType}
+          data-difficulty={card.difficulty}
           // Phase 5: drive the activation-gated entrance animation. Only the
           // focused slide carries `data-active="true"`, so a pre-mounted
           // neighbour stays still until it actually snaps into view (motion is
@@ -562,20 +634,43 @@ const FeedSlide = memo(function FeedSlide({
           // it never feeds back into timing/`isActive` game logic.
           data-active={active ? 'true' : 'false'}
         >
-          {createElement(Renderer as TemplateRenderer<LiquidCard>, {
-            key: `${feedId}:${index}`,
-            // #106: until engaged, the renderer's timer stays disarmed.
-            card: timerGatedCard(card, engaged),
-            context,
-            // Activation signal (#137 review fix): only the focused slide is
-            // active. Renderers with a timed PRE-phase (memory_sequence's watch,
-            // what_changed's preview) hold until this is true, so a pre-mounted
-            // slide's pre-phase cannot elapse off-screen. Template-agnostic; most
-            // renderers ignore it.
-            isActive: active,
-            onAttempt: handleAttempt,
-            onResolve: (resolution: CardResolution) => onResolve(index, resolution),
-          })}
+          <div className="feed-slide__game-light" aria-hidden="true">
+            <span className="feed-slide__game-orbit" />
+            <span className="feed-slide__game-sweep" />
+          </div>
+          <GamePostChrome
+            templateType={card.templateType}
+            mechanic={card.puzzleDna.mechanic}
+            difficulty={card.difficulty}
+          />
+          <div className="feed-slide__game-content">
+            {createElement(Renderer as TemplateRenderer<LiquidCard>, {
+              key: `${feedId}:${index}`,
+              // Until the slide activates, the renderer's timer stays disarmed;
+              // on activation the real finite limit flows through and the
+              // countdown starts (immediate-play arms now; pre-phase renderers
+              // arm their inner timer at their own answer-phase start).
+              card: timerGatedCard(card, armed),
+              context,
+              // Activation signal (#137 review fix): only the focused slide is
+              // active. Renderers with a timed PRE-phase (memory_sequence's watch,
+              // what_changed's preview) hold until this is true, so a pre-mounted
+              // slide's pre-phase cannot elapse off-screen. Template-agnostic; most
+              // renderers ignore it.
+              isActive: active,
+              onAttempt: handleAttempt,
+              onResolve: (resolution: CardResolution) =>
+                onResolve(index, resolution),
+            })}
+          </div>
+        </div>
+        {/* Per-card social surface (likes + comments) — a FEED-LAYER concern
+            keyed by cardId, NOT per-template (no switch on templateType, never
+            touches the renderer's logic). Activation-gated: it loads only when
+            this slide is the focused one (`active`), so pre-mounted neighbours
+            don't fetch. Renders nothing when there's no social provider. */}
+        <div className="feed-slide__social">
+          <CardSocialRail cardId={cardId} active={active} />
         </div>
         <SlideBottomChrome creatorHandle={card.creatorHandle} index={index} />
       </div>
@@ -583,7 +678,12 @@ const FeedSlide = memo(function FeedSlide({
   }
 
   return (
-    <div className="feed-slide" data-index={index} data-testid="feed-slide" ref={registerSlide}>
+    <div
+      className="feed-slide"
+      data-index={index}
+      data-testid="feed-slide"
+      ref={registerSlide}
+    >
       <div
         className="feed-slide__placeholder"
         data-testid={`feed-placeholder-${index}`}
@@ -616,6 +716,109 @@ function categoryLabel(category: string): string {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
+/** Generic human-readable label for a template id ("spot_it" → "Spot it"). */
+function templateLabel(templateType: string): string {
+  return categoryLabel(templateType);
+}
+
+function templateDescription(templateType: string): string | null {
+  if (templateType === 'prism_path') {
+    return 'Rotate mirrors to guide a beam from IN to the star while avoiding blockers. Tap mirrors to flip / and \\, then fire when the preview reaches the target.';
+  }
+  return null;
+}
+
+function difficultyLevel(difficulty: string): number {
+  if (difficulty === 'extremely_hard') return 5;
+  if (difficulty === 'hard') return 4;
+  if (difficulty === 'medium') return 3;
+  if (difficulty === 'easy') return 2;
+  return 1;
+}
+
+function templateMonogram(templateType: string): string {
+  return templateType
+    .split('_')
+    .map((part) => part[0] ?? '')
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+/** Stable nine-cell fingerprint derived from the template id; no template switch. */
+function templateFingerprint(templateType: string): readonly boolean[] {
+  let hash = 2166136261;
+  for (const char of templateType) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return Array.from({ length: 9 }, (_, index) => {
+    const bit = (hash >>> (index % 24)) & 1;
+    return bit === 1 || index === 4;
+  });
+}
+
+/**
+ * Identity strip for the game object. The template name and authored mechanic
+ * replace the redundant "Playable" badge; the deterministic fingerprint gives
+ * every template a recognizable visual signature without branching in the feed.
+ */
+function GamePostChrome({
+  templateType,
+  mechanic,
+  difficulty,
+}: {
+  templateType: string;
+  mechanic: string;
+  difficulty: string;
+}) {
+  const level = difficultyLevel(difficulty);
+  const fingerprint = templateFingerprint(templateType);
+  const label = templateLabel(templateType);
+  const description = templateDescription(templateType);
+  return (
+    <div className="feed-slide__game-kicker">
+      <span className="feed-slide__template-mark" aria-hidden="true">
+        <span className="feed-slide__template-monogram">
+          {templateMonogram(templateType)}
+        </span>
+        <span className="feed-slide__fingerprint">
+          {fingerprint.map((filled, index) => (
+            <span key={index} data-filled={filled ? 'true' : 'false'} />
+          ))}
+        </span>
+      </span>
+      <span className="feed-slide__template-copy">
+        <span
+          className="feed-slide__template-label"
+          data-description={description ?? undefined}
+          data-has-description={description ? 'true' : 'false'}
+          title={description ?? undefined}
+          tabIndex={description ? 0 : undefined}
+          aria-label={description ? `${label}. ${description}` : undefined}
+        >
+          {label}
+        </span>
+        <span className="feed-slide__mechanic-label">
+          {categoryLabel(mechanic.replace(/-/g, '_'))}
+        </span>
+      </span>
+      <span
+        className="feed-slide__level"
+        aria-label={`${categoryLabel(difficulty)} difficulty`}
+      >
+        {[1, 2, 3, 4, 5].map((step) => (
+          <span
+            key={step}
+            aria-hidden="true"
+            data-filled={step <= level ? 'true' : 'false'}
+          />
+        ))}
+      </span>
+    </div>
+  );
+}
+
 /**
  * Top-of-slide chrome (Phase 3): a small category CHIP, accent-tinted from the
  * slide's `--accent`. It names the performance category in modest, guardrail-safe
@@ -623,12 +826,51 @@ function categoryLabel(category: string): string {
  * signal (the chip text carries the meaning). Decorative to assistive tech beyond
  * its text label.
  */
-function SlideTopChrome({ category }: { category: string }) {
+function SlideTopChrome({
+  category,
+  difficulty,
+  timeLimitMs,
+}: {
+  category: string;
+  difficulty: string;
+  timeLimitMs: number;
+}) {
   return (
     <div className="feed-slide__top">
-      <span className="feed-slide__chip">{categoryLabel(category)}</span>
+      <span className="feed-slide__brand">
+        <span className="feed-slide__brand-mark" aria-hidden="true">
+          ✦
+        </span>
+        <Wordmark className="feed-slide__brand-name" />
+        <span className="feed-slide__brand-mode">Discover</span>
+      </span>
+      <span className="feed-slide__meta">
+        <span className="feed-slide__chip">{categoryLabel(category)}</span>
+        <span className="feed-slide__meta-pill">
+          {categoryLabel(difficulty)}
+        </span>
+        {/* The actual time the player gets — the per-difficulty budget, not an
+            estimate (so the tag matches the countdown). */}
+        <span className="feed-slide__meta-pill" data-testid="feed-time-pill">
+          {formatTimeLimitLabel(timeLimitMs)}
+        </span>
+      </span>
     </div>
   );
+}
+
+/**
+ * Format a time-limit (ms) as a compact tag: under a minute reads as `30s`; a
+ * minute or more reads as `m:ss` (e.g. 90000 → `1:30`, 120000 → `2:00`). A
+ * non-finite limit (a timer-gated, off-screen slide) shows nothing.
+ */
+function formatTimeLimitLabel(ms: number): string {
+  if (!Number.isFinite(ms)) return '';
+  const totalSeconds = Math.round(ms / 1000);
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
 /**
@@ -656,8 +898,16 @@ function SlideBottomChrome({
           {monogram}
         </span>
         {/* creatorHandle already carries the leading `@` (catalog convention). */}
-        <span className="feed-slide__byline" data-testid={`feed-byline-${index}`}>
-          {creatorHandle}
+        <span className="feed-slide__author-copy">
+          <span
+            className="feed-slide__byline"
+            data-testid={`feed-byline-${index}`}
+          >
+            {creatorHandle}
+          </span>
+          <span className="feed-slide__creator-caption">
+            Original playable challenge
+          </span>
         </span>
       </span>
       <span className="feed-slide__swipe" aria-hidden="true">

@@ -9,11 +9,13 @@
  * no real games, and so M4 can drop the real renderers into {@link RendererRegistry}
  * with zero feed changes.
  *
- * It honours the feed's engage-gated timing by mounting the shared, template-
- * AGNOSTIC {@link useCardTimer}: the feed hands an un-engaged card a non-finite
- * `timeLimitMs` (see `FeedScreen`'s `timerGatedCard`), so the timer stays disarmed
- * until the player presses "engage" — at which point a fresh, full-duration
- * countdown arms from the engage instant, just like the real renderers will.
+ * It honours the feed's ACTIVATION-gated timing by mounting the shared, template-
+ * AGNOSTIC {@link useCardTimer}: the feed hands a NON-active (pre-mounted) card a
+ * non-finite `timeLimitMs` (see `FeedScreen`'s `timerGatedCard`), so a neighbour's
+ * timer stays disarmed; once the slide becomes the focused card the real finite
+ * limit flows through and a full-duration countdown arms from the activation
+ * instant — i.e. the countdown starts when the game appears, like the real
+ * immediate-play renderers. "engage" only records the first interaction now.
  */
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 

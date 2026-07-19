@@ -1,0 +1,41 @@
+/**
+ * Share-to-status button (in the result card). Token-driven; accent-aware so it
+ * matches the slide it belongs to (reads the per-category `--accent` aliases
+ * seeded on `.feed-slide`).
+ */
+.card-share {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  width: 100%;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+  /* Filled accent so it reads as a clear call-to-action after playing. */
+  background: var(--accent, var(--color-accent));
+  color: var(--color-accent-on, #0b0b0f);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+  transition: filter 0.12s ease, opacity 0.12s ease;
+}
+
+.card-share:hover,
+.card-share:focus-visible {
+  filter: brightness(1.08);
+  outline: none;
+}
+
+.card-share[data-state='shared'] {
+  background: transparent;
+  border-color: var(--color-success-border, var(--color-border));
+  color: var(--color-success-bright, var(--color-text-muted));
+  cursor: default;
+}
+
+.card-share:disabled {
+  cursor: default;
+}

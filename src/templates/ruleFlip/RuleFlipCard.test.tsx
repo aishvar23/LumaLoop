@@ -129,10 +129,51 @@ describe('comprehension gate', () => {
 
     expect(screen.getByTestId('rf-gate-rule')).toHaveTextContent('Rule: Tap red');
     expect(screen.getByTestId('rf-start')).toBeInTheDocument();
+    expect(screen.getByTestId('rf-demo-button')).toHaveAttribute(
+      'title',
+      expect.stringContaining('adds about 5 seconds'),
+    );
 
     // The measured stream is not mounted and no response controls exist yet.
     expect(screen.queryByTestId('rf-stimulus')).not.toBeInTheDocument();
     expect(screen.queryByTestId('rf-match')).not.toBeInTheDocument();
+    expect(onAttempt).not.toHaveBeenCalled();
+    expect(onResolve).not.toHaveBeenCalled();
+  });
+
+  it('plays a separate demo without starting the stream or attempt', () => {
+    const { onAttempt, onResolve } = renderCard({ now: () => 1_000 });
+
+    fireEvent.click(screen.getByTestId('rf-demo-button'));
+    expect(screen.getByRole('dialog')).toHaveAccessibleName(
+      'Rule Flip demonstration',
+    );
+    expect(screen.getByTestId('rf-demo-rule')).toHaveTextContent(
+      'Filled circles match',
+    );
+    expect(screen.getByTestId('rf-demo-answer')).toHaveTextContent(
+      'Demo taps: Match',
+    );
+    expect(onAttempt).not.toHaveBeenCalled();
+
+    advance(1_500);
+    expect(screen.getByTestId('rf-demo-rule')).toHaveTextContent(
+      'outlined squares match',
+    );
+    expect(screen.getByTestId('rf-demo-answer')).toHaveTextContent(
+      'No-match',
+    );
+
+    advance(1_500);
+    expect(screen.getByTestId('rf-demo-stimulus')).toHaveTextContent('□');
+    expect(screen.getByTestId('rf-demo-note')).toHaveTextContent(
+      'fits the new rule',
+    );
+
+    advance(2_000);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByTestId('rf-your-turn')).toHaveTextContent('Your turn');
+    expect(screen.queryByTestId('rf-stimulus')).not.toBeInTheDocument();
     expect(onAttempt).not.toHaveBeenCalled();
     expect(onResolve).not.toHaveBeenCalled();
   });
@@ -284,7 +325,60 @@ describe('stream completion', () => {
     expect(resolution.signals.switch_latency_ms).toBe(400);
     expect(resolution.signals.perseveration).toBe(0);
     expect(resolution.signals.correct).toBe(true);
+    expect(resolution.signals.failed_step).toBe(-1);
+    expect(resolution.signals.failure_reason).toBe('');
+    const actionLog = JSON.parse(resolution.signals.step_action_log as string) as Array<{
+      step: number;
+      response: string;
+      correct: boolean;
+    }>;
+    expect(actionLog).toHaveLength(3);
+    expect(actionLog.map((item) => item.step)).toEqual([1, 2, 3]);
+    expect(actionLog.every((item) => item.correct)).toBe(true);
     expect(resolution.signals.time_to_interaction).toBe(200);
+  });
+
+  it('fails the card when any one step is wrong and reports the first failed step', () => {
+    let clock = 1_000;
+    const { onResolve } = renderCard({ now: () => clock });
+
+    clock = 1_000;
+    start();
+
+    clock = 1_200;
+    respondMatch(); // step 1 correct
+
+    clock = 2_000;
+    advance(1_000);
+    clock = 2_500;
+    advance(500);
+    clock = 2_900;
+    respondMatch(); // step 2 correct
+
+    clock = 3_500;
+    advance(1_000);
+    clock = 4_000;
+    advance(500);
+    clock = 4_300;
+    respondMatch(); // step 3 wrong: expected No-match
+
+    clock = 5_000;
+    advance(1_000);
+    clock = 5_500;
+    advance(500);
+
+    const resolution = lastResolution(onResolve);
+    expect(resolution.resolutionType).toBe('incorrect');
+    expect(resolution.isCorrect).toBe(false);
+    expect(resolution.signals.overall_accuracy).toBe(2 / 3);
+    expect(resolution.signals.failed_step).toBe(3);
+    expect(resolution.signals.failure_reason).toContain('Step 3 (C)');
+    expect(resolution.signals.failure_reason).toContain('expected No-match');
+    const actionLog = JSON.parse(resolution.signals.step_action_log as string) as Array<{
+      step: number;
+      correct: boolean;
+    }>;
+    expect(actionLog.at(-1)).toMatchObject({ step: 3, correct: false });
   });
 
   it('records perseveration when the player keeps the OLD rule after the flip', () => {
@@ -326,9 +420,11 @@ describe('stream completion', () => {
 
     const resolution = lastResolution(onResolve);
     expect(resolution.signals.perseveration).toBe(2);
+    expect(resolution.signals.failed_step).toBe(2);
+    expect(resolution.signals.failure_reason).toContain('Step 2 (B)');
     expect(resolution.signals.post_flip_accuracy).toBe(0);
     expect(resolution.signals.pre_flip_accuracy).toBe(1);
-    // 1 of 3 correct overall (< 0.5 pass threshold) -> incorrect.
+    // Any wrong Rule Flip step fails the card.
     expect(resolution.resolutionType).toBe('incorrect');
     expect(resolution.isCorrect).toBe(false);
   });

@@ -36,9 +36,10 @@
  * own accent surface paired with the order, never colour alone.
  */
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { orderOptions } from '../../core/cards/optionOrder';
 import type { PatternChainCard as PatternChainCardType } from '../../core/cards/types';
 import type { CardResolution, TemplateProps } from '../../core/templates/contract';
 import { useCardTimer } from '../../core/templates/useCardTimer';
@@ -53,6 +54,7 @@ import {
   space,
   TAP_TARGET_MIN,
 } from './tokens';
+import { useGameTheme } from './GameTheme';
 
 /**
  * The renderer accepts the shared {@link TemplateProps} plus an optional
@@ -78,6 +80,7 @@ export default function PatternChainCard({
 }: PatternChainCardProps) {
   const { config } = card;
   const { sequence, steps } = config;
+  const theme = useGameTheme();
 
   // The current step index drives which step's options are shown. The chosen
   // labels (appended to the visible sequence) and the chain of picked ids are
@@ -183,6 +186,18 @@ export default function PatternChainCard({
   const chainComplete = chosenLabels.length >= steps.length;
   const activeStep = chainComplete ? undefined : steps[currentStep];
 
+  // Present the active step's options in a deterministic, per-step-seeded order so
+  // the correct next item is not positionally guessable (keyed by
+  // `correctOptionId`, not slot). Seeded per step (`cardId:stepIndex`) so each
+  // step shuffles independently but stably; identical on web↔mobile.
+  const orderedOptions = useMemo(
+    () =>
+      activeStep
+        ? orderOptions(`${card.cardId}:${currentStep}`, activeStep.options)
+        : [],
+    [card.cardId, currentStep, activeStep],
+  );
+
   return (
     <View style={styles.section} accessibilityLabel="Pattern chain">
       <Text testID="pc-prompt" style={styles.prompt}>
@@ -191,7 +206,10 @@ export default function PatternChainCard({
 
       <View
         accessibilityLabel="The sequence so far"
-        style={styles.sequence}
+        style={[
+          styles.sequence,
+          { backgroundColor: theme.surface, borderColor: theme.border },
+        ]}
       >
         {shownItems.map((item, index) => {
           const isChosen = index >= sequence.length;
@@ -200,7 +218,17 @@ export default function PatternChainCard({
               // Items can repeat, so the index is part of the key by design.
               key={`${index}-${item}`}
               testID={`pc-seq-${index}`}
-              style={[styles.chip, isChosen && styles.chosenChip]}
+              style={[
+                styles.chip,
+                {
+                  backgroundColor: theme.surfaceRaised,
+                  borderColor: theme.border,
+                },
+                isChosen && {
+                  backgroundColor: theme.accent,
+                  borderColor: theme.accent,
+                },
+              ]}
             >
               <Text
                 style={[styles.chipText, isChosen && styles.chosenChipText]}
@@ -210,7 +238,10 @@ export default function PatternChainCard({
             </View>
           );
         })}
-        <View testID="pc-next-slot" style={styles.nextSlot}>
+        <View
+          testID="pc-next-slot"
+          style={[styles.nextSlot, { borderColor: theme.border }]}
+        >
           <Text style={styles.nextSlotText}>?</Text>
         </View>
       </View>
@@ -220,7 +251,7 @@ export default function PatternChainCard({
           accessibilityLabel={`Pick the next item (step ${currentStep + 1} of ${steps.length})`}
           style={styles.options}
         >
-          {activeStep.options.map((option) => (
+          {orderedOptions.map((option) => (
             <Pressable
               key={option.id}
               testID={`pc-option-${option.id}`}
@@ -229,7 +260,14 @@ export default function PatternChainCard({
               onPress={() => handlePick(option.id, option.label)}
               style={({ pressed }) => [
                 styles.option,
-                pressed && styles.optionPressed,
+                {
+                  backgroundColor: theme.surfaceRaised,
+                  borderColor: theme.border,
+                },
+                pressed && {
+                  backgroundColor: theme.surfaceStrong,
+                  borderColor: theme.accent,
+                },
               ]}
             >
               <Text style={styles.optionText}>{option.label}</Text>
@@ -268,6 +306,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: space.sm,
     width: '100%',
+    padding: space.sm,
+    borderRadius: radius.lg,
+    borderWidth: 1,
   },
   chip: {
     minHeight: TAP_TARGET_MIN,

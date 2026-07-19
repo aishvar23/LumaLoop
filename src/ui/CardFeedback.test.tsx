@@ -37,6 +37,30 @@ describe('CardFeedback', () => {
     }
   });
 
+  it('shows "Play again" only when onReplay is provided, and fires it', () => {
+    const onReplay = vi.fn();
+    const { rerender } = render(
+      <CardFeedback
+        resolution={makeResolution('correct')}
+        explanation={explanation}
+        onContinue={() => {}}
+      />,
+    );
+    // Omitted by default (standalone renders/tests).
+    expect(screen.queryByTestId('feedback-replay')).not.toBeInTheDocument();
+
+    rerender(
+      <CardFeedback
+        resolution={makeResolution('correct')}
+        explanation={explanation}
+        onContinue={() => {}}
+        onReplay={onReplay}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('feedback-replay'));
+    expect(onReplay).toHaveBeenCalledTimes(1);
+  });
+
   it('exposes the machine-readable outcome on the card (data-outcome)', () => {
     render(
       <CardFeedback
@@ -61,6 +85,29 @@ describe('CardFeedback', () => {
     );
     expect(screen.getByText('Why')).toBeInTheDocument();
     expect(screen.getByText('Because of the rule.')).toBeInTheDocument();
+  });
+
+  it('renders a renderer-supplied failure reason above the authored explanation', () => {
+    render(
+      <CardFeedback
+        resolution={{
+          ...makeResolution('incorrect'),
+          signals: {
+            failure_reason:
+              'Step 2 (B) was answered Match, but "Tap blue" expected No-match.',
+          },
+        }}
+        explanation={explanation}
+        onContinue={() => {}}
+      />,
+    );
+
+    expect(screen.getByTestId('card-failure-reason')).toHaveTextContent(
+      'What went wrong',
+    );
+    expect(screen.getByTestId('card-failure-reason')).toHaveTextContent(
+      'Step 2 (B)',
+    );
   });
 
   it('announces the outcome via a polite live region after mount', async () => {
@@ -138,5 +185,66 @@ describe('CardFeedback', () => {
     );
     expect(screen.getByTestId('card-score-reset')).toHaveTextContent('Streak reset');
     expect(screen.queryByText(/pts/)).not.toBeInTheDocument();
+  });
+
+  // ── Engagement §4.4: per-card personal best ────────────────────────────────
+  it('celebrates a new best when isNewBest and points were earned', () => {
+    render(
+      <CardFeedback
+        resolution={makeResolution('correct')}
+        explanation={explanation}
+        cardScore={{ points: 132, correct: true, streak: 1, combo: 1 }}
+        personalBest={132}
+        isNewBest
+        onContinue={() => {}}
+      />,
+    );
+    expect(screen.getByTestId('feedback-newbest')).toHaveTextContent('New best');
+    expect(screen.queryByTestId('feedback-best')).not.toBeInTheDocument();
+  });
+
+  it('shows the subtle prior best when no new best was set', () => {
+    render(
+      <CardFeedback
+        resolution={makeResolution('correct')}
+        explanation={explanation}
+        cardScore={{ points: 100, correct: true, streak: 1, combo: 1 }}
+        personalBest={300}
+        isNewBest={false}
+        onContinue={() => {}}
+      />,
+    );
+    expect(screen.getByTestId('feedback-best')).toHaveTextContent('Best: 300');
+    expect(screen.queryByTestId('feedback-newbest')).not.toBeInTheDocument();
+  });
+
+  // ── Engagement §4.3: performance tags ──────────────────────────────────────
+  it('renders a "Perfect" tag for a correct, first-attempt, fast resolution', () => {
+    render(
+      <CardFeedback
+        resolution={{
+          ...makeResolution('correct'),
+          interactionElapsedMs: 800,
+          attemptCount: 1,
+        }}
+        explanation={explanation}
+        timeLimitMs={60_000}
+        onContinue={() => {}}
+      />,
+    );
+    expect(screen.getByTestId('feedback-tags')).toBeInTheDocument();
+    expect(screen.getByTestId('feedback-tag')).toHaveTextContent('Perfect');
+  });
+
+  it('renders no performance tags on a miss', () => {
+    render(
+      <CardFeedback
+        resolution={makeResolution('incorrect')}
+        explanation={explanation}
+        timeLimitMs={60_000}
+        onContinue={() => {}}
+      />,
+    );
+    expect(screen.queryByTestId('feedback-tags')).not.toBeInTheDocument();
   });
 });

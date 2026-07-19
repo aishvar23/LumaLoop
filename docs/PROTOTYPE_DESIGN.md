@@ -265,10 +265,12 @@ Signals:
 - Post-switch accuracy
 - Switch latency
 - Perseveration errors
+- First failed step and failure reason
+- Per-step action log for authored stimuli
 
 Implementation note:
 
-- Rule Flip requires per-stimulus timing to compute switch latency and perseveration errors. If early testers cannot understand the template without extra explanation, replace it with Estimate Fast before the 7-day validation run.
+- Rule Flip requires per-stimulus timing to compute switch latency and perseveration errors. A card is correct only when every authored step is answered correctly. If the user watches the demo, it must use a separate pattern and communicate that it adds about 5 seconds to the overall solve time. If early testers cannot understand the template without the demo, replace it with Estimate Fast before the 7-day validation run.
 
 ### 9.4 Tiny Logic
 
@@ -331,7 +333,12 @@ type TemplateType =
   | 'rule_flip'
   | 'tiny_logic';
 
-type Difficulty = 'easy' | 'medium' | 'hard';
+type Difficulty =
+  | 'extremely_easy'
+  | 'easy'
+  | 'medium'
+  | 'hard'
+  | 'extremely_hard';
 
 type LiquidCard = {
   cardId: string;
@@ -695,7 +702,7 @@ Rules:
 
 - Use a fixed seeded order per tester and test day.
 - Balance categories where possible.
-- Start with easy cards and ramp toward medium difficulty.
+- Start with extremely easy/easy cards and ramp toward medium difficulty.
 - Avoid more than two cards from the same template in a row.
 - Use `estimatedSeconds` to keep session length within the chosen mode.
 

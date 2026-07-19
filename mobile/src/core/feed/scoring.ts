@@ -209,3 +209,32 @@ export function applyResolution(
     cardScore: { points, correct: true, streak: currentStreak, combo },
   };
 }
+
+// ── Performance tags (engagement §4.3) ───────────────────────────────────────
+
+/** A correct answer counts as FAST if it used at most this fraction of the time limit. */
+export const FAST_FRACTION = 0.35;
+
+/**
+ * Game-framing performance tags for a resolved card (engagement §4.3). Empty for
+ * a miss/timeout. "Clean" = solved on the first attempt; "Fast" = well within the
+ * time limit; "Perfect" = both; "Recovered" = correct but took more than one
+ * attempt. GAME LANGUAGE ONLY — never skill/IQ/ability/trait words.
+ */
+export function performanceTags(
+  resolution: Pick<CardResolution, 'isCorrect' | 'attemptCount' | 'interactionElapsedMs'>,
+  timeLimitMs: number,
+): string[] {
+  if (!resolution.isCorrect) return [];
+  const clean = resolution.attemptCount <= 1;
+  const fast =
+    Number.isFinite(timeLimitMs) &&
+    timeLimitMs > 0 &&
+    resolution.interactionElapsedMs <= timeLimitMs * FAST_FRACTION;
+  if (clean && fast) return ['Perfect'];
+  const tags: string[] = [];
+  if (fast) tags.push('Fast');
+  if (clean) tags.push('Clean');
+  if (!clean) tags.push('Recovered');
+  return tags;
+}

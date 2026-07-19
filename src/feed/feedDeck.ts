@@ -92,6 +92,64 @@ export const defaultFeedBatchSource: FeedBatchSource = (seedUserId, batchIndex) 
   });
 
 /**
+ * Build a {@link FeedBatchSource} that skips already-played games (D2) — the
+ * default source plus an `excludeCardIds` set threaded into the pure composer.
+ *
+ * Composes cleanly with the difficulty ramp (the ramp is still
+ * `feedDifficultyBias(batchIndex)`) and stays template-agnostic — the exclusion
+ * is just an id set. The composer applies the ENDLESS-feed exhaustion fallback
+ * (if every eligible card is already played, it replays the full pool rather
+ * than empties), so this source is always non-empty when the catalog is. An
+ * empty/omitted set yields exactly {@link defaultFeedBatchSource} behaviour.
+ */
+export function makeFeedBatchSource(
+  excludeCardIds: ReadonlySet<string> | readonly string[] | undefined,
+): FeedBatchSource {
+  const exclude = excludeCardIds ?? EMPTY_EXCLUDE_IDS;
+  return (seedUserId, batchIndex) =>
+    composeSession({
+      mode: FEED_BATCH_MODE,
+      anonymousUserId: seedUserId,
+      difficultyBias: feedDifficultyBias(batchIndex),
+      excludeCardIds: exclude,
+    });
+}
+
+/** Shared empty exclusion — keeps {@link makeFeedBatchSource} allocation-free. */
+const EMPTY_EXCLUDE_IDS: ReadonlySet<string> = new Set<string>();
+
+/**
+ * Pin `cardId` as the FIRST card of a deck (a featured-game deep link): it moves
+ * to index 0 and any other occurrence is removed, so the chosen game opens
+ * immediately and the rest of the endless stream follows. `batchesUsed` is
+ * preserved (the materialised batches are unchanged — only their order). A falsy
+ * `cardId` returns the deck unchanged. Pure; unit-tested.
+ */
+export function withPinnedFirst(
+  state: FeedDeckState,
+  cardId: string | undefined,
+): FeedDeckState {
+  if (!cardId) return state;
+  const rest = state.cards.filter((id) => id !== cardId);
+  return { cards: [cardId, ...rest], batchesUsed: state.batchesUsed };
+}
+
+/**
+ * Merge a played-exclusion set with an optional pinned start card so the seeded
+ * batches never re-surface the pinned card (it is shown once, at the top). Returns
+ * the original set when there is no start card.
+ */
+export function excludeWithStart(
+  exclude: ReadonlySet<string> | readonly string[] | undefined,
+  startCardId: string | undefined,
+): ReadonlySet<string> | readonly string[] | undefined {
+  if (!startCardId) return exclude;
+  const set = new Set<string>(exclude ?? []);
+  set.add(startCardId);
+  return set;
+}
+
+/**
  * Append one more batch to the deck, avoiding an exact back-to-back repeat at
  * the seam (if the new batch's first card equals the deck's last card, rotate it
  * to the end). A source that yields no cards returns the deck unchanged — the

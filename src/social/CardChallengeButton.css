@@ -1,0 +1,29 @@
+/**
+ * "Challenge a friend" button (in the result card). Token-driven and accent-aware
+ * like `CardShareButton`, but an OUTLINE variant so the two CTAs read as distinct
+ * actions sitting side by side (share to status vs. invite a friend to beat you).
+ */
+.card-challenge {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  width: 100%;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--accent, var(--color-accent));
+  background: transparent;
+  color: var(--accent, var(--color-accent));
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+  transition: filter 0.12s ease, opacity 0.12s ease;
+}
+
+.card-challenge:hover,
+.card-challenge:focus-visible {
+  filter: brightness(1.12);
+  outline: none;
+}

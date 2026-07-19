@@ -10,14 +10,34 @@
  */
 export const ROUTES = {
   /**
-   * `/` — the endless full-screen swipe feed (#107), the DEFAULT app surface.
-   * The bounded start-screen/session/receipt flow it replaced is retired; the
-   * former `/feed` preview route (#105) is folded into this single entry.
+   * `/` — the Home / Discover landing surface, the DEFAULT post-login screen
+   * (accounts pivot). A signed-in user lands here (greeting, stats, featured
+   * games) and enters the immersive feed from a "Start playing" CTA. This
+   * replaces dropping straight into a game card on login.
    */
-  session: '/',
+  home: '/',
+  /**
+   * `/feed` — the endless full-screen swipe feed (#107). Reached from Home's
+   * "Start playing"; still the single feed entry (the bounded start-screen/
+   * session/receipt flow it replaced is retired).
+   */
+  feed: '/feed',
   /** `/c/:cardId` — opens a single creator-attributed card from the catalog. */
   cardDeepLink: '/c/:cardId',
+  /** `/auth/callback` — OAuth / magic-link PKCE return target (accounts pivot). */
+  authCallback: '/auth/callback',
+  /** `/you` — the signed-in user's profile + game-activity stats. */
+  profile: '/you',
+  /** `/people` — search other users to follow (accounts pivot, Phase 2/3). */
+  people: '/people',
+  /** `/u/:userId` — another user's public profile + follow toggle. */
+  userProfile: '/u/:userId',
 } as const;
+
+/** Build the path to a user's public profile: `/u/<userId>`. */
+export function buildUserProfilePath(userId: string): string {
+  return `/u/${encodeURIComponent(userId)}`;
+}
 
 export type RouteKey = keyof typeof ROUTES;
 
@@ -27,12 +47,22 @@ export type RouteKey = keyof typeof ROUTES;
  * here so routing never imports the telemetry client. The telemetry layer reads
  * this value; routing only produces it.
  */
-export type RouteKind = 'session' | 'card_deep_link';
+export type RouteKind = 'session' | 'card_deep_link' | 'account';
 
-/** Maps an internal {@link RouteKey} to its telemetry {@link RouteKind}. */
+/**
+ * Maps an internal {@link RouteKey} to its telemetry {@link RouteKind}. Only the
+ * `feed` route is a feed-telemetry surface (`session`). The Home landing and the
+ * account routes (callback / profile) are not — they map to the `account` kind,
+ * which the feed telemetry layer does not emit for.
+ */
 export const routeKindFor: Record<RouteKey, RouteKind> = {
-  session: 'session',
+  home: 'account',
+  feed: 'session',
   cardDeepLink: 'card_deep_link',
+  authCallback: 'account',
+  profile: 'account',
+  people: 'account',
+  userProfile: 'account',
 } as const;
 
 /**

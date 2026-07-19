@@ -1,0 +1,158 @@
+/*
+ * Shared styling for the account screens (login / profile creation / profile).
+ * On-brand with the token system (src/styles/tokens.css): near-black surface,
+ * the brand accent, generous tap targets. Mobile-first, centered card layout.
+ */
+.auth-screen {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: calc(var(--space-4) + var(--safe-top)) var(--space-4)
+    calc(var(--space-4) + var(--safe-bottom));
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 28rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg, 16px);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.auth-brand {
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin: 0;
+  text-align: center;
+  color: var(--color-text);
+}
+
+.auth-tagline {
+  margin: 0;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+}
+
+/* A subtle centered "Sign out" escape on the profile-creation screen (so a stale
+   session isn't a dead end). */
+.auth-signout-link {
+  display: block;
+  margin: var(--space-3) auto 0;
+  padding: var(--space-2);
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+.auth-signout-link:hover {
+  color: var(--color-text);
+  text-decoration: underline;
+}
+
+.auth-providers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.auth-provider-btn {
+  width: 100%;
+  min-height: 48px;
+  border-radius: var(--radius-md, 12px);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.auth-provider-btn:hover {
+  border-color: var(--color-accent);
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+}
+
+.auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.auth-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.auth-input {
+  width: 100%;
+  min-height: 48px;
+  box-sizing: border-box;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md, 12px);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 1rem;
+}
+
+.auth-input:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.auth-hint {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.auth-error {
+  font-size: 0.9rem;
+  color: #ff8a8a;
+  margin: 0;
+}
+
+.auth-success {
+  font-size: 0.9rem;
+  color: var(--color-accent);
+  margin: 0;
+}
+
+.auth-note {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  text-align: center;
+  margin: 0;
+}

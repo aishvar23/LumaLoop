@@ -47,6 +47,18 @@ describe('useFeedController', () => {
     expect(len()).toBeGreaterThanOrEqual(8);
   });
 
+  it('pins a startCardId as the first slide (featured-game deep link)', () => {
+    render(
+      <Harness anonymousUserId="anon" source={fakeSource} startCardId="b0-2" />,
+    );
+    // The chosen game opens first…
+    expect(idx()).toBe('0');
+    expect(card()).toBe('b0-2');
+    // …and is not duplicated immediately after (deduped from the rest).
+    fireEvent.click(screen.getByTestId('next'));
+    expect(card()).not.toBe('b0-2');
+  });
+
   it('advances across batch boundaries with next()', () => {
     render(<Harness anonymousUserId="anon" source={fakeSource} />);
     fireEvent.click(screen.getByTestId('next'));

@@ -1,0 +1,276 @@
+/**
+ * Status story viewer overlay (WhatsApp/IG-style) — immersive, category-tinted.
+ * Token-driven layout; the gradient backdrop is set inline per category. A big
+ * game emblem, an outcome badge, points, and a clear Play CTA.
+ */
+.status-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: calc(var(--safe-top) + var(--space-4)) var(--space-4)
+    calc(var(--safe-bottom) + var(--space-5));
+  color: #fff;
+  /* `background` is set inline (category gradient); this is a fallback. */
+  background: #0b0b0f;
+}
+
+/* Faded preview of the actual game screen, behind everything. */
+.status-viewer__preview {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0.28;
+  filter: blur(7px) saturate(1.1);
+  transform: scale(1.06);
+}
+
+/* The preview's inner renderer fills the area; details are softened by the blur. */
+.status-viewer__preview > * {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* A scrim over the preview so the foreground text stays legible. */
+.status-viewer__scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(70% 50% at 50% 55%, rgba(0, 0, 0, 0.55), transparent 75%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.35), transparent 25%, transparent 70%, rgba(0, 0, 0, 0.45));
+}
+
+/* Tap zones cover the screen; content/buttons sit above via z-index. */
+.status-viewer__zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.status-viewer__zone--prev {
+  left: 0;
+}
+
+.status-viewer__zone--next {
+  right: 0;
+}
+
+.status-viewer__top {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.status-viewer__segments {
+  display: flex;
+  gap: 4px;
+}
+
+.status-viewer__segment {
+  flex: 1;
+  height: 3px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.3);
+  overflow: hidden;
+}
+
+.status-viewer__segment-fill {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: #fff;
+  border-radius: var(--radius-pill);
+}
+
+.status-viewer__segment-fill[data-fill='full'] {
+  width: 100%;
+}
+
+.status-viewer__segment-fill[data-fill='active'] {
+  width: 100%;
+  animation: status-segment-grow linear forwards;
+}
+
+@keyframes status-segment-grow {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-viewer__segment-fill[data-fill='active'] {
+    animation: none;
+    width: 100%;
+  }
+}
+
+.status-viewer__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.status-viewer__avatar {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.25);
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  color: #fff;
+  font-weight: var(--font-weight-bold);
+}
+
+.status-viewer__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.status-viewer__id {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.status-viewer__who {
+  font-weight: var(--font-weight-bold);
+}
+
+.status-viewer__time {
+  font-size: var(--font-size-sm);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.status-viewer__close {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font-size: var(--font-size-lg);
+  cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+}
+
+/* Centerpiece. */
+.status-viewer__center {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  text-align: center;
+}
+
+.status-viewer__kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: var(--font-size-sm);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.status-viewer__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px var(--space-3);
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.92);
+  color: #1a1330;
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-sm);
+}
+
+.status-viewer__game {
+  font-size: 34px;
+  font-weight: var(--font-weight-bold);
+  line-height: 1.08;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.5);
+}
+
+.status-viewer__points {
+  font-size: 34px;
+  font-weight: var(--font-weight-bold);
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.5);
+}
+
+.status-viewer__points-unit {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Accessible result summary (carries outcome + points text); not shown visually. */
+.status-viewer__result {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+/* Bottom CTA. */
+.status-viewer__bottom {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.status-viewer__play {
+  appearance: none;
+  width: 100%;
+  border: 0;
+  border-radius: var(--radius-pill);
+  padding: var(--space-3) var(--space-5);
+  background: #fff;
+  color: #15101f;
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-md);
+  cursor: pointer;
+}
+
+.status-viewer__play:hover,
+.status-viewer__play:focus-visible {
+  filter: brightness(0.96);
+  outline: none;
+}
+
+.status-viewer__hint {
+  font-size: var(--font-size-sm);
+  color: rgba(255, 255, 255, 0.75);
+}

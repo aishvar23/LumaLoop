@@ -53,6 +53,7 @@ import {
   space,
   TAP_TARGET_MIN,
 } from './tokens';
+import { useGameTheme } from './GameTheme';
 
 /**
  * The renderer accepts the shared {@link TemplateProps} plus an optional
@@ -81,6 +82,7 @@ export default function CodeBreakCard({
 }: CodeBreakCardProps) {
   const { config } = card;
   const { palette, codeLength, secret, maxGuesses } = config;
+  const theme = useGameTheme();
 
   const [rows, setRows] = useState<BoardRow[]>([]);
   const submittedGuessesRef = useRef<string[][]>([]);
@@ -215,19 +217,35 @@ export default function CodeBreakCard({
 
       {/* Submitted history: each guess + its peg feedback as TEXT. */}
       <ScrollView
-        style={styles.history}
+        style={[
+          styles.history,
+          { backgroundColor: theme.surface, borderColor: theme.border },
+        ]}
+        contentContainerStyle={styles.historyContent}
         accessibilityLabel="Your guesses so far"
       >
         {rows.map((row, rowIndex) => (
           <View key={rowIndex} testID={`cb-row-${rowIndex}`} style={styles.row}>
             <View style={styles.rowSymbols}>
               {row.guess.map((symbol, slot) => (
-                <View key={slot} style={styles.historyChip}>
+                <View
+                  key={slot}
+                  style={[
+                    styles.historyChip,
+                    {
+                      backgroundColor: theme.surfaceRaised,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                >
                   <Text style={styles.historyChipText}>{symbol}</Text>
                 </View>
               ))}
             </View>
-            <Text testID={`cb-feedback-${rowIndex}`} style={styles.feedback}>
+            <Text
+              testID={`cb-feedback-${rowIndex}`}
+              style={[styles.feedback, { color: theme.accent }]}
+            >
               {`${row.feedback.exact} exact, ${row.feedback.partial} partial`}
             </Text>
           </View>
@@ -248,7 +266,13 @@ export default function CodeBreakCard({
                 draft[slot] ? `: ${draft[slot]}` : ': empty'
               }${active ? ' (active)' : ''}`}
               onPress={() => handleSlotTap(slot)}
-              style={[styles.slot, active && styles.slotActive]}
+              style={[
+                styles.slot,
+                {
+                  backgroundColor: theme.surfaceRaised,
+                  borderColor: active ? theme.accent : theme.border,
+                },
+              ]}
             >
               <Text style={styles.slotText}>{draft[slot] ?? '·'}</Text>
             </Pressable>
@@ -267,7 +291,14 @@ export default function CodeBreakCard({
             onPress={() => handlePaletteTap(symbol)}
             style={({ pressed }) => [
               styles.paletteButton,
-              pressed && styles.paletteButtonPressed,
+              {
+                backgroundColor: theme.surfaceRaised,
+                borderColor: theme.border,
+              },
+              pressed && {
+                backgroundColor: theme.surfaceStrong,
+                borderColor: theme.accent,
+              },
             ]}
           >
             <Text style={styles.paletteButtonText}>{symbol}</Text>
@@ -281,7 +312,14 @@ export default function CodeBreakCard({
         accessibilityState={{ disabled: !draftComplete }}
         disabled={!draftComplete}
         onPress={handleSubmit}
-        style={[styles.submit, !draftComplete && styles.submitDisabled]}
+        style={[
+          styles.submit,
+          { backgroundColor: theme.accent },
+          !draftComplete && {
+            backgroundColor: theme.surfaceRaised,
+            borderColor: theme.border,
+          },
+        ]}
       >
         <Text
           style={[
@@ -321,6 +359,11 @@ const styles = StyleSheet.create({
   history: {
     width: '100%',
     maxHeight: 200,
+    borderWidth: 1,
+    borderRadius: radius.lg,
+  },
+  historyContent: {
+    padding: space.md,
   },
   row: {
     flexDirection: 'row',

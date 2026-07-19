@@ -34,14 +34,59 @@
  * NO explanation seam — that card was left, not played.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 
 import type { LiquidCard, TemplateType } from '../core/cards/types';
 import type { CardResolution, TemplateProps } from '../core/templates/contract';
 import { useCardScoreLookup } from './cardScoreContext';
+import { errorBuzz, selectionTick, successBuzz } from './haptics';
+import { recordCardBest } from './cardBestStore';
+import { View } from 'react-native';
+
+import CardShareButton from '../social/CardShareButton';
+import CardChallengeButton from '../social/CardChallengeButton';
 import CardFeedback from './CardFeedback';
 import { defaultRendererRegistry } from './rendererRegistry';
 import type { RendererRegistry, TemplateRenderer } from './rendererRegistry';
+
+/**
+ * Records ONE replayed attempt as a play when the player taps "Play again" to
+ * replay the same card (product decision 2026-06 — each replay counts as a new
+ * play). Threaded via context so the gate stays template-agnostic and the feed's
+ * per-index resolution latch (which ignores repeat resolutions of one slide) is
+ * left untouched: the FIRST attempt records on resolve through the normal latched
+ * path; each REPLAY (which that latch would drop) records here instead. Absent a
+ * provider (tests/standalone), replay just remounts the card with no recording.
+ */
+export type CardReplayHandler = (
+  card: LiquidCard,
+  resolution: CardResolution,
+) => void;
+
+const CardReplayContext = createContext<CardReplayHandler | null>(null);
+
+/** Provide the replay-record handler to the gates rendered beneath it. */
+export function CardReplayProvider({
+  handler,
+  children,
+}: {
+  handler: CardReplayHandler;
+  children: ReactNode;
+}) {
+  return (
+    <CardReplayContext.Provider value={handler}>
+      {children}
+    </CardReplayContext.Provider>
+  );
+}
 
 /**
  * Wraps one renderer so its resolution pauses on the uniform feedback +
@@ -85,13 +130,53 @@ export function withFeedbackGate(
     isActiveRef.current = isActive;
     const [played, setPlayed] = useState(false);
 
+    // "Play again" remounts the SAME card fresh by bumping this counter (it is
+    // part of the inner renderer's React key), resetting the renderer's state and
+    // re-arming its countdown. Read via a ref inside the stable resolve handler.
+    const [replayKey, setReplayKey] = useState(0);
+    const replayKeyRef = useRef(0);
+    replayKeyRef.current = replayKey;
+    const recordReplay = useContext(CardReplayContext);
+    const recordReplayRef = useRef(recordReplay);
+    recordReplayRef.current = recordReplay;
+
+    // Juice: a light selection tick on the first meaningful interaction with the
+    // card (template-agnostic — every renderer calls `onAttempt` once on engage).
+    const onAttemptRef = useRef(onAttempt);
+    onAttemptRef.current = onAttempt;
+    const handleAttempt = useCallback(
+      (signals?: Record<string, number | string | boolean>) => {
+        selectionTick();
+        onAttemptRef.current(signals);
+      },
+      [],
+    );
+
     const onResolveRef = useRef(onResolve);
     onResolveRef.current = onResolve;
-    const handleResolve = useCallback((next: CardResolution) => {
-      setResolution(next);
-      if (isActiveRef.current !== false) setPlayed(true);
-      onResolveRef.current(next);
-    }, []);
+    const handleResolve = useCallback(
+      (next: CardResolution) => {
+        setResolution(next);
+        if (isActiveRef.current !== false) {
+          setPlayed(true);
+          // Juice: a celebratory buzz on a correct answer, a softer error buzz on
+          // a miss/timeout (best-effort; no-ops on the simulator). Only for a real
+          // played resolution, never an off-screen abandoned timeout.
+          if (next.isCorrect) successBuzz();
+          else errorBuzz();
+        }
+        // First play (replayKey 0) records through the normal latched path. A
+        // REPLAY's resolution would be dropped by the feed's per-index latch, so
+        // record it here off that path — at resolve time, so it still counts even
+        // if the player swipes away instead of tapping "Play again" again.
+        if (replayKeyRef.current === 0) {
+          onResolveRef.current(next);
+        } else {
+          recordReplayRef.current?.(card, next);
+        }
+      },
+      [card],
+    );
 
     const showFeedback = resolution !== null && played;
 
@@ -115,22 +200,88 @@ export function withFeedbackGate(
     const scoreLookup = useCardScoreLookup();
     const cardScore = scoreLookup ? scoreLookup(context.cardIndex) : null;
 
+    // Engagement §4.4: the LOCAL per-card personal best — "something to chase".
+    // When a scored feedback step becomes visible, record its points against this
+    // card's stored best ONCE (a ref latch guards re-renders), and surface the
+    // outcome so CardFeedback can celebrate a "New best!" or show the prior best.
+    // The latch resets when `resolution` returns to null on "Play again", so the
+    // NEXT attempt records again. Best-effort; recordCardBest never rejects.
+    const [cardBest, setCardBest] = useState<{
+      personalBest: number;
+      isNewBest: boolean;
+    } | null>(null);
+    const bestRecordedRef = useRef(false);
+    useEffect(() => {
+      if (resolution === null) {
+        bestRecordedRef.current = false;
+        setCardBest(null);
+        return undefined;
+      }
+      if (!showFeedback || bestRecordedRef.current) return undefined;
+      if (cardScore && cardScore.points > 0) {
+        bestRecordedRef.current = true;
+        let cancelled = false;
+        void (async () => {
+          const { best, isNewBest } = await recordCardBest(
+            card.cardId,
+            cardScore.points,
+          );
+          if (!cancelled) setCardBest({ personalBest: best, isNewBest });
+        })();
+        return () => {
+          cancelled = true;
+        };
+      }
+      return undefined;
+    }, [resolution, showFeedback, cardScore, card.cardId]);
+
     if (showFeedback && resolution) {
       return (
         <CardFeedback
           resolution={resolution}
           explanation={card.explanation}
           cardScore={cardScore}
+          personalBest={cardBest?.personalBest}
+          isNewBest={cardBest?.isNewBest}
+          timeLimitMs={card.config.timeLimitMs}
+          // Inject the social Share-to-status action AND the "Challenge a friend"
+          // viral-loop action (both feed-layer concerns keyed by cardId; the share
+          // button renders nothing without a social provider, so the engine stays
+          // auth-free). The challenge button only shows when the player scored.
+          footer={
+            <View style={{ gap: 8 }}>
+              <CardShareButton
+                cardId={card.cardId}
+                outcome={resolution.resolutionType}
+                points={cardScore?.points ?? 0}
+              />
+              {cardScore && cardScore.points > 0 ? (
+                <CardChallengeButton
+                  cardId={card.cardId}
+                  points={cardScore.points}
+                />
+              ) : null}
+            </View>
+          }
+          // "Play again": remount the same card fresh. Recording is done at
+          // resolve time (see `handleResolve`), so this only resets the gate.
+          onReplay={() => {
+            setResolution(null);
+            setPlayed(false);
+            setReplayKey((key) => key + 1);
+          }}
         />
       );
     }
 
     return (
       <Inner
+        // Bumped by "Play again" to force a fresh mount of the same card.
+        key={replayKey}
         card={card}
         context={context}
         isActive={isActive}
-        onAttempt={onAttempt}
+        onAttempt={handleAttempt}
         // Capture + forward — but DO NOT show its own explanation; the gate owns
         // the uniform explanation step now.
         onResolve={handleResolve}

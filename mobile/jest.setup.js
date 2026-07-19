@@ -19,3 +19,29 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
   useSafeAreaFrame: () => ({ x: 0, y: 0, width: 320, height: 640 }),
 }));
+
+// Accounts pivot. The Supabase client (`src/auth/supabaseClient.ts`) fails fast at
+// import if the public env vars are missing; provide harmless placeholders so the
+// auth modules import under Jest. Tests never hit a real backend — they inject a
+// fake AuthClient — so these values are never used to make a request.
+process.env.EXPO_PUBLIC_SUPABASE_URL =
+  process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://test.supabase.co';
+process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY =
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'test-anon-key';
+
+// Accounts pivot. The native auth modules import Expo native modules at load time
+// (no native module under Jest). The AuthProvider injects fakes for behaviour, but
+// importing the module graph must not crash, so stub the native surfaces.
+jest.mock('expo-web-browser', () => ({
+  openAuthSessionAsync: jest.fn(async () => ({ type: 'dismiss' })),
+  maybeCompleteAuthSession: jest.fn(),
+}));
+jest.mock('expo-linking', () => ({
+  getInitialURL: jest.fn(async () => null),
+  addEventListener: jest.fn(() => ({ remove: jest.fn() })),
+  createURL: jest.fn((path) => `lumaloop://${path}`),
+}));
+jest.mock('expo-apple-authentication', () => ({
+  signInAsync: jest.fn(async () => ({ identityToken: 'fake-apple-token' })),
+  AppleAuthenticationScope: { FULL_NAME: 0, EMAIL: 1 },
+}));

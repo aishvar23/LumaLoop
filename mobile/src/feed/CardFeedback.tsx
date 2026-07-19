@@ -28,10 +28,10 @@
  * renders in-flow as a `View`, never as an overlay/dialog.
  */
 
-import { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, type ReactNode } from 'react';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import type { CardScore } from '../core/feed/scoring';
+import { performanceTags, type CardScore } from '../core/feed/scoring';
 import type { CardResolution, ResolutionType } from '../core/templates/contract';
 import { useReducedMotion } from './useReducedMotion';
 import {
@@ -55,6 +55,34 @@ export type CardFeedbackProps = {
    * chip. GAME language only (Design §7/§21.8).
    */
   cardScore?: CardScore | null;
+  /**
+   * The player's LOCAL best game-points for THIS card so far (engagement §4.4 —
+   * "something to chase"). Shown as a subtle "Best: N" beside the score chip when
+   * no new best was set this play. Omitted ≡ no stored best to show.
+   */
+  personalBest?: number;
+  /**
+   * True when this play STRICTLY beat the card's prior best — shows a celebratory
+   * "🏆 New best!" instead of the subtle best line. GAME framing only (Design §7).
+   */
+  isNewBest?: boolean;
+  /**
+   * The card's time limit (ms), used to derive the FAST performance tag
+   * (engagement §4.3). Omitted/non-finite ≡ no time pressure → never "Fast".
+   */
+  timeLimitMs?: number;
+  /**
+   * Optional presentational slot rendered below the explanation — used by the feed
+   * to inject the social Share action (kept OUT of this component so it stays pure /
+   * Supabase-free; CLAUDE.md §4). Omitted in standalone renders/tests.
+   */
+  footer?: ReactNode;
+  /**
+   * Replay the SAME card from the start. When provided, a "Play again" button is
+   * shown above the swipe cue; each replay is recorded as a new play (product
+   * decision 2026-06). Omitted in standalone renders/tests → not shown.
+   */
+  onReplay?: () => void;
 };
 
 /** Per-outcome heading copy. Modest + performance-based, no trait language (Design §7). */
@@ -82,11 +110,23 @@ export default function CardFeedback({
   resolution,
   explanation,
   cardScore,
+  personalBest,
+  isNewBest,
+  timeLimitMs,
+  footer,
+  onReplay,
 }: CardFeedbackProps) {
   const { resolutionType } = resolution;
+  // Game-framing performance tags (engagement §4.3) — empty for a miss/timeout.
+  const tags = performanceTags(resolution, timeLimitMs ?? Number.POSITIVE_INFINITY);
   const heading = OUTCOME_HEADING[resolutionType];
   const detail = OUTCOME_DETAIL[resolutionType];
   const positive = resolutionType === 'correct';
+  const failureReason =
+    typeof resolution.signals.failure_reason === 'string' &&
+    resolution.signals.failure_reason.trim().length > 0
+      ? resolution.signals.failure_reason
+      : null;
 
   // Outcome-tinted treatment: a success hue reinforces "Correct"; the softer
   // danger hue reinforces "Not quite"/"Time's up". Always paired with the word.
@@ -116,12 +156,44 @@ export default function CardFeedback({
     animation.start();
     return () => animation.stop();
   }, [reducedMotion, anim]);
+
+  // Juice: a celebratory ✦ spark BURST on a correct answer; a quick SHAKE on a
+  // miss. Both are decorative and disabled under reduce-motion.
+  const burst = useRef(new Animated.Value(0)).current;
+  const shake = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (reducedMotion) return undefined;
+    if (positive) {
+      burst.setValue(0);
+      const a = Animated.timing(burst, {
+        toValue: 1,
+        duration: 620,
+        useNativeDriver: true,
+      });
+      a.start();
+      return () => a.stop();
+    }
+    shake.setValue(0);
+    const a = Animated.timing(shake, {
+      toValue: 1,
+      duration: 360,
+      useNativeDriver: true,
+    });
+    a.start();
+    return () => a.stop();
+  }, [reducedMotion, positive, burst, shake]);
+  const shakeTranslate = shake.interpolate({
+    inputRange: [0, 0.2, 0.4, 0.6, 0.8, 1],
+    outputRange: [0, -8, 8, -6, 6, 0],
+  });
+
   const animatedStyle = {
     opacity: anim.interpolate({
       inputRange: [0, 0.6, 1],
       outputRange: [0, 1, 1],
     }),
     transform: [
+      { translateX: shakeTranslate },
       {
         translateY: anim.interpolate({
           inputRange: [0, 1],
@@ -150,6 +222,11 @@ export default function CardFeedback({
         animatedStyle,
       ]}
     >
+      {/* Juice: sparks radiate from the badge on a correct answer (on-brand ✦). */}
+      {positive && !reducedMotion ? (
+        <SparkBurst progress={burst} color={accent} />
+      ) : null}
+
       {/* Outcome badge: a tinted glyph chip + the outcome word. The word itself
           carries meaning (not colour-only); a polite live region announces it. */}
       <View style={styles.outcomeRow}>
@@ -175,10 +252,50 @@ export default function CardFeedback({
         </View>
       </View>
 
+      {/* Engagement §4.3: game-framing performance tags (Perfect/Fast/Clean/
+          Recovered) above the points chip — a small reward flourish. Empty for a
+          miss/timeout → nothing rendered. GAME words only (Design §7/§21.8). */}
+      {tags.length > 0 ? (
+        <View style={styles.tagsRow} testID="feedback-tags">
+          {tags.map((tag) => (
+            <View key={tag} style={[styles.tagChip, { borderColor: accent }]}>
+              <Text style={[styles.tagChipLabel, { color: accent }]} testID="feedback-tag">
+                {tag}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
       {/* Phase 4: the per-resolution GAME-POINTS chip — points earned plus the
           current streak/combo. Shown only when a score was supplied (feed runs);
           omitted in standalone renders. */}
       {cardScore ? <ScoreChip cardScore={cardScore} accent={accent} /> : null}
+
+      {/* Engagement §4.4: the LOCAL per-card personal best — "something to chase".
+          Shown only when points were earned this play (the score chip is up). A
+          new best gets a celebratory chip; otherwise the prior best is a subtle
+          line. GAME framing only — "best", never skill/ability (Design §7). */}
+      {cardScore && cardScore.points > 0 ? (
+        isNewBest ? (
+          <View style={[styles.newBestChip, { borderColor: colors.success }]}>
+            <Text style={[styles.newBestChipLabel, { color: colors.success }]} testID="feedback-newbest">
+              🏆 New best!
+            </Text>
+          </View>
+        ) : personalBest && personalBest > 0 ? (
+          <Text style={styles.bestLine} testID="feedback-best">
+            Best: {personalBest}
+          </Text>
+        ) : null
+      ) : null}
+
+      {failureReason ? (
+        <View testID="feedback-failure-reason" style={styles.failureReason}>
+          <Text style={styles.failureReasonTitle}>What went wrong</Text>
+          <Text style={styles.failureReasonBody}>{failureReason}</Text>
+        </View>
+      ) : null}
 
       {/* Explanation state — the card's authored copy, shown for every outcome. */}
       <View
@@ -194,6 +311,26 @@ export default function CardFeedback({
         </Text>
       </View>
 
+      {/* Optional injected actions (the feed's Share button). */}
+      {footer}
+
+      {/* Replay the SAME card. Each replay is recorded as a new play (the gate
+          wires the recording). Omitted in standalone renders/tests. */}
+      {onReplay ? (
+        <Pressable
+          testID="feedback-replay"
+          accessibilityRole="button"
+          accessibilityLabel="Play again"
+          onPress={onReplay}
+          style={({ pressed }) => [
+            styles.replayButton,
+            pressed && styles.replayButtonPressed,
+          ]}
+        >
+          <Text style={styles.replayButtonLabel}>↻  Play again</Text>
+        </Pressable>
+      ) : null}
+
       {/* Advancing is a swipe, not a button — a subtle cue with a chevron. */}
       <Text
         testID="feedback-swipe-cue"
@@ -206,6 +343,74 @@ export default function CardFeedback({
   );
 }
 CardFeedback.displayName = 'CardFeedback';
+
+/** Angles (deg) the celebratory sparks radiate along from the badge. */
+const BURST_ANGLES = [0, 55, 120, 180, 240, 305];
+
+/**
+ * A one-shot ✦ spark burst radiating from the outcome badge on a correct answer
+ * (engagement "juice", on-brand). Purely decorative + a11y-hidden; the caller
+ * gates it on reduce-motion.
+ */
+function SparkBurst({
+  progress,
+  color,
+}: {
+  progress: Animated.Value;
+  color: string;
+}) {
+  return (
+    <View
+      pointerEvents="none"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={styles.burst}
+    >
+      {BURST_ANGLES.map((deg) => {
+        const rad = (deg * Math.PI) / 180;
+        const dx = Math.cos(rad) * 48;
+        const dy = Math.sin(rad) * 48;
+        return (
+          <Animated.Text
+            key={deg}
+            style={[
+              styles.burstSpark,
+              {
+                color,
+                opacity: progress.interpolate({
+                  inputRange: [0, 0.6, 1],
+                  outputRange: [0, 1, 0],
+                }),
+                transform: [
+                  {
+                    translateX: progress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, dx],
+                    }),
+                  },
+                  {
+                    translateY: progress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, dy],
+                    }),
+                  },
+                  {
+                    scale: progress.interpolate({
+                      inputRange: [0, 0.5, 1],
+                      outputRange: [0.3, 1.2, 0.7],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            ✦
+          </Animated.Text>
+        );
+      })}
+    </View>
+  );
+}
 
 /**
  * The per-resolution GAME-POINTS chip (Phase 4). Shows points earned and, on a
@@ -257,6 +462,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     ...elevation.card,
   },
+  // Spark burst origin — centered over the outcome badge (top-left of the card).
+  burst: {
+    position: 'absolute',
+    top: space.xl + 22,
+    left: space.xl + 22,
+    width: 0,
+    height: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  burstSpark: {
+    position: 'absolute',
+    fontSize: 15,
+  },
   outcomeRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -296,6 +516,24 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
+  failureReason: {
+    gap: space.xs,
+    padding: space.lg,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.dangerBorder,
+    backgroundColor: colors.dangerSurface,
+  },
+  failureReasonTitle: {
+    color: colors.danger,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold,
+  },
+  failureReasonBody: {
+    color: colors.text,
+    fontSize: fontSize.sm,
+    lineHeight: fontSize.sm * lineHeight.normal,
+  },
   explanationTitle: {
     color: colors.text,
     fontSize: fontSize.md,
@@ -305,6 +543,23 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: fontSize.sm,
     lineHeight: fontSize.sm * lineHeight.relaxed,
+  },
+  replayButton: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    paddingVertical: space.md,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  replayButtonPressed: {
+    opacity: 0.7,
+  },
+  replayButtonLabel: {
+    color: colors.text,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.semibold,
   },
   swipeCue: {
     color: colors.textFaint,
@@ -326,10 +581,47 @@ const styles = StyleSheet.create({
   },
   scorePoints: {
     color: colors.text,
-    fontSize: fontSize.md,
+    fontSize: fontSize.lg,
     fontWeight: fontWeight.heavy,
   },
+  tagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: space.sm,
+  },
+  tagChip: {
+    paddingVertical: space.xs,
+    paddingHorizontal: space.sm,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+  },
+  tagChipLabel: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold,
+  },
   scoreMeta: {
+    color: colors.textMuted,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.semibold,
+  },
+  // Engagement §4.4: the celebratory "New best!" pill — success-tinted, sits
+  // just under the points chip. GAME framing only.
+  newBestChip: {
+    alignSelf: 'flex-start',
+    paddingVertical: space.xs,
+    paddingHorizontal: space.md,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    backgroundColor: colors.successSurface,
+  },
+  newBestChipLabel: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold,
+  },
+  // The subtle "Best: N" line — shown when no new best was set this play.
+  bestLine: {
+    alignSelf: 'flex-start',
     color: colors.textMuted,
     fontSize: fontSize.sm,
     fontWeight: fontWeight.semibold,

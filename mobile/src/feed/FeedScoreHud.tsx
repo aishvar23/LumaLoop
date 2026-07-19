@@ -97,7 +97,9 @@ FeedScoreHud.displayName = 'FeedScoreHud';
 const styles = StyleSheet.create({
   hud: {
     position: 'absolute',
-    right: space.md,
+    // Sit to the LEFT of the profile button (40px wide at right:16) so the
+    // points/streak pills never overlap it: 16 + 40 + 8 gap = 64.
+    right: 64,
     zIndex: 2,
     flexDirection: 'row',
     alignItems: 'center',

@@ -14,7 +14,7 @@
  * resolves a renderer for each card via the injected {@link RendererRegistry} only
  * — there is NO switch on `templateType` anywhere, so adding a new game never
  * touches this file (CLAUDE.md §6). It defaults to the {@link feedRegistry} — the
- * four real native renderers, each behind the uniform feedback/explanation
+ * all shipped native renderers, each behind the uniform feedback/explanation
  * {@link FeedbackGate} (#133); tests inject a stub/fake registry.
  *
  * Active-card detection: a game becomes ACTIVE when it snaps into view, detected
@@ -23,12 +23,17 @@
  * mount their real renderer; the rest render a same-height placeholder (perf).
  *
  * Free-scroll semantics (#106 parity, docs/FEED_DIRECTION.md §3.2): each game runs
- * a local lifecycle — not-engaged → engaged → resolved — and the per-game timer
- * arms on ENGAGEMENT (first interaction), not on becoming active. Swiping past an
- * un-engaged game is a SKIP (no resolution); engaging then leaving before resolve
- * is an ABANDONED attempt; a played game resolves correct/incorrect/timeout
- * unchanged. The lifecycle callbacks are the telemetry seam for M5 — this file
- * emits the signals but does NOT post telemetry.
+ * a local lifecycle — not-engaged → engaged → resolved. The per-game COUNTDOWN now
+ * arms on ACTIVATION (the game appearing/snapping into view), not on first
+ * interaction, so an immediate-play puzzle is timed from the moment it is on screen
+ * and answerable; pre-phase games (watch/preview/Start) still start their countdown
+ * at their own answer-phase start (see `timerGatedCard`). ENGAGEMENT (first
+ * interaction) is still tracked, but only to classify leave behaviour: swiping past
+ * an un-engaged game is a SKIP (no resolution); engaging then leaving before
+ * resolve is an ABANDONED attempt; a game that resolves (correct/incorrect/timeout)
+ * is played. A game left active long enough to time out resolves as a TIMEOUT even
+ * if never engaged. The lifecycle callbacks are the telemetry seam for M5 — this
+ * file emits the signals but does NOT post telemetry.
  */
 
 import {
@@ -43,6 +48,7 @@ import {
   Animated,
   FlatList,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -55,6 +61,7 @@ import {
   type EdgeInsets,
 } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import Wordmark from '../Wordmark';
 
 import {
   colors,
@@ -65,21 +72,29 @@ import {
   PAGE_BACKGROUND,
   slideGradient,
   categoryAccent,
+  elevation,
   motion,
 } from './templates/tokens';
+import { GameThemeProvider } from './templates/GameTheme';
 import { useReducedMotion } from './useReducedMotion';
 import { getCardById as getCatalogCardById } from '../core/cards/catalog';
+import { hookForCard } from '../core/cards/cardHook';
 import type { LiquidCard } from '../core/cards/types';
-import type { CardResolution, CardStartContext } from '../core/templates/contract';
+import type {
+  CardResolution,
+  CardStartContext,
+} from '../core/templates/contract';
 import { resolveRenderer } from './rendererRegistry';
 import type { RendererRegistry, TemplateRenderer } from './rendererRegistry';
 import { feedRegistry } from './FeedbackGate';
 import type { FeedBatchSource } from '../core/feed/feedDeck';
 import { CardScoreProvider } from './cardScoreContext';
+import type { CardScore } from '../core/feed/scoring';
 import FeedScoreHud from './FeedScoreHud';
 import type { ScoreStore } from './scoreStore';
 import { useFeedController } from './useFeedController';
 import { useFeedScore } from './useFeedScore';
+import CardSocialRail from '../social/CardSocialRail';
 
 /** Slides within this many of the active index mount their real renderer. */
 const WINDOW_RADIUS = 1;
@@ -102,13 +117,26 @@ const DEFAULT_ANONYMOUS_USER_ID = 'anonymous';
 export type FeedScreenProps = {
   /**
    * Test/wiring seam: maps each `templateType` to its renderer (dependency
-   * inversion). Defaults to the {@link feedRegistry} — the four real native
+   * inversion). Defaults to the {@link feedRegistry} — all shipped native
    * renderers, each behind the uniform feedback/explanation gate (#133); tests
    * inject a stub/fake. Must be referentially stable.
    */
   registry?: RendererRegistry;
   /** Test seam: deterministic feed batch source. Defaults to seeded catalog. */
   source?: FeedBatchSource;
+  /**
+   * Already-played cardIds for the signed-in user, skipped in the endless feed
+   * (D2). Threaded into the controller's composition; ignored when an explicit
+   * `source` is supplied. Best-effort — an empty/omitted set means "skip
+   * nothing", and the composer's exhaustion fallback keeps the feed endless.
+   */
+  excludeCardIds?: ReadonlySet<string> | readonly string[];
+  /**
+   * Pin this card as the FIRST slide — a featured-game deep link (so tapping a
+   * specific game opens THAT game). Threaded into the controller; ignored when an
+   * explicit `source` is supplied (tests).
+   */
+  startCardId?: string;
   /**
    * The anonymous id seeding deck composition. Defaults to a stable placeholder
    * (telemetry identity is M5).
@@ -162,6 +190,19 @@ export type FeedScreenProps = {
    */
   onCardExplanationViewed?: (index: number, cardId: string) => void;
   /**
+   * Accounts pivot: notified once per resolution that ALSO produced a Phase-4
+   * score, AFTER {@link onCardResolved}, with that card's points (the SAME value
+   * the HUD/result card show — not a recomputation). The signed-in `game_plays`
+   * recorder rides this seam (see `useRecordGamePlay`); a resolution with no score
+   * (should not happen) is not forwarded. Template-agnostic: the feed never
+   * branches on `templateType`. Fires at most once per index.
+   */
+  onCardScored?: (
+    index: number,
+    resolution: CardResolution,
+    score: CardScore,
+  ) => void;
+  /**
    * Test seam: the Phase-4 best-run persistence store. Defaults to the real
    * best-effort AsyncStorage store; pass `null` to disable persistence (tests).
    */
@@ -169,19 +210,35 @@ export type FeedScreenProps = {
 };
 
 /**
- * #106: gate the per-game timer on ENGAGEMENT. Until the player interacts with a
- * game we hand the renderer a card whose `timeLimitMs` is non-finite, so the
- * shared {@link useCardTimer} skips arming its countdown. On the first interaction
+ * Gate the per-game timer on ACTIVATION. Until a slide is the ACTIVE/focused card
+ * we hand the renderer a card whose `timeLimitMs` is non-finite, so the shared
+ * {@link useCardTimer} skips arming its countdown. Once the slide becomes active
  * the real card flows through and the timer arms a fresh, full-duration countdown
- * from the engage instant.
+ * from the activation instant — so the countdown starts the moment the game
+ * appears (snaps into view), NOT on the player's first interaction.
  *
  * Template-AGNOSTIC: `timeLimitMs` is the one timing primitive common to every
  * {@link LiquidCard} config, so a single override works for all renderers with NO
  * switch on `templateType`. The override preserves the card's discriminant and
  * every other field, so the result is the same card variant with a swapped limit.
+ *
+ * IMMEDIATE-PLAY vs PRE-PHASE — why activation-gating is correct for BOTH, with no
+ * per-template flag:
+ *  - IMMEDIATE-PLAY games pass `card` straight into {@link useCardTimer} on mount,
+ *    so flipping the limit finite on activation arms their countdown the instant
+ *    the card appears.
+ *  - PRE-PHASE games (what_changed's preview, memory_sequence's watch, n_back /
+ *    color_word / rule_flip's Start→stream) mount their `useCardTimer` ONLY inside
+ *    the answer-phase subtree, which renders AFTER the pre-phase ends, so their
+ *    inner timer arms at the real round-start, never during the pre-phase. The
+ *    pre-phase itself is independently held by each renderer's `isActive` gate (or
+ *    its Start button), so a pre-mounted neighbour never advances either.
+ *
+ * Neighbour safety: a windowed-but-not-focused slide stays non-finite, so its
+ * timer can never run — only the ACTIVE slide's timer arms.
  */
-function timerGatedCard(card: LiquidCard, engaged: boolean): LiquidCard {
-  if (engaged) return card;
+function timerGatedCard(card: LiquidCard, armed: boolean): LiquidCard {
+  if (armed) return card;
   return {
     ...card,
     config: { ...card.config, timeLimitMs: Number.POSITIVE_INFINITY },
@@ -190,12 +247,16 @@ function timerGatedCard(card: LiquidCard, engaged: boolean): LiquidCard {
 
 /** A best-effort per-mount feed id; RN engines may lack `crypto.randomUUID`. */
 function makeFeedId(anonymousUserId: string, stamp: number): string {
-  return globalThis.crypto?.randomUUID?.() ?? `feed-${anonymousUserId}-${stamp}`;
+  return (
+    globalThis.crypto?.randomUUID?.() ?? `feed-${anonymousUserId}-${stamp}`
+  );
 }
 
 export default function FeedScreen({
   registry = feedRegistry,
   source,
+  excludeCardIds,
+  startCardId,
   anonymousUserId = DEFAULT_ANONYMOUS_USER_ID,
   getCardById = getCatalogCardById,
   now,
@@ -206,6 +267,7 @@ export default function FeedScreen({
   onCardAbandoned,
   onCardResolved,
   onCardExplanationViewed,
+  onCardScored,
   scoreStore,
 }: FeedScreenProps) {
   const { height: windowHeight } = useWindowDimensions();
@@ -220,9 +282,10 @@ export default function FeedScreen({
   const insets = useSafeAreaInsets();
 
   const nowFn = now ?? Date.now;
-  // A per-mount feed instance id + a single "active at" stamp: the `elapsedMs`
-  // origin for the card start context. The interaction timer no longer arms from
-  // here — each slide arms it from its own engage instant (#106).
+  // A per-mount feed instance id + a single "active at" stamp. This stamp is now
+  // only a FALLBACK origin for the card start context: each slide stamps its own
+  // per-activation instant and arms its timer from there (see FeedSlide), so the
+  // countdown starts when the game appears.
   const [activeAtMs] = useState(() => nowFn());
   const [feedId] = useState(
     () => feedIdProp ?? makeFeedId(anonymousUserId, activeAtMs),
@@ -231,6 +294,8 @@ export default function FeedScreen({
   const { cards, activeIndex, setActiveIndex } = useFeedController({
     anonymousUserId,
     source,
+    excludeCardIds,
+    startCardId,
   });
 
   // Phase 4: the GAME-POINTS accumulator. It folds each resolution through the
@@ -240,6 +305,12 @@ export default function FeedScreen({
   const score = useFeedScore({ getCardById, store: scoreStore });
   const scoreOnResolvedRef = useRef(score.onCardResolved);
   scoreOnResolvedRef.current = score.onCardResolved;
+  // Accounts pivot: stable handles to read this card's score + forward it to the
+  // `onCardScored` seam (the signed-in `game_plays` recorder), mirroring web.
+  const getCardScoreRef = useRef(score.getCardScore);
+  getCardScoreRef.current = score.getCardScore;
+  const onCardScoredRef = useRef(onCardScored);
+  onCardScoredRef.current = onCardScored;
 
   // Stable handle to `setActiveIndex` for the once-created viewability callback
   // (`VirtualizedList` does not support changing `onViewableItemsChanged` on the
@@ -337,6 +408,10 @@ export default function FeedScreen({
       // by the time the result card renders via the feedback gate.
       scoreOnResolvedRef.current(index, resolution);
       onCardResolved?.(index, resolution);
+      // Accounts pivot: forward this card's score (read AFTER folding it in) to the
+      // `onCardScored` seam so the signed-in `game_plays` recorder persists the row.
+      const cardScore = getCardScoreRef.current(index);
+      if (cardScore) onCardScoredRef.current?.(index, resolution, cardScore);
     },
     [onCardResolved],
   );
@@ -369,9 +444,12 @@ export default function FeedScreen({
   // Forward a renderer's explanation reveal (#129, M5) to the feed-level seam via
   // a stable callback reading the live ref, so FeedSlide stays referentially
   // stable and never re-renders just because the parent's handler identity moved.
-  const handleExplanationViewed = useCallback((index: number, cardId: string) => {
-    onCardExplanationViewedRef.current?.(index, cardId);
-  }, []);
+  const handleExplanationViewed = useCallback(
+    (index: number, cardId: string) => {
+      onCardExplanationViewedRef.current?.(index, cardId);
+    },
+    [],
+  );
 
   const renderItem = useCallback(
     ({ item: cardId, index }: ListRenderItemInfo<string>) => (
@@ -473,7 +551,7 @@ type FeedSlideProps = {
   getCardById: (cardId: string) => LiquidCard | undefined;
   feedId: string;
   activeAtMs: number;
-  /** Wall clock for stamping this slide's engage instant (#106). */
+  /** Wall clock for stamping this slide's activation instant (timer origin). */
   now: () => number;
   /** Notify the feed that this game was engaged (first interaction). */
   onEngage: (index: number, cardId: string) => void;
@@ -512,45 +590,70 @@ const FeedSlide = memo(function FeedSlide({
   const card = windowed ? getCardById(cardId) : undefined;
   const Renderer = card ? resolveRenderer(registry, card) : undefined;
 
-  // #106: the engage instant — null until the player first interacts with this
-  // game. Local to the slide so engagement (and thus timer-arming) is per-game. A
-  // ref guards the one-time engage notification independently of render timing.
-  const [engageAtMs, setEngageAtMs] = useState<number | null>(null);
+  // The per-slide ACTIVATION instant — null until this slide first becomes the
+  // focused card. The countdown now arms on activation (the game APPEARING), so
+  // this is the timing origin for the card start context AND the gate that flips
+  // `timeLimitMs` finite. Latched once so re-activating a slide keeps its origin.
+  const [activatedAtMs, setActivatedAtMs] = useState<number | null>(null);
+  useEffect(() => {
+    if (!active || activatedAtMs !== null) return;
+    setActivatedAtMs(now());
+  }, [active, activatedAtMs, now]);
+
+  // The engage instant is still tracked, but ONLY to drive the skip-vs-abandon
+  // telemetry classification (first interaction) — it no longer gates the timer.
+  // A ref guards the one-time engage notification independently of render timing.
   const engagedOnceRef = useRef(false);
   const handleAttempt = useCallback(
     (_signals?: Record<string, number | string | boolean>) => {
       if (engagedOnceRef.current) return;
       engagedOnceRef.current = true;
-      setEngageAtMs(now());
       onEngage(index, cardId);
     },
-    [now, onEngage, index, cardId],
+    [onEngage, index, cardId],
   );
 
   // Mount the game only inside the window AND when the card + renderer resolve; a
   // missing card/renderer falls back to the placeholder (fail-safe, never a crash).
   if (card && Renderer) {
-    const engaged = engageAtMs !== null;
+    // Arm the timer once the slide has activated (countdown starts on appear).
+    // Until then the card carries a non-finite limit so a pre-mounted neighbour's
+    // timer never runs. `armed` latches on first activation.
+    const armed = activatedAtMs !== null;
+    // The timing origin is the slide's own activation instant (not the stale
+    // per-feed mount stamp), so `elapsedMs` measures from when THIS game appeared.
+    // For IMMEDIATE-PLAY games the puzzle is answerable on appear, so
+    // `interactionEnabledAtMs` is also the activation instant. PRE-PHASE renderers
+    // override `interactionEnabledAtMs` themselves with their answer-phase start.
+    const originMs = activatedAtMs ?? activeAtMs;
     const context: CardStartContext = {
       sessionId: feedId,
       cardIndex: index,
-      activeAtMs,
-      // #106: timing origin is the engage instant. Before engagement it falls back
-      // to `activeAtMs`, but the timer is gated off anyway (`timerGatedCard` hands
-      // the renderer a non-finite limit until the player interacts).
-      interactionEnabledAtMs: engageAtMs ?? activeAtMs,
+      activeAtMs: originMs,
+      interactionEnabledAtMs: originMs,
     };
     const Game = Renderer as TemplateRenderer<LiquidCard>;
+    const gameTheme = categoryAccent(card.category);
     return (
       <View
         style={[styles.slide, slideInsetStyle(insets), { height }]}
         testID={`feed-slide-${index}`}
       >
-        <SlideBackground />
+        <SlideBackground category={card.category} />
         {/* Phase 3: a category CHIP at the top, accent-tinted from the card's
             category. The chip text carries the meaning (guardrail-safe copy, no
             IQ/trait language); colour only reinforces it. */}
-        <CategoryChip category={card.category} />
+        <FeedHeader
+          category={card.category}
+          difficulty={card.difficulty}
+          timeLimitMs={card.config.timeLimitMs}
+        />
+        {/* The card's HOOK — the bold first-read promise before the player
+            engages (engagement strategy §4.1). Per-template fallback so every
+            slide has one. */}
+        <Text style={styles.hook} testID="feed-hook">
+          {hookForCard(card)}
+        </Text>
         {/* MP2 (#134): center the game (and, via the gate, the feedback step)
             vertically + horizontally in the slide. The full-width inner wrapper
             keeps games spanning the padded content box rather than collapsing to
@@ -561,23 +664,73 @@ const FeedSlide = memo(function FeedSlide({
               mounted neighbour stays still until it snaps into view — avoiding
               the documented pre-mounted-neighbour pitfall. Visual-only: it never
               feeds back into timing/`isActive` game logic. */}
-          <ActiveEntrance active={active} style={styles.gameContent}>
-            <Game
-              // #106: until engaged, the renderer's timer stays disarmed.
-              key={`${feedId}:${index}`}
-              card={timerGatedCard(card, engaged)}
-              context={context}
-              // Activation signal (#128 review fix): only the focused slide is
-              // active. Renderers with a timed PRE-phase (what_changed's preview)
-              // hold until this is true, so a pre-mounted slide's preview cannot
-              // elapse off-screen. Template-agnostic; most renderers ignore it.
-              isActive={active}
-              onAttempt={handleAttempt}
-              onResolve={(resolution: CardResolution) => onResolve(index, resolution)}
-              onExplanationViewed={() => onExplanationViewed(index, cardId)}
+          <ActiveEntrance
+            active={active}
+            style={[
+              styles.gameContent,
+              styles.gameShell,
+              {
+                borderColor: gameTheme.border,
+                backgroundColor: '#11141d',
+                shadowColor: gameTheme.accent,
+              },
+            ]}
+          >
+            <View
+              pointerEvents="none"
+              style={[
+                styles.gameGlow,
+                { backgroundColor: gameTheme.accent },
+              ]}
             />
+            <View
+              pointerEvents="none"
+              style={[
+                styles.gameEdge,
+                { backgroundColor: gameTheme.accent },
+              ]}
+            />
+            <BoundedGameContent testID={`feed-game-scroll-${index}`}>
+              <GamePostChrome
+                templateType={card.templateType}
+                mechanic={card.puzzleDna.mechanic}
+                difficulty={card.difficulty}
+                accent={gameTheme.accent}
+              />
+              <View style={styles.gameBody}>
+                <GameThemeProvider category={card.category}>
+                  <Game
+                    // Until the slide activates, the renderer's timer stays
+                    // disarmed; on activation the real finite limit flows through
+                    // and the countdown starts (immediate-play arms now; pre-phase
+                    // renderers arm their inner timer at their answer-phase start).
+                    key={`${feedId}:${index}`}
+                    card={timerGatedCard(card, armed)}
+                    context={context}
+                    // Activation signal (#128 review fix): only the focused slide is
+                    // active. Renderers with a timed PRE-phase (what_changed's preview)
+                    // hold until this is true, so a pre-mounted slide's preview cannot
+                    // elapse off-screen. Template-agnostic; most renderers ignore it.
+                    isActive={active}
+                    onAttempt={handleAttempt}
+                    onResolve={(resolution: CardResolution) =>
+                      onResolve(index, resolution)
+                    }
+                    onExplanationViewed={() =>
+                      onExplanationViewed(index, cardId)
+                    }
+                  />
+                </GameThemeProvider>
+              </View>
+            </BoundedGameContent>
           </ActiveEntrance>
         </View>
+        {/* Per-card social surface (likes + comments) — a FEED-LAYER concern
+            keyed by cardId, NOT per-template (no switch on templateType, never
+            touches the renderer's logic). Activation-gated: it loads only when
+            this slide is the focused one (`active`). Renders nothing when there
+            is no social provider. */}
+        <CardSocialRail cardId={cardId} active={active} />
         {/* MP3 (#135): the social-feed author byline as a bottom-left overlay
             (avatar monogram + @handle) plus a subtle swipe-up affordance — so each
             slide reads like a Reels/TikTok card, not a plain page. Phase 3: the
@@ -610,6 +763,44 @@ const FeedSlide = memo(function FeedSlide({
     </View>
   );
 });
+
+/**
+ * Keeps a renderer inside the center region reserved between the feed header and
+ * creator chrome. Most games remain ordinary, non-scrolling cards; scrolling is
+ * enabled only when measured content is taller than the available viewport. This
+ * prevents a tall answer phase from covering either adjacent row without making
+ * the feed controller aware of any template's layout.
+ */
+function BoundedGameContent({
+  children,
+  testID,
+}: {
+  children: ReactNode;
+  testID: string;
+}) {
+  const [viewportHeight, setViewportHeight] = useState(0);
+  const [contentHeight, setContentHeight] = useState(0);
+  const scrollEnabled =
+    viewportHeight > 0 && contentHeight > viewportHeight + 1;
+
+  return (
+    <ScrollView
+      testID={testID}
+      style={styles.gameScroll}
+      contentContainerStyle={styles.gameScrollContent}
+      scrollEnabled={scrollEnabled}
+      nestedScrollEnabled
+      bounces={scrollEnabled}
+      showsVerticalScrollIndicator={scrollEnabled}
+      onLayout={(event) =>
+        setViewportHeight(event.nativeEvent.layout.height)
+      }
+      onContentSizeChange={(_width, height) => setContentHeight(height)}
+    >
+      {children}
+    </ScrollView>
+  );
+}
 
 /**
  * Active-card entrance (Phase 5). Fades + lifts + slightly scales its children
@@ -696,18 +887,41 @@ function ActiveEntrance({
  * never intercepts a swipe/tap or adds noise; the slide keeps its own solid
  * {@link PAGE_BACKGROUND} underneath so paging never flashes a seam.
  */
-function SlideBackground() {
+function SlideBackground({ category }: { category?: string }) {
+  const { accent, tint } = categoryAccent(category);
   return (
-    <LinearGradient
-      colors={slideGradient.colors}
-      locations={slideGradient.locations}
-      start={slideGradient.start}
-      end={slideGradient.end}
+    <View
       style={StyleSheet.absoluteFill}
       pointerEvents="none"
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-    />
+    >
+      <LinearGradient
+        colors={category ? [tint, '#10131d', '#07090e'] : slideGradient.colors}
+        locations={slideGradient.locations}
+        start={slideGradient.start}
+        end={slideGradient.end}
+        style={StyleSheet.absoluteFill}
+      />
+      {category ? (
+        <>
+          <View
+            style={[
+              styles.ambientOrb,
+              styles.ambientOrbTop,
+              { backgroundColor: accent },
+            ]}
+          />
+          <View
+            style={[
+              styles.ambientOrb,
+              styles.ambientOrbBottom,
+              { backgroundColor: accent },
+            ]}
+          />
+        </>
+      ) : null}
+    </View>
   );
 }
 
@@ -734,20 +948,20 @@ function SlideChrome({
   const { accent } = categoryAccent(category);
   return (
     <View style={styles.chrome}>
-      <Pressable
-        accessibilityRole="button"
+      <View
         accessibilityLabel={`Creator ${creatorHandle}`}
-        accessibilityHint="Creator profiles are coming soon"
-        onPress={noop}
         style={styles.bylinePressable}
       >
         <View style={[styles.avatar, { backgroundColor: accent }]}>
           <Text style={styles.avatarText}>{monogram}</Text>
         </View>
-        <Text style={styles.byline} testID={`feed-byline-${index}`}>
-          {creatorHandle}
-        </Text>
-      </Pressable>
+        <View style={styles.authorCopy}>
+          <Text style={styles.byline} testID={`feed-byline-${index}`}>
+            {creatorHandle}
+          </Text>
+          <Text style={styles.creatorCaption}>Original playable challenge</Text>
+        </View>
+      </View>
       {/* Decorative scroll affordance — the FlatList already carries the
           screen-reader swipe instruction, so hide this from assistive tech. */}
       <Text
@@ -755,19 +969,126 @@ function SlideChrome({
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
       >
-        Swipe up  ⌃
+        Swipe up ⌃
       </Text>
     </View>
   );
 }
 
-/** No-op seam for the (later-phase) tappable creator profile. */
-function noop() {}
-
 /** Format a category id ("visual_attention") into a chip label ("Visual attention"). */
 function categoryLabel(category: string): string {
   const spaced = category.replace(/_/g, ' ');
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+function difficultyLevel(difficulty: string): number {
+  if (difficulty === 'extremely_hard') return 5;
+  if (difficulty === 'hard') return 4;
+  if (difficulty === 'medium') return 3;
+  if (difficulty === 'easy') return 2;
+  return 1;
+}
+
+function templateDescription(templateType: string): string | null {
+  if (templateType === 'prism_path') {
+    return 'Rotate mirrors to guide a beam from IN to the star while avoiding blockers. Tap mirrors to flip slash direction, then fire when the preview reaches the target.';
+  }
+  return null;
+}
+
+function templateMonogram(templateType: string): string {
+  return templateType
+    .split('_')
+    .map((part) => part[0] ?? '')
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+function templateFingerprint(templateType: string): readonly boolean[] {
+  let hash = 2166136261;
+  for (const char of templateType) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return Array.from({ length: 9 }, (_, index) => {
+    const bit = (hash >>> (index % 24)) & 1;
+    return bit === 1 || index === 4;
+  });
+}
+
+function GamePostChrome({
+  templateType,
+  mechanic,
+  difficulty,
+  accent,
+}: {
+  templateType: string;
+  mechanic: string;
+  difficulty: string;
+  accent: string;
+}) {
+  const level = difficultyLevel(difficulty);
+  const fingerprint = templateFingerprint(templateType);
+  const label = categoryLabel(templateType);
+  const description = templateDescription(templateType);
+  return (
+    <View style={styles.gameKicker}>
+      <View
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        style={[styles.templateMark, { borderColor: accent }]}
+      >
+        <Text style={[styles.templateMonogram, { color: accent }]}>
+          {templateMonogram(templateType)}
+        </Text>
+        <View style={styles.fingerprint}>
+          {fingerprint.map((filled, index) => (
+            <View
+              key={index}
+              style={[
+                styles.fingerprintDot,
+                {
+                  backgroundColor: filled
+                    ? accent
+                    : 'rgba(255,255,255,0.10)',
+                },
+              ]}
+            />
+          ))}
+        </View>
+      </View>
+      <View
+        accessible={Boolean(description)}
+        accessibilityLabel={description ? `${label}. ${description}` : undefined}
+        accessibilityHint={description ?? undefined}
+        style={styles.templateCopy}
+      >
+        <Text style={styles.templateLabel}>{label}</Text>
+        <Text style={styles.mechanicLabel}>
+          {categoryLabel(mechanic.replace(/-/g, '_'))}
+        </Text>
+      </View>
+      <View
+        accessibilityLabel={`${categoryLabel(difficulty)} difficulty`}
+        style={styles.levelMeter}
+      >
+        {[1, 2, 3, 4, 5].map((step) => (
+          <View
+            key={step}
+            style={[
+              styles.levelBar,
+              {
+                height: 3 + step * 3,
+                backgroundColor:
+                  step <= level ? accent : 'rgba(255,255,255,0.12)',
+              },
+            ]}
+          />
+        ))}
+      </View>
+    </View>
+  );
 }
 
 /**
@@ -776,12 +1097,58 @@ function categoryLabel(category: string): string {
  * modest, guardrail-safe copy (no IQ/trait language). The chip text carries the
  * meaning — colour only reinforces it.
  */
-function CategoryChip({ category }: { category: string }) {
+/**
+ * Format a time-limit (ms) as a compact tag: under a minute reads as `30s`; a
+ * minute or more reads as `m:ss` (90000 → `1:30`, 120000 → `2:00`). A non-finite
+ * limit (a timer-gated, off-screen slide) shows nothing.
+ */
+function formatTimeLimitLabel(ms: number): string {
+  if (!Number.isFinite(ms)) return '';
+  const totalSeconds = Math.round(ms / 1000);
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
+
+function FeedHeader({
+  category,
+  difficulty,
+  timeLimitMs,
+}: {
+  category: string;
+  difficulty: string;
+  timeLimitMs: number;
+}) {
   const { accent, tint } = categoryAccent(category);
   return (
-    <View style={styles.chipRow}>
-      <View style={[styles.chip, { borderColor: accent, backgroundColor: tint }]}>
-        <Text style={styles.chipText}>{categoryLabel(category)}</Text>
+    <View style={styles.header}>
+      <View style={styles.brandRow}>
+        <LinearGradient
+          colors={['#6c7bff', '#9d7bff', '#ff7eb6']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.brandMark}
+        >
+          <Text style={styles.brandMarkText}>✦</Text>
+        </LinearGradient>
+        <Wordmark fontSize={fontSize.lg} />
+        <Text style={styles.brandMode}>Discover</Text>
+      </View>
+      <View style={styles.chipRow}>
+        <View
+          style={[styles.chip, { borderColor: accent, backgroundColor: tint }]}
+        >
+          <Text style={styles.chipText}>{categoryLabel(category)}</Text>
+        </View>
+        <View style={styles.metaPill}>
+          <Text style={styles.metaPillText}>{categoryLabel(difficulty)}</Text>
+        </View>
+        <View style={styles.metaPill}>
+          <Text testID="feed-time-pill" style={styles.metaPillText}>
+            {formatTimeLimitLabel(timeLimitMs)}
+          </Text>
+        </View>
       </View>
     </View>
   );
@@ -824,11 +1191,30 @@ const styles = StyleSheet.create({
     // (SlideBackground) layers over this solid base for depth (MP3 #135).
     backgroundColor: PAGE_BACKGROUND,
   },
+  ambientOrb: {
+    position: 'absolute',
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    opacity: 0.11,
+  },
+  ambientOrbTop: { top: 30, right: -110 },
+  ambientOrbBottom: { bottom: -80, left: -140, opacity: 0.07 },
   // MP2 (#134): center the game content in the middle of the viewport, not pinned
   // to the top — TikTok/Reels-style. Template-agnostic: centering happens here at
   // the slide/feed level, never per game.
+  // The card HOOK — bold first-read promise above the game (engagement §4.1).
+  hook: {
+    color: colors.text,
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.bold,
+    lineHeight: fontSize.lg * 1.2,
+    marginBottom: space.md,
+    paddingHorizontal: 2,
+  },
   game: {
     flex: 1,
+    minHeight: 0,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -836,11 +1222,140 @@ const styles = StyleSheet.create({
   // step) span the padded content width instead of shrinking to intrinsic width.
   gameContent: {
     width: '100%',
+    maxHeight: '100%',
+    flexShrink: 1,
+  },
+  gameShell: {
+    position: 'relative',
+    overflow: 'hidden',
+    borderRadius: 28,
+    borderWidth: 1,
+    backgroundColor: 'rgba(18,21,31,0.86)',
+    ...elevation.card,
+  },
+  gameScroll: {
+    width: '100%',
+    maxHeight: '100%',
+    flexShrink: 1,
+  },
+  gameScrollContent: {
+    flexGrow: 1,
+    padding: space.lg,
+  },
+  gameGlow: {
+    position: 'absolute',
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    top: -125,
+    right: -70,
+    opacity: 0.16,
+  },
+  gameEdge: {
+    position: 'absolute',
+    top: 0,
+    left: 34,
+    right: 34,
+    height: 2,
+    borderBottomLeftRadius: radius.pill,
+    borderBottomRightRadius: radius.pill,
+    opacity: 0.82,
+  },
+  gameKicker: {
+    position: 'relative',
+    zIndex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: space.lg,
+    gap: space.sm,
+  },
+  templateMark: {
+    width: 54,
+    height: 38,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 7,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    backgroundColor: 'rgba(255,255,255,0.045)',
+  },
+  templateMonogram: {
+    fontSize: 11,
+    fontWeight: fontWeight.heavy,
+  },
+  fingerprint: {
+    width: 13,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 2,
+  },
+  fingerprintDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 2,
+  },
+  templateCopy: {
+    flex: 1,
+    gap: 1,
+  },
+  templateLabel: {
+    color: colors.text,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.semibold,
+  },
+  mechanicLabel: {
+    color: colors.textFaint,
+    fontSize: 10,
+  },
+  levelMeter: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 3,
+    minHeight: 12,
+  },
+  levelBar: {
+    width: 4,
+    borderRadius: radius.pill,
+  },
+  gameBody: {
+    position: 'relative',
+    zIndex: 1,
+    width: '100%',
+  },
+  header: {
+    gap: space.md,
+    marginBottom: space.md,
+    paddingRight: 86,
+  },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    minHeight: 34,
+  },
+  // The LumaLoop logo — a loop (∞) badge with the brand purple (matches Home).
+  brandMark: {
+    width: 32,
+    height: 32,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  brandMarkText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: fontWeight.bold,
+  },
+  brandMode: {
+    color: colors.textMuted,
+    fontSize: fontSize.xs,
   },
   // Phase 3: the top-of-slide category chip row.
   chipRow: {
     flexDirection: 'row',
-    marginBottom: space.md,
+    alignItems: 'center',
+    gap: space.sm,
   },
   chip: {
     paddingVertical: space.xs,
@@ -852,6 +1367,19 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: fontSize.sm,
     fontWeight: fontWeight.semibold,
+  },
+  metaPill: {
+    paddingVertical: space.xs,
+    paddingHorizontal: space.sm,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.10)',
+    backgroundColor: 'rgba(255,255,255,0.045)',
+  },
+  metaPillText: {
+    color: colors.textMuted,
+    fontSize: fontSize.xs,
+    textTransform: 'capitalize',
   },
   // MP3 (#135): the bottom social chrome row — byline left, swipe cue right.
   chrome: {
@@ -867,12 +1395,14 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   avatar: {
-    width: 34,
-    height: 34,
+    width: 42,
+    height: 42,
     borderRadius: radius.pill,
     backgroundColor: colors.avatar,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.78)',
   },
   avatarText: {
     color: colors.accentContrast,
@@ -885,11 +1415,19 @@ const styles = StyleSheet.create({
     fontWeight: fontWeight.semibold,
     flexShrink: 1,
   },
+  authorCopy: { flexShrink: 1, gap: 1 },
+  creatorCaption: { color: colors.textMuted, fontSize: fontSize.xs },
   swipeHint: {
     color: colors.textFaint,
     fontSize: fontSize.sm,
     fontWeight: fontWeight.medium,
     marginLeft: space.sm,
+    paddingVertical: space.sm,
+    paddingHorizontal: space.md,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(6,8,13,0.48)',
   },
   placeholder: {
     flex: 1,

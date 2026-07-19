@@ -37,8 +37,9 @@
  * progress is never conveyed by colour or position alone.
  */
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
+import { orderOptions } from '../../cards/optionOrder';
 import type { PatternChainCard as PatternChainCardType } from '../../cards/types';
 import type { CardResolution, TemplateProps } from '../contract';
 import { useCardTimer } from '../useCardTimer';
@@ -173,6 +174,18 @@ export default function PatternChainCard({
   const chainComplete = chosenLabels.length >= steps.length;
   const activeStep = chainComplete ? undefined : steps[currentStep];
 
+  // Present the active step's options in a deterministic, per-step-seeded order so
+  // the correct next item is not positionally guessable (it is keyed by
+  // `correctOptionId`, not slot). Seeded per step (`cardId:stepIndex`) so each
+  // step shuffles independently but stably; identical on web↔mobile.
+  const orderedOptions = useMemo(
+    () =>
+      activeStep
+        ? orderOptions(`${card.cardId}:${currentStep}`, activeStep.options)
+        : [],
+    [card.cardId, currentStep, activeStep],
+  );
+
   return (
     <section aria-label="Pattern chain" style={sectionStyle}>
       <p data-testid="pc-prompt" style={promptStyle}>
@@ -205,7 +218,7 @@ export default function PatternChainCard({
           aria-label={`Pick the next item (step ${currentStep + 1} of ${steps.length})`}
           style={optionsStyle}
         >
-          {activeStep.options.map((option) => (
+          {orderedOptions.map((option) => (
             <button
               key={option.id}
               type="button"
@@ -249,6 +262,10 @@ const sequenceStyle = {
   alignItems: 'center',
   gap: 'var(--space-2)',
   width: '100%',
+  padding: 'var(--space-3)',
+  borderRadius: 'var(--radius-lg)',
+  border: '1px solid var(--game-border, var(--color-border))',
+  background: 'var(--game-board, transparent)',
 } as const;
 
 const chipStyle = {
@@ -259,8 +276,8 @@ const chipStyle = {
   minWidth: 'var(--tap-target-min)',
   padding: 'var(--space-2)',
   borderRadius: 'var(--radius-md)',
-  border: '1px solid var(--color-border)',
-  background: 'var(--color-surface-raised)',
+  border: '1px solid var(--game-border, var(--color-border))',
+  background: 'var(--game-surface-raised, var(--color-surface-raised))',
   color: 'var(--color-text)',
   fontSize: 'var(--font-size-lg)',
   fontFamily: 'var(--font-sans)',
@@ -301,8 +318,8 @@ const optionStyle = {
   minWidth: 'var(--tap-target-min)',
   padding: 'var(--space-3)',
   borderRadius: 'var(--radius-md)',
-  border: '1px solid var(--color-border)',
-  background: 'var(--color-surface-raised)',
+  border: '1px solid var(--game-border, var(--color-border))',
+  background: 'var(--game-surface-raised, var(--color-surface-raised))',
   color: 'var(--color-text)',
   fontSize: 'var(--font-size-md)',
   fontFamily: 'var(--font-sans)',
