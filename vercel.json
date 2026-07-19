@@ -7,7 +7,7 @@
     },
     {
       "path": "/api/daily-reminder?slot=evening",
-      "schedule": "0 16 * * *"
+      "schedule": "0 13 * * *"
     }
   ]
 }
