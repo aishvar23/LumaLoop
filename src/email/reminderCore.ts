@@ -54,25 +54,49 @@ export function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 }
 
-/** Build the (static, daily) reminder email. Guardrail-safe copy. */
-export function buildReminderEmail(): ReminderEmail {
-  const subject = 'Your next Witzy puzzle is waiting';
+/** Which of the two daily sends this is — drives the morning/evening copy. */
+export type ReminderSlot = 'morning' | 'evening';
+
+/** Fallback app link when `REMINDER_APP_URL` isn't configured. */
+export const DEFAULT_APP_URL = 'https://witzy.app';
+
+/**
+ * Build a reminder email for a time-of-day `slot`. Two gentle variants (morning
+ * warm-up / evening wind-down) so twice-daily nudges don't read as duplicates.
+ * `appUrl` is where "Start playing" points — pass the live deployment URL.
+ * Guardrail-safe copy (Design §7/§21.8): games/streak framing only — no IQ /
+ * brain-training / ability / clinical claims.
+ */
+export function buildReminderEmail(
+  slot: ReminderSlot = 'evening',
+  appUrl: string = DEFAULT_APP_URL,
+): ReminderEmail {
+  const morning = slot === 'morning';
+  const subject = morning
+    ? '☀️ Warm up with a Witzy puzzle'
+    : '🌙 Your evening Witzy break';
+  const heading = morning
+    ? 'Start the day with a few puzzles'
+    : 'Wind down with a few puzzles';
+  const body = morning
+    ? 'A fresh feed of quick puzzles is ready. Play a few with your morning coffee and keep your streak going.'
+    : 'Take a short break and solve a few quick puzzles — keep your streak alive before the day is out.';
+
   const text = [
-    'Ready for today’s games?',
+    `${heading}?`,
     '',
-    'A fresh feed of quick puzzles is ready to play on Witzy. ' +
-      'Keep your streak going and see what you can solve today.',
+    body,
     '',
-    'Open Witzy and start playing: https://witzy.app',
+    `Open Witzy and start playing: ${appUrl}`,
   ].join('\n');
   const html = [
     '<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:480px;margin:0 auto;color:#16181f">',
-    '<h1 style="font-size:20px;margin:0 0 12px">Ready for today’s games?</h1>',
+    `<h1 style="font-size:20px;margin:0 0 12px">${heading}?</h1>`,
     '<p style="font-size:15px;line-height:1.5;margin:0 0 16px">',
-    'A fresh feed of quick puzzles is ready to play on Witzy. Keep your streak going and see what you can solve today.',
+    body,
     '</p>',
     '<p style="margin:0 0 16px">',
-    '<a href="https://witzy.app" style="display:inline-block;background:#6c7bff;color:#fff;text-decoration:none;padding:12px 20px;border-radius:999px;font-weight:600">Start playing</a>',
+    `<a href="${appUrl}" style="display:inline-block;background:#6c7bff;color:#fff;text-decoration:none;padding:12px 20px;border-radius:999px;font-weight:600">Start playing</a>`,
     '</p>',
     '</div>',
   ].join('');
@@ -93,8 +117,10 @@ export function buildReminderEmail(): ReminderEmail {
 export async function sendDailyReminders(
   recipients: readonly Recipient[],
   send: SendEmail | null,
+  slot: ReminderSlot = 'evening',
+  appUrl: string = DEFAULT_APP_URL,
 ): Promise<ReminderSummary> {
-  const email = buildReminderEmail();
+  const email = buildReminderEmail(slot, appUrl);
   const valid = recipients.filter((r) => isValidEmail(r.email));
   let skipped = recipients.length - valid.length;
   const errors: string[] = [];

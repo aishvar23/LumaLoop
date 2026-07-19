@@ -101,12 +101,25 @@ export default async function handler(request: Request): Promise<Response> {
     return json(503, { error: 'supabase admin not configured' });
   }
 
+  // Time-of-day slot from the cron path (`?slot=morning|evening`); the app link
+  // to point at comes from REMINDER_APP_URL (the live deployment).
+  const slot =
+    new URL(request.url).searchParams.get('slot') === 'morning'
+      ? 'morning'
+      : 'evening';
+  const appUrl = process.env.REMINDER_APP_URL || undefined;
+
   try {
     const recipients = await listRecipients();
     const transport = resolveTransport();
-    const summary = await sendDailyReminders(recipients, transport);
+    const summary = await sendDailyReminders(
+      recipients,
+      transport,
+      slot,
+      appUrl,
+    );
     // No addresses/PII in the response — just counts (+ provider error strings).
-    return json(200, { ...summary, configured: transport !== null });
+    return json(200, { ...summary, slot, configured: transport !== null });
   } catch (err) {
     return json(500, {
       error: err instanceof Error ? err.message : 'reminder run failed',
