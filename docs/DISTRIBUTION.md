@@ -176,6 +176,31 @@ npx vercel --prod   # deploy production → prints your public URL
 - Send testers the URL + "Add to Home Screen" one-liner (see the message template
   below in §7).
 
+### 4e. Daily reminder emails (twice-daily nudge)
+
+Two Vercel crons hit `/api/daily-reminder?slot=morning|evening`
+(`vercel.json`: **02:30 UTC** = 8:00 AM IST / 10:30 PM ET, and **13:00 UTC** =
+6:30 PM IST / 9:00 AM ET — the second is prime for *both* zones). The send is
+**gated**: with no email provider configured the cron fires but sends nothing (a
+safe no-op). To turn it on, set these in **Vercel → luma-loop → Settings →
+Environment Variables (Production)**:
+
+| Var | Where to get it |
+|---|---|
+| `RESEND_API_KEY` | Sign up at **resend.com** → **API Keys → Create API Key** → copy the `re_…` value. |
+| `REMINDER_FROM` | A from-address **on a domain you verified in Resend** (Resend → **Domains → Add Domain**, add the DNS records). e.g. `Witzy <hello@yourdomain.com>`. Without a verified domain you can only send to your own address (Resend test mode). |
+| `CRON_SECRET` | **You invent it** — any long random string (`openssl rand -hex 32`). Vercel Cron auto-sends it as `Authorization: Bearer <CRON_SECRET>`; the handler rejects calls without it. |
+| `REMINDER_APP_URL` | Your **live web URL** (what you share with testers), so "Start playing" links there instead of the placeholder. |
+
+Notes:
+- `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (already set) power the recipient
+  list via the Supabase admin API.
+- **Resend free tier = 100 emails/day.** 50 testers × 2 sends = 100/day — right at
+  the cap. If you add testers, drop to one send/day or upgrade.
+- After setting the vars + redeploying, check the Vercel project's **Crons** tab
+  shows both jobs, and hit the endpoint manually to test:
+  `curl -H "Authorization: Bearer <CRON_SECRET>" https://<your-url>/api/daily-reminder?slot=evening`
+
 ---
 
 ## 5. Pre-flight checklist (all native paths)
