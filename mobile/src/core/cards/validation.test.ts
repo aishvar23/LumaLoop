@@ -1,3 +1,5 @@
+// Ported from web `src/cards/validation.test.ts`; source of truth is the web app — keep in
+// sync (Phase M, M2). See `mobile/src/core/README.md`.
 import {
   ALLOWED_EVIDENCE_TIERS,
   MAX_CHAIN_STEPS,
@@ -5,6 +7,7 @@ import {
   MAX_CODE_LENGTH,
   MAX_PRISM_GRID_SIZE,
   MAX_SEQUENCE_LENGTH,
+  MAX_SPOT_IT_COLUMNS,
   MAX_STEP_LOGIC_STEPS,
   MAX_TIME_LIMIT_MS,
   MIN_CODE_GUESSES,
@@ -19,17 +22,29 @@ import {
   templateCategoryMap,
   type ChallengeCategory,
   type CodeBreakCard,
+  type CircuitFlowCard,
+  type ColorWordCard,
   type LiquidCard,
+  type MatrixReasoningCard,
+  type GearsRotationCard,
+  type MemoryMatchCard,
+  type MazePathCard,
   type MemorySequenceCard,
+  type NBackCard,
+  type OddOneOutCard,
   type PatternChainCard,
   type PrismPathCard,
   type PuzzleDna,
   type RuleFlipCard,
+  type SchulteOrderCard,
+  type SignalSetCard,
   type SpotItCard,
   type StepLogicCard,
+  type QuickMathCard,
   type TemplateType,
   type TinyLogicCard,
   type WhatChangedCard,
+  type WordUnscrambleCard,
 } from './types';
 
 // ---------------------------------------------------------------------------
@@ -337,6 +352,370 @@ function validPrismPath(): PrismPathCard {
   };
 }
 
+function validSignalSet(): SignalSetCard {
+  return {
+    cardId: 'signalset-1',
+    creatorHandle: '@test',
+    templateType: 'signal_set',
+    category: 'pattern_recognition',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 20,
+    prompt: 'Pick a valid trio.',
+    puzzleDna: dna('attribute-triad'),
+    explanation: { title: 'Triad', body: 'All same or all different.' },
+    config: {
+      tiles: [
+        { id: 'a', shape: 'circle', fill: 'solid', count: 1 },
+        { id: 'b', shape: 'triangle', fill: 'striped', count: 2 },
+        { id: 'c', shape: 'diamond', fill: 'outline', count: 3 },
+        { id: 'd', shape: 'circle', fill: 'outline', count: 2 },
+        { id: 'e', shape: 'triangle', fill: 'solid', count: 3 },
+        { id: 'f', shape: 'diamond', fill: 'striped', count: 1 },
+      ],
+      solutionIds: ['a', 'b', 'c'],
+      timeLimitMs: 20000,
+    },
+  };
+}
+
+function validCircuitFlow(): CircuitFlowCard {
+  return {
+    cardId: 'circuit-1',
+    creatorHandle: '@test',
+    templateType: 'circuit_flow',
+    category: 'logical_reasoning',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 20,
+    prompt: 'Connect every tile.',
+    puzzleDna: dna('rotating-network'),
+    explanation: { title: 'Circuit', body: 'Every arm meets a neighbor.' },
+    config: {
+      rows: 2,
+      columns: 2,
+      sourceTileId: 'a',
+      tiles: [
+        {
+          id: 'a',
+          row: 0,
+          column: 0,
+          connections: ['right', 'down'],
+          initialRotation: 1,
+        },
+        {
+          id: 'b',
+          row: 0,
+          column: 1,
+          connections: ['left'],
+          initialRotation: 2,
+        },
+        {
+          id: 'c',
+          row: 1,
+          column: 0,
+          connections: ['up', 'right'],
+          initialRotation: 3,
+        },
+        {
+          id: 'd',
+          row: 1,
+          column: 1,
+          connections: ['left'],
+          initialRotation: 1,
+        },
+      ],
+      solution: [
+        { tileId: 'a', rotation: 0 },
+        { tileId: 'b', rotation: 0 },
+        { tileId: 'c', rotation: 0 },
+        { tileId: 'd', rotation: 0 },
+      ],
+      timeLimitMs: 20000,
+    },
+  };
+}
+
+function validWordUnscramble(): WordUnscrambleCard {
+  return {
+    cardId: 'unscramble-1',
+    creatorHandle: '@test',
+    templateType: 'word_unscramble',
+    category: 'pattern_recognition',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 15,
+    prompt: 'Unscramble the word.',
+    puzzleDna: dna('word-unscramble'),
+    explanation: { title: 'It spells STARE', body: 'The letters spell STARE.' },
+    config: {
+      scrambled: 'tsrae',
+      answer: 'stare',
+      options: [
+        { id: 'a', label: 'stare' },
+        { id: 'b', label: 'store' },
+        { id: 'c', label: 'scare' },
+      ],
+      correctOptionId: 'a',
+      timeLimitMs: 15000,
+    },
+  };
+}
+
+function validQuickMath(): QuickMathCard {
+  return {
+    cardId: 'quickmath-1',
+    creatorHandle: '@test',
+    templateType: 'quick_math',
+    category: 'logical_reasoning',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 14,
+    prompt: 'Solve the equation.',
+    puzzleDna: dna('quick-math'),
+    explanation: { title: 'Multiply first', body: '9 × 4 = 36, − 5 = 31.' },
+    config: {
+      display: '9 × 4 − 5',
+      expression: { operands: [9, 4, 5], operators: ['*', '-'] },
+      options: [
+        { id: 'a', label: '31', value: 31 },
+        { id: 'b', label: '41', value: 41 },
+        { id: 'c', label: '30', value: 30 },
+      ],
+      correctOptionId: 'a',
+      timeLimitMs: 14000,
+    },
+  };
+}
+
+function validColorWord(): ColorWordCard {
+  return {
+    cardId: 'colorword-1',
+    creatorHandle: '@test',
+    templateType: 'color_word',
+    category: 'cognitive_flexibility',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 14,
+    prompt: 'Tap the colour the word is printed in.',
+    puzzleDna: dna('stroop-interference'),
+    explanation: { title: 'Ink over word', body: 'Answer the ink colour.' },
+    config: {
+      colors: [
+        { id: 'red', label: 'Red', hex: '#e5484d' },
+        { id: 'blue', label: 'Blue', hex: '#3e63dd' },
+        { id: 'green', label: 'Green', hex: '#46a758' },
+      ],
+      trials: [
+        { id: 't0', word: 'RED', inkColorId: 'red', congruent: true },
+        { id: 't1', word: 'BLUE', inkColorId: 'green', congruent: false },
+        { id: 't2', word: 'GREEN', inkColorId: 'red', congruent: false },
+        { id: 't3', word: 'BLUE', inkColorId: 'blue', congruent: true },
+      ],
+      trialDurationMs: 2000,
+      interTrialGapMs: 300,
+      timeLimitMs: 16000,
+    },
+  };
+}
+
+function validNBack(): NBackCard {
+  return {
+    cardId: 'nback-1',
+    creatorHandle: '@test',
+    templateType: 'n_back',
+    category: 'working_memory',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 18,
+    prompt: 'Flag each letter that repeats the one just before it.',
+    puzzleDna: dna('n-back'),
+    explanation: { title: '1-back', body: 'Match the item one step back.' },
+    config: {
+      itemKind: 'letter',
+      stream: ['A', 'B', 'B', 'C', 'D', 'D', 'E'],
+      n: 1,
+      matchIndices: [2, 5],
+      itemDurationMs: 1600,
+      interItemGapMs: 400,
+      timeLimitMs: 18000,
+    },
+  };
+}
+
+function validOddOneOut(): OddOneOutCard {
+  return {
+    cardId: 'oddoneout-1',
+    creatorHandle: '@test',
+    templateType: 'odd_one_out',
+    category: 'pattern_recognition',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 12,
+    prompt: 'Tap the one that does not belong.',
+    puzzleDna: dna('odd-one-out'),
+    explanation: { title: 'Shared rule', body: 'Three are even; one is odd.' },
+    config: {
+      items: [
+        { id: 'a', label: '4' },
+        { id: 'b', label: '8' },
+        { id: 'c', label: '7' },
+        { id: 'd', label: '12' },
+      ],
+      oddItemId: 'c',
+      timeLimitMs: 12000,
+    },
+  };
+}
+
+function validSchulteOrder(): SchulteOrderCard {
+  return {
+    cardId: 'schulte-1',
+    creatorHandle: '@test',
+    templateType: 'schulte_order',
+    category: 'processing_speed',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 15,
+    prompt: 'Tap 1 to 5 in order, as fast as you can.',
+    puzzleDna: dna('schulte-scan'),
+    explanation: { title: 'Order', body: 'Scan and tap ascending.' },
+    config: {
+      rows: 3,
+      columns: 2,
+      targets: [
+        { id: 's1', label: '1', row: 2, column: 1 },
+        { id: 's2', label: '2', row: 0, column: 0 },
+        { id: 's3', label: '3', row: 1, column: 1 },
+        { id: 's4', label: '4', row: 2, column: 0 },
+        { id: 's5', label: '5', row: 0, column: 1 },
+      ],
+      timeLimitMs: 20000,
+    },
+  };
+}
+
+function validMatrixReasoning(): MatrixReasoningCard {
+  return {
+    cardId: 'matrix-1',
+    creatorHandle: '@test',
+    templateType: 'matrix_reasoning',
+    category: 'pattern_recognition',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 20,
+    prompt: 'Pick the shape that completes the pattern.',
+    puzzleDna: dna('visual-pattern-completion'),
+    explanation: { title: 'Pattern', body: 'Each row adds one shape.' },
+    config: {
+      grid: ['●', '●●', '●●●', '■', '■■', '■■■', '▲', '▲▲', null],
+      options: [
+        { id: 'opt-a', glyph: '▲▲▲' },
+        { id: 'opt-b', glyph: '▲▲' },
+        { id: 'opt-c', glyph: '●●●' },
+      ],
+      correctOptionId: 'opt-a',
+      timeLimitMs: 20000,
+    },
+  };
+}
+
+function validGearsRotation(): GearsRotationCard {
+  return {
+    cardId: 'gears-1',
+    creatorHandle: '@test',
+    templateType: 'gears_rotation',
+    category: 'pattern_recognition',
+    difficulty: 'medium',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 20,
+    prompt: 'Which way does the last gear spin?',
+    puzzleDna: dna('gear-direction'),
+    explanation: { title: 'Gears', body: 'Meshed gears alternate direction.' },
+    config: {
+      gearCount: 3,
+      driveDirection: 'cw',
+      options: [
+        { id: 'cw', label: 'Clockwise' },
+        { id: 'ccw', label: 'Counter-clockwise' },
+      ],
+      correctOptionId: 'cw',
+      timeLimitMs: 20000,
+    },
+  };
+}
+
+function validMemoryMatch(): MemoryMatchCard {
+  return {
+    cardId: 'memorymatch-1',
+    creatorHandle: '@test',
+    templateType: 'memory_match',
+    category: 'working_memory',
+    difficulty: 'extremely_easy',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 10,
+    prompt: 'Flip the tiles two at a time to find the matching pairs.',
+    puzzleDna: dna('pair-recall'),
+    explanation: { title: 'Pairs', body: 'Two tiles share a shape.' },
+    config: {
+      rows: 2,
+      columns: 2,
+      tiles: [
+        { id: 't1', pairKey: 'p1', glyph: '●' },
+        { id: 't2', pairKey: 'p2', glyph: '■' },
+        { id: 't3', pairKey: 'p1', glyph: '●' },
+        { id: 't4', pairKey: 'p2', glyph: '■' },
+      ],
+      timeLimitMs: 12000,
+    },
+  };
+}
+
+function validMazePath(): MazePathCard {
+  return {
+    cardId: 'mazepath-1',
+    creatorHandle: '@test',
+    templateType: 'maze_path',
+    category: 'logical_reasoning',
+    difficulty: 'extremely_easy',
+    evidenceTier: 'mechanic_mapped',
+    reviewStatus: 'manual_reviewed',
+    estimatedSeconds: 12,
+    prompt: 'Tap your way through the open squares from the start to the exit.',
+    puzzleDna: dna('route-finding'),
+    explanation: { title: 'Route', body: 'Step to an adjacent open square.' },
+    config: {
+      rows: 3,
+      columns: 3,
+      cells: [
+        'open',
+        'open',
+        'open',
+        'open',
+        'open',
+        'open',
+        'open',
+        'open',
+        'open',
+      ],
+      startIndex: 0,
+      exitIndex: 8,
+      timeLimitMs: 12000,
+    },
+  };
+}
+
 function validCatalog(): LiquidCard[] {
   return [
     validSpotIt(),
@@ -348,6 +727,16 @@ function validCatalog(): LiquidCard[] {
     validStepLogic(),
     validCodeBreak(),
     validPrismPath(),
+    validSignalSet(),
+    validCircuitFlow(),
+    validColorWord(),
+    validNBack(),
+    validOddOneOut(),
+    validSchulteOrder(),
+    validMatrixReasoning(),
+    validGearsRotation(),
+    validMemoryMatch(),
+    validMazePath(),
   ];
 }
 
@@ -368,6 +757,31 @@ describe('validateCatalog', () => {
 
   it('accepts an empty catalog (nothing to violate)', () => {
     expect(validateCatalog([])).toEqual({ valid: true, errors: [] });
+  });
+
+  it('rejects a signal_set whose canonical trio breaks an attribute rule', () => {
+    const card = validSignalSet();
+    card.config = { ...card.config, solutionIds: ['a', 'b', 'd'] };
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('rejects a circuit_flow whose authored solution leaves loose arms', () => {
+    const card = validCircuitFlow();
+    card.config = {
+      ...card.config,
+      solution: card.config.solution.map((item) =>
+        item.tileId === 'a' ? { ...item, rotation: 1 as const } : item,
+      ),
+    };
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
   });
 
   it('rejects a duplicate cardId', () => {
@@ -478,6 +892,16 @@ describe('validateCatalog', () => {
   it('rejects a spot_it anomalyColumn outside the grid bounds', () => {
     const card = validSpotIt();
     card.config.anomalyColumn = card.config.columns; // one past the last column
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('rejects a spot_it board wider than the mobile-safe column limit', () => {
+    const card = validSpotIt();
+    card.config.columns = MAX_SPOT_IT_COLUMNS + 1;
     const result = validateCatalog([card]);
     expect(result.valid).toBe(false);
     expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
@@ -1045,7 +1469,6 @@ describe('validateCatalog', () => {
     );
   });
 });
-
 // ---------------------------------------------------------------------------
 // templateCategoryMap <-> VALID_CATEGORY_FOR_TEMPLATE consistency (§17 item 7).
 //
@@ -1069,6 +1492,18 @@ const ALL_TEMPLATE_TYPES: TemplateType[] = [
   'step_logic',
   'code_break',
   'prism_path',
+  'signal_set',
+  'circuit_flow',
+  'word_unscramble',
+  'quick_math',
+  'color_word',
+  'n_back',
+  'odd_one_out',
+  'schulte_order',
+  'matrix_reasoning',
+  'gears_rotation',
+  'memory_match',
+  'maze_path',
 ];
 
 const ALL_CATEGORIES: ChallengeCategory[] = [
@@ -1091,6 +1526,18 @@ const validCardFor: Record<TemplateType, () => LiquidCard> = {
   step_logic: validStepLogic,
   code_break: validCodeBreak,
   prism_path: validPrismPath,
+  signal_set: validSignalSet,
+  circuit_flow: validCircuitFlow,
+  word_unscramble: validWordUnscramble,
+  quick_math: validQuickMath,
+  color_word: validColorWord,
+  n_back: validNBack,
+  odd_one_out: validOddOneOut,
+  schulte_order: validSchulteOrder,
+  matrix_reasoning: validMatrixReasoning,
+  gears_rotation: validGearsRotation,
+  memory_match: validMemoryMatch,
+  maze_path: validMazePath,
 };
 
 describe('templateCategoryMap <-> validation consistency', () => {
@@ -1152,5 +1599,353 @@ describe('assertValidCatalog', () => {
       expect(message).toContain(ValidationRule.NON_EMPTY_PROMPT);
       expect(message).toContain(ValidationRule.EVIDENCE_TIER);
     }
+  });
+});
+
+describe('word_unscramble answer validation', () => {
+  it('accepts a well-formed card', () => {
+    expect(validateCatalog([validWordUnscramble()]).valid).toBe(true);
+  });
+
+  it('rejects scrambled letters that are not an anagram of the answer', () => {
+    const card = validWordUnscramble();
+    card.config = { ...card.config, scrambled: 'xxxxx' };
+    const result = validateCatalog([card]);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('rejects scrambled letters that already spell the answer', () => {
+    const card = validWordUnscramble();
+    card.config = { ...card.config, scrambled: 'stare' };
+    expect(validateCatalog([card]).valid).toBe(false);
+  });
+
+  it('rejects a correct option whose label is not the answer', () => {
+    const card = validWordUnscramble();
+    card.config = { ...card.config, correctOptionId: 'b' }; // label "store" != answer
+    expect(validateCatalog([card]).valid).toBe(false);
+  });
+
+  it('rejects a correctOptionId that is not among options', () => {
+    const card = validWordUnscramble();
+    card.config = { ...card.config, correctOptionId: 'missing' };
+    expect(validateCatalog([card]).valid).toBe(false);
+  });
+
+  it('rejects a distractor that is itself a valid anagram of the letters', () => {
+    const card = validWordUnscramble();
+    // "tears" is a genuine unscramble of "tsrae" — a second valid answer.
+    card.config = {
+      ...card.config,
+      options: [
+        { id: 'a', label: 'stare' },
+        { id: 'b', label: 'tears' },
+        { id: 'c', label: 'scare' },
+      ],
+    };
+    const result = validateCatalog([card]);
+    expect(result.valid).toBe(false);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+    expect(
+      result.errors.some((error) =>
+        error.message.includes('is itself a valid unscramble'),
+      ),
+    ).toBe(true);
+  });
+
+  it('accepts a card whose distractors are near-words but not anagrams', () => {
+    // The default fixture distractors ("store", "scare") differ from the
+    // letters of "tsrae", so the clean card passes the uniqueness rule.
+    expect(validateCatalog([validWordUnscramble()]).valid).toBe(true);
+  });
+});
+
+describe('quick_math answer validation', () => {
+  it('accepts a well-formed card', () => {
+    expect(validateCatalog([validQuickMath()]).valid).toBe(true);
+  });
+
+  it('rejects a correct option whose value does not equal the computed result', () => {
+    const card = validQuickMath();
+    // Computed = 31; point correct at the wrong value.
+    card.config = { ...card.config, correctOptionId: 'b' };
+    const result = validateCatalog([card]);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('rejects an operator/operand length mismatch', () => {
+    const card = validQuickMath();
+    card.config = {
+      ...card.config,
+      expression: { operands: [9, 4, 5], operators: ['*'] },
+    };
+    expect(validateCatalog([card]).valid).toBe(false);
+  });
+
+  it('rejects two options sharing the computed value (ambiguous answer)', () => {
+    const card = validQuickMath();
+    card.config = {
+      ...card.config,
+      options: [
+        { id: 'a', label: '31', value: 31 },
+        { id: 'b', label: '31', value: 31 },
+        { id: 'c', label: '30', value: 30 },
+      ],
+    };
+    expect(validateCatalog([card]).valid).toBe(false);
+  });
+});
+
+describe('color_word answer validation', () => {
+  it('accepts a well-formed card', () => {
+    expect(validateCatalog([validColorWord()]).valid).toBe(true);
+  });
+
+  it('rejects a trial whose inkColorId is not a defined color', () => {
+    const card = validColorWord();
+    card.config = {
+      ...card.config,
+      trials: [
+        ...card.config.trials.slice(0, 3),
+        { id: 't3', word: 'BLUE', inkColorId: 'purple', congruent: false },
+      ],
+    };
+    const result = validateCatalog([card]);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('rejects too few trials', () => {
+    const card = validColorWord();
+    card.config = { ...card.config, trials: card.config.trials.slice(0, 2) };
+    expect(validateCatalog([card]).valid).toBe(false);
+  });
+
+  it('rejects duplicate color ids', () => {
+    const card = validColorWord();
+    card.config = {
+      ...card.config,
+      colors: [
+        { id: 'red', label: 'Red', hex: '#e5484d' },
+        { id: 'red', label: 'Crimson', hex: '#c00' },
+      ],
+    };
+    expect(validateCatalog([card]).valid).toBe(false);
+  });
+
+  it('rejects a color swatch missing its label (colour is never the sole signal)', () => {
+    const card = validColorWord();
+    card.config = {
+      ...card.config,
+      colors: [
+        { id: 'red', label: '', hex: '#e5484d' },
+        { id: 'blue', label: 'Blue', hex: '#3e63dd' },
+        { id: 'green', label: 'Green', hex: '#46a758' },
+      ],
+    };
+    expect(validateCatalog([card]).valid).toBe(false);
+  });
+});
+
+describe('n_back answer validation', () => {
+  it('accepts a well-formed card', () => {
+    expect(validateCatalog([validNBack()]).valid).toBe(true);
+  });
+
+  it('accepts a 2-back card with a derived match set', () => {
+    const card = validNBack();
+    card.config = {
+      ...card.config,
+      stream: ['F', 'K', 'F', 'M', 'K', 'P', 'M', 'P'],
+      n: 2,
+      matchIndices: [2, 7],
+    };
+    expect(validateCatalog([card]).valid).toBe(true);
+  });
+
+  it('rejects matchIndices that disagree with the derived match set', () => {
+    const card = validNBack();
+    // Derived for this stream/n is [2, 5]; claim a wrong set.
+    card.config = { ...card.config, matchIndices: [2, 3] };
+    const result = validateCatalog([card]);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('rejects a matchIndex inside the first-n window', () => {
+    const card = validNBack();
+    card.config = { ...card.config, matchIndices: [0, 2, 5] };
+    expect(validateCatalog([card]).valid).toBe(false);
+  });
+
+  it('rejects an out-of-range n', () => {
+    const card = validNBack();
+    card.config = { ...card.config, n: 3, matchIndices: [] };
+    expect(validateCatalog([card]).valid).toBe(false);
+  });
+
+  it('rejects a stream shorter than the minimum', () => {
+    const card = validNBack();
+    card.config = {
+      ...card.config,
+      stream: ['A', 'A'],
+      n: 1,
+      matchIndices: [1],
+    };
+    expect(validateCatalog([card]).valid).toBe(false);
+  });
+});
+
+describe('odd_one_out answer validation', () => {
+  it('accepts a well-formed card', () => {
+    expect(validateCatalog([validOddOneOut()]).valid).toBe(true);
+  });
+
+  it('rejects an oddItemId that is not among items', () => {
+    const card = validOddOneOut();
+    card.config = { ...card.config, oddItemId: 'nope' };
+    const result = validateCatalog([card]);
+    expect(hasRule(result.errors, ValidationRule.CORRECT_ANSWER_PRESENT)).toBe(
+      true,
+    );
+  });
+
+  it('rejects fewer than the minimum items', () => {
+    const card = validOddOneOut();
+    card.config = {
+      ...card.config,
+      items: [
+        { id: 'a', label: '4' },
+        { id: 'b', label: '8' },
+      ],
+      oddItemId: 'a',
+    };
+    expect(validateCatalog([card]).valid).toBe(false);
+  });
+
+  it('rejects duplicate item ids', () => {
+    const card = validOddOneOut();
+    card.config = {
+      ...card.config,
+      items: [
+        { id: 'a', label: '4' },
+        { id: 'a', label: '8' },
+        { id: 'c', label: '7' },
+      ],
+      oddItemId: 'c',
+    };
+    expect(validateCatalog([card]).valid).toBe(false);
+  });
+
+  it('rejects an empty item label', () => {
+    const card = validOddOneOut();
+    card.config = {
+      ...card.config,
+      items: [
+        { id: 'a', label: '' },
+        { id: 'b', label: '8' },
+        { id: 'c', label: '7' },
+      ],
+      oddItemId: 'c',
+    };
+    expect(validateCatalog([card]).valid).toBe(false);
+  });
+});
+
+describe('schulte_order answer validation', () => {
+  it('accepts a well-formed card', () => {
+    expect(validateCatalog([validSchulteOrder()]).valid).toBe(true);
+  });
+
+  it('rejects a target outside grid bounds', () => {
+    const card = validSchulteOrder();
+    card.config = {
+      ...card.config,
+      targets: [
+        { id: 's1', label: '1', row: 9, column: 0 },
+        { id: 's2', label: '2', row: 0, column: 0 },
+        { id: 's3', label: '3', row: 1, column: 1 },
+        { id: 's4', label: '4', row: 2, column: 0 },
+      ],
+    };
+    expect(validateCatalog([card]).valid).toBe(false);
+  });
+
+  it('rejects overlapping targets', () => {
+    const card = validSchulteOrder();
+    card.config = {
+      ...card.config,
+      targets: [
+        { id: 's1', label: '1', row: 0, column: 0 },
+        { id: 's2', label: '2', row: 0, column: 0 },
+        { id: 's3', label: '3', row: 1, column: 1 },
+        { id: 's4', label: '4', row: 2, column: 0 },
+      ],
+    };
+    expect(validateCatalog([card]).valid).toBe(false);
+  });
+
+  it('rejects duplicate target labels', () => {
+    const card = validSchulteOrder();
+    card.config = {
+      ...card.config,
+      targets: [
+        { id: 's1', label: '1', row: 0, column: 0 },
+        { id: 's2', label: '1', row: 0, column: 1 },
+        { id: 's3', label: '3', row: 1, column: 1 },
+        { id: 's4', label: '4', row: 2, column: 0 },
+      ],
+    };
+    expect(validateCatalog([card]).valid).toBe(false);
+  });
+
+  it('rejects fewer than the minimum targets', () => {
+    const card = validSchulteOrder();
+    card.config = {
+      ...card.config,
+      targets: [
+        { id: 's1', label: '1', row: 0, column: 0 },
+        { id: 's2', label: '2', row: 0, column: 1 },
+        { id: 's3', label: '3', row: 1, column: 1 },
+      ],
+    };
+    expect(validateCatalog([card]).valid).toBe(false);
+  });
+
+  it('rejects more targets than grid cells', () => {
+    const card = validSchulteOrder();
+    card.config = {
+      ...card.config,
+      rows: 2,
+      columns: 2,
+      targets: [
+        { id: 's1', label: '1', row: 0, column: 0 },
+        { id: 's2', label: '2', row: 0, column: 1 },
+        { id: 's3', label: '3', row: 1, column: 0 },
+        { id: 's4', label: '4', row: 1, column: 1 },
+        { id: 's5', label: '5', row: 0, column: 0 },
+      ],
+    };
+    expect(validateCatalog([card]).valid).toBe(false);
+  });
+
+  it('accepts a long time limit (schulte now follows the global maximum)', () => {
+    const card = validSchulteOrder();
+    card.config = { ...card.config, timeLimitMs: 120000 };
+    expect(validateCatalog([card]).valid).toBe(true);
+  });
+
+  it('rejects a time limit beyond the global maximum', () => {
+    const card = validSchulteOrder();
+    card.config = { ...card.config, timeLimitMs: MAX_TIME_LIMIT_MS + 1 };
+    expect(validateCatalog([card]).valid).toBe(false);
   });
 });

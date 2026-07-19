@@ -1,5 +1,5 @@
-// Ported from web `src/cards/validation.ts`; source of truth is the web app —
-// keep in sync (Phase M, M2). See `mobile/src/core/README.md`.
+// Ported from web `src/cards/validation.ts`; source of truth is the web app — keep in
+// sync (Phase M, M2). See `mobile/src/core/README.md`.
 /**
  * Startup card-catalog validation (Technical Design §11).
  *
@@ -22,28 +22,59 @@
 import {
   templateCategoryMap,
   type CodeBreakCard,
+  type CircuitFlowCard,
+  type ColorWordCard,
   type EvidenceTier,
+  type NBackCard,
   type LiquidCard,
+  type MatrixReasoningCard,
+  type GearsRotationCard,
+  type MemoryMatchCard,
+  type MazePathCard,
   type MemorySequenceCard,
+  type OddOneOutCard,
   type PatternChainCard,
   type PrismMirrorOrientation,
   type PrismPathCard,
   type RuleFlipCard,
+  type SchulteOrderCard,
+  type SignalSetCard,
   type SpotItCard,
   type StepLogicCard,
+  type QuickMathCard,
   type TemplateType,
   type TinyLogicCard,
   type WhatChangedCard,
+  type WordUnscrambleCard,
 } from './types';
 import {
   orientationMapFromSolution,
   tracePrismPath,
 } from '../templates/prismPath/prismPathEvaluator';
+import {
+  circuitRotationsFromSolution,
+  evaluateCircuitFlow,
+} from '../templates/circuitFlow/circuitFlowEvaluator';
+import { isValidSignalTrio } from '../templates/signalSet/signalSetEvaluator';
+import { isValidUnscramble } from '../templates/wordUnscramble/wordUnscrambleEvaluator';
+import { computeQuickMath } from '../templates/quickMath/quickMathEvaluator';
+import { matchIndicesAreConsistent } from '../templates/nBack/nBackEvaluator';
+import { hasPath } from '../templates/mazePath/mazePathEvaluator';
 
 /** Inclusive lower bound for any template's `config.timeLimitMs` (5 seconds). */
 export const MIN_TIME_LIMIT_MS = 5000;
-/** Inclusive upper bound for any template's `config.timeLimitMs` (30 seconds). */
-export const MAX_TIME_LIMIT_MS = 30000;
+/**
+ * Inclusive upper bound for any template's `config.timeLimitMs` (180 seconds).
+ * Sized to the longest difficulty budget — `extremely_hard` = 180s (see
+ * {@link TIME_LIMIT_BY_DIFFICULTY}).
+ */
+export const MAX_TIME_LIMIT_MS = 180000;
+/**
+ * Maximum Spot It columns that preserve the 48 px tap target in the mobile
+ * feed card. More visual-search items should be added as rows, not by making
+ * the board wider than the viewport.
+ */
+export const MAX_SPOT_IT_COLUMNS = 6;
 
 /**
  * Evidence tiers permitted in the prototype catalog. `telemetry_calibrated` and
@@ -112,6 +143,18 @@ const templateAnswerValidators: {
   step_logic: validateStepLogicAnswer,
   code_break: validateCodeBreakAnswer,
   prism_path: validatePrismPathAnswer,
+  signal_set: validateSignalSetAnswer,
+  circuit_flow: validateCircuitFlowAnswer,
+  word_unscramble: validateWordUnscrambleAnswer,
+  quick_math: validateQuickMathAnswer,
+  color_word: validateColorWordAnswer,
+  n_back: validateNBackAnswer,
+  odd_one_out: validateOddOneOutAnswer,
+  schulte_order: validateSchulteOrderAnswer,
+  matrix_reasoning: validateMatrixReasoningAnswer,
+  gears_rotation: validateGearsRotationAnswer,
+  memory_match: validateMemoryMatchAnswer,
+  maze_path: validateMazePathAnswer,
 };
 
 /**
@@ -145,6 +188,14 @@ function validateSpotItAnswer(card: SpotItCard): ValidationError[] {
       answerError(
         card.cardId,
         `spot_it grid must have positive dimensions, got ${rows}x${columns}`,
+      ),
+    );
+  }
+  if (columns > MAX_SPOT_IT_COLUMNS) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `spot_it columns ${columns} exceeds the mobile-safe maximum ${MAX_SPOT_IT_COLUMNS}`,
       ),
     );
   }
@@ -221,6 +272,290 @@ function validateTinyLogicAnswer(card: TinyLogicCard): ValidationError[] {
     ];
   }
   return [];
+}
+
+/**
+ * matrix_reasoning: a 3×3 glyph grid (exactly one missing cell) plus options;
+ * exactly one option completes the pattern. Validates the grid shape, that every
+ * visible glyph + option glyph is non-empty, unique non-empty option ids, and
+ * that `correctOptionId` is among the options.
+ */
+const MATRIX_GRID_SIZE = 9;
+function validateMatrixReasoningAnswer(
+  card: MatrixReasoningCard,
+): ValidationError[] {
+  const { grid, options, correctOptionId } = card.config;
+  const errors: ValidationError[] = [];
+
+  if (grid.length !== MATRIX_GRID_SIZE) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `matrix_reasoning grid must have ${MATRIX_GRID_SIZE} cells, got ${grid.length}`,
+      ),
+    );
+  }
+  const blanks = grid.filter((cell) => cell === null).length;
+  if (blanks !== 1) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `matrix_reasoning must have exactly one missing cell, got ${blanks}`,
+      ),
+    );
+  }
+  if (grid.some((cell) => cell !== null && cell.trim().length === 0)) {
+    errors.push(
+      answerError(card.cardId, 'matrix_reasoning grid glyphs must be non-empty'),
+    );
+  }
+
+  if (options.length < 2) {
+    errors.push(
+      answerError(card.cardId, 'matrix_reasoning needs at least two options'),
+    );
+  }
+  const ids = new Set<string>();
+  for (const option of options) {
+    if (option.id.trim().length === 0 || option.glyph.trim().length === 0) {
+      errors.push(
+        answerError(
+          card.cardId,
+          'matrix_reasoning option ids and glyphs must be non-empty',
+        ),
+      );
+    }
+    if (ids.has(option.id)) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `matrix_reasoning has a duplicate option id "${option.id}"`,
+        ),
+      );
+    }
+    ids.add(option.id);
+  }
+  if (!options.some((option) => option.id === correctOptionId)) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `matrix_reasoning correctOptionId "${correctOptionId}" is not among options`,
+      ),
+    );
+  }
+  return errors;
+}
+
+/**
+ * gears_rotation: a meshed-gear chain (gearCount >= 2) plus two direction
+ * options; exactly one option matches the last gear's true spin. Validates the
+ * gear count, that there are at least two options with unique non-empty ids and
+ * non-empty labels, and that `correctOptionId` is among the options.
+ */
+function validateGearsRotationAnswer(
+  card: GearsRotationCard,
+): ValidationError[] {
+  const { gearCount, options, correctOptionId } = card.config;
+  const errors: ValidationError[] = [];
+
+  if (!Number.isInteger(gearCount) || gearCount < 2) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `gears_rotation gearCount must be an integer >= 2, got ${gearCount}`,
+      ),
+    );
+  }
+
+  if (options.length < 2) {
+    errors.push(
+      answerError(card.cardId, 'gears_rotation needs at least two options'),
+    );
+  }
+  const ids = new Set<string>();
+  for (const option of options) {
+    if (option.id.trim().length === 0 || option.label.trim().length === 0) {
+      errors.push(
+        answerError(
+          card.cardId,
+          'gears_rotation option ids and labels must be non-empty',
+        ),
+      );
+    }
+    if (ids.has(option.id)) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `gears_rotation has a duplicate option id "${option.id}"`,
+        ),
+      );
+    }
+    ids.add(option.id);
+  }
+  if (!options.some((option) => option.id === correctOptionId)) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `gears_rotation correctOptionId "${correctOptionId}" is not among options`,
+      ),
+    );
+  }
+  return errors;
+}
+
+/**
+ * memory_match: a rows×columns flip-and-match board. Validates that the grid is
+ * positive and EVEN (tiles come in pairs), that `tiles` is exactly rows*columns
+ * long with unique non-empty ids and non-empty glyphs, and that every `pairKey`
+ * appears EXACTLY twice (a well-formed pairing).
+ */
+function validateMemoryMatchAnswer(card: MemoryMatchCard): ValidationError[] {
+  const { rows, columns, tiles } = card.config;
+  const errors: ValidationError[] = [];
+
+  if (!Number.isInteger(rows) || rows < 1) {
+    errors.push(
+      answerError(card.cardId, `memory_match rows must be a positive integer, got ${rows}`),
+    );
+  }
+  if (!Number.isInteger(columns) || columns < 1) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `memory_match columns must be a positive integer, got ${columns}`,
+      ),
+    );
+  }
+  const cellCount = rows * columns;
+  if (cellCount % 2 !== 0) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `memory_match rows*columns must be even (tiles come in pairs), got ${cellCount}`,
+      ),
+    );
+  }
+  if (tiles.length !== cellCount) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `memory_match tiles length must equal rows*columns (${cellCount}), got ${tiles.length}`,
+      ),
+    );
+  }
+
+  const ids = new Set<string>();
+  const pairCounts = new Map<string, number>();
+  for (const tile of tiles) {
+    if (
+      tile.id.trim().length === 0 ||
+      tile.pairKey.trim().length === 0 ||
+      tile.glyph.trim().length === 0
+    ) {
+      errors.push(
+        answerError(
+          card.cardId,
+          'memory_match tile ids, pairKeys and glyphs must be non-empty',
+        ),
+      );
+    }
+    if (ids.has(tile.id)) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `memory_match has a duplicate tile id "${tile.id}"`,
+        ),
+      );
+    }
+    ids.add(tile.id);
+    pairCounts.set(tile.pairKey, (pairCounts.get(tile.pairKey) ?? 0) + 1);
+  }
+  for (const [pairKey, count] of pairCounts) {
+    if (count !== 2) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `memory_match pairKey "${pairKey}" must appear exactly twice, got ${count}`,
+        ),
+      );
+    }
+  }
+  return errors;
+}
+
+/**
+ * maze_path: a rows×columns grid of 'open'/'wall' cells. Validates that the grid
+ * is positive, that `cells` is exactly rows*columns long, that the start and
+ * exit are in range, distinct, and 'open', and — critically — that the exit is
+ * actually REACHABLE from the start (BFS via {@link hasPath}), so no unsolvable
+ * maze can ship.
+ */
+function validateMazePathAnswer(card: MazePathCard): ValidationError[] {
+  const { rows, columns, cells, startIndex, exitIndex } = card.config;
+  const errors: ValidationError[] = [];
+
+  if (!Number.isInteger(rows) || rows < 1) {
+    errors.push(
+      answerError(card.cardId, `maze_path rows must be a positive integer, got ${rows}`),
+    );
+  }
+  if (!Number.isInteger(columns) || columns < 1) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `maze_path columns must be a positive integer, got ${columns}`,
+      ),
+    );
+  }
+  const cellCount = rows * columns;
+  if (cells.length !== cellCount) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `maze_path cells length must equal rows*columns (${cellCount}), got ${cells.length}`,
+      ),
+    );
+  }
+
+  const inRange = (i: number) => Number.isInteger(i) && i >= 0 && i < cells.length;
+  if (!inRange(startIndex)) {
+    errors.push(
+      answerError(card.cardId, `maze_path startIndex ${startIndex} is out of range`),
+    );
+  } else if (cells[startIndex] !== 'open') {
+    errors.push(
+      answerError(card.cardId, 'maze_path startIndex must be an open cell'),
+    );
+  }
+  if (!inRange(exitIndex)) {
+    errors.push(
+      answerError(card.cardId, `maze_path exitIndex ${exitIndex} is out of range`),
+    );
+  } else if (cells[exitIndex] !== 'open') {
+    errors.push(
+      answerError(card.cardId, 'maze_path exitIndex must be an open cell'),
+    );
+  }
+  if (startIndex === exitIndex) {
+    errors.push(
+      answerError(card.cardId, 'maze_path startIndex and exitIndex must differ'),
+    );
+  }
+
+  // Only run the reachability BFS once the structural checks above pass, so the
+  // error is "unsolvable maze" rather than noise from a malformed grid.
+  if (
+    errors.length === 0 &&
+    !hasPath({ rows, columns, cells, startIndex, exitIndex })
+  ) {
+    errors.push(
+      answerError(
+        card.cardId,
+        'maze_path exit is not reachable from the start (unsolvable maze)',
+      ),
+    );
+  }
+  return errors;
 }
 
 /** Inclusive bounds for a memory_sequence's reproduction length (Tech #137).
@@ -695,6 +1030,792 @@ function validatePrismPathAnswer(card: PrismPathCard): ValidationError[] {
   return errors;
 }
 
+export const MIN_SIGNAL_TILES = 6;
+export const MAX_SIGNAL_TILES = 9;
+
+function validateSignalSetAnswer(card: SignalSetCard): ValidationError[] {
+  const { tiles, solutionIds } = card.config;
+  const errors: ValidationError[] = [];
+  if (tiles.length < MIN_SIGNAL_TILES || tiles.length > MAX_SIGNAL_TILES) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `signal_set tile count ${tiles.length} is outside [${MIN_SIGNAL_TILES}, ${MAX_SIGNAL_TILES}]`,
+      ),
+    );
+  }
+  const ids = tiles.map((tile) => tile.id);
+  if (
+    new Set(ids).size !== ids.length ||
+    ids.some((id) => id.trim().length === 0)
+  ) {
+    errors.push(
+      answerError(
+        card.cardId,
+        'signal_set tile ids must be unique and non-empty',
+      ),
+    );
+  }
+  const signatures = tiles.map(
+    (tile) => `${tile.shape}:${tile.fill}:${tile.count}`,
+  );
+  if (new Set(signatures).size !== signatures.length) {
+    errors.push(
+      answerError(
+        card.cardId,
+        'signal_set tiles must have unique attribute combinations',
+      ),
+    );
+  }
+  if (solutionIds.length !== 3 || new Set(solutionIds).size !== 3) {
+    errors.push(
+      answerError(
+        card.cardId,
+        'signal_set solution must contain three unique tile ids',
+      ),
+    );
+    return errors;
+  }
+  const solutionTiles = solutionIds
+    .map((id) => tiles.find((tile) => tile.id === id))
+    .filter(
+      (tile): tile is SignalSetCard['config']['tiles'][number] =>
+        tile !== undefined,
+    );
+  if (solutionTiles.length !== 3) {
+    errors.push(
+      answerError(
+        card.cardId,
+        'signal_set solution references an unknown tile',
+      ),
+    );
+  } else if (!isValidSignalTrio(solutionTiles)) {
+    errors.push(
+      answerError(
+        card.cardId,
+        'signal_set authored solution is not a valid trio',
+      ),
+    );
+  }
+  return errors;
+}
+
+export const MIN_CIRCUIT_GRID_SIZE = 2;
+export const MAX_CIRCUIT_GRID_SIZE = 4;
+
+function validateCircuitFlowAnswer(card: CircuitFlowCard): ValidationError[] {
+  const { rows, columns, sourceTileId, tiles, solution } = card.config;
+  const errors: ValidationError[] = [];
+  if (
+    !Number.isInteger(rows) ||
+    !Number.isInteger(columns) ||
+    rows < MIN_CIRCUIT_GRID_SIZE ||
+    rows > MAX_CIRCUIT_GRID_SIZE ||
+    columns < MIN_CIRCUIT_GRID_SIZE ||
+    columns > MAX_CIRCUIT_GRID_SIZE
+  ) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `circuit_flow grid ${rows}x${columns} is outside [${MIN_CIRCUIT_GRID_SIZE}, ${MAX_CIRCUIT_GRID_SIZE}]`,
+      ),
+    );
+  }
+  if (tiles.length !== rows * columns) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `circuit_flow must fill its grid (${rows * columns} tiles expected)`,
+      ),
+    );
+  }
+  const ids = tiles.map((tile) => tile.id);
+  if (
+    new Set(ids).size !== ids.length ||
+    ids.some((id) => id.trim().length === 0)
+  ) {
+    errors.push(
+      answerError(
+        card.cardId,
+        'circuit_flow tile ids must be unique and non-empty',
+      ),
+    );
+  }
+  if (!ids.includes(sourceTileId)) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `circuit_flow source "${sourceTileId}" is missing`,
+      ),
+    );
+  }
+  const coordinates = new Set<string>();
+  const validDirections = new Set(['up', 'right', 'down', 'left']);
+  for (const tile of tiles) {
+    const key = coordKey(tile.row, tile.column);
+    if (
+      !Number.isInteger(tile.row) ||
+      !Number.isInteger(tile.column) ||
+      tile.row < 0 ||
+      tile.row >= rows ||
+      tile.column < 0 ||
+      tile.column >= columns
+    ) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `circuit_flow tile "${tile.id}" is outside grid bounds`,
+        ),
+      );
+    }
+    if (coordinates.has(key)) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `circuit_flow has overlapping tiles at ${key}`,
+        ),
+      );
+    }
+    coordinates.add(key);
+    if (
+      tile.connections.length === 0 ||
+      new Set(tile.connections).size !== tile.connections.length ||
+      tile.connections.some((direction) => !validDirections.has(direction))
+    ) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `circuit_flow tile "${tile.id}" has invalid connections`,
+        ),
+      );
+    }
+    if (
+      !Number.isInteger(tile.initialRotation) ||
+      tile.initialRotation < 0 ||
+      tile.initialRotation > 3
+    ) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `circuit_flow tile "${tile.id}" has invalid initial rotation`,
+        ),
+      );
+    }
+  }
+  const solutionIds = solution.map((item) => item.tileId);
+  if (
+    solution.length !== tiles.length ||
+    new Set(solutionIds).size !== solution.length ||
+    solution.some(
+      (item) =>
+        !ids.includes(item.tileId) ||
+        !Number.isInteger(item.rotation) ||
+        item.rotation < 0 ||
+        item.rotation > 3,
+    )
+  ) {
+    errors.push(
+      answerError(
+        card.cardId,
+        'circuit_flow solution must set every tile once with a valid rotation',
+      ),
+    );
+  }
+  if (errors.length === 0) {
+    const result = evaluateCircuitFlow(
+      card.config,
+      circuitRotationsFromSolution(solution),
+      0,
+    );
+    if (!result.isCorrect) {
+      errors.push(
+        answerError(
+          card.cardId,
+          'circuit_flow authored solution is not fully connected',
+        ),
+      );
+    }
+  }
+  return errors;
+}
+
+/** Inclusive bounds for a word_unscramble's answer length, in letters. */
+export const MIN_UNSCRAMBLE_LENGTH = 3;
+export const MAX_UNSCRAMBLE_LENGTH = 10;
+/** Inclusive lower bound for a word_unscramble's option count. */
+export const MIN_UNSCRAMBLE_OPTIONS = 2;
+
+function validateWordUnscrambleAnswer(
+  card: WordUnscrambleCard,
+): ValidationError[] {
+  const { scrambled, answer, options, correctOptionId } = card.config;
+  const errors: ValidationError[] = [];
+
+  if (typeof answer !== 'string' || answer.trim().length === 0) {
+    errors.push(answerError(card.cardId, 'word_unscramble has an empty answer'));
+  } else if (
+    answer.length < MIN_UNSCRAMBLE_LENGTH ||
+    answer.length > MAX_UNSCRAMBLE_LENGTH
+  ) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `word_unscramble answer length ${answer.length} is outside [${MIN_UNSCRAMBLE_LENGTH}, ${MAX_UNSCRAMBLE_LENGTH}]`,
+      ),
+    );
+  }
+
+  if (typeof scrambled !== 'string' || scrambled.trim().length === 0) {
+    errors.push(
+      answerError(card.cardId, 'word_unscramble has empty scrambled letters'),
+    );
+  }
+
+  // The scrambled letters must really be a rearrangement of the answer (so the
+  // puzzle is solvable), and ideally not already spell the answer.
+  if (
+    typeof scrambled === 'string' &&
+    typeof answer === 'string' &&
+    scrambled.length > 0 &&
+    answer.length > 0
+  ) {
+    if (!isValidUnscramble(scrambled, answer)) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `word_unscramble scrambled "${scrambled}" is not an anagram of answer "${answer}"`,
+        ),
+      );
+    }
+    if (scrambled.toLowerCase() === answer.toLowerCase()) {
+      errors.push(
+        answerError(
+          card.cardId,
+          'word_unscramble scrambled letters already spell the answer',
+        ),
+      );
+    }
+  }
+
+  if (options.length < MIN_UNSCRAMBLE_OPTIONS) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `word_unscramble must have at least ${MIN_UNSCRAMBLE_OPTIONS} options, got ${options.length}`,
+      ),
+    );
+    return errors;
+  }
+
+  const ids = options.map((option) => option.id);
+  if (new Set(ids).size !== ids.length) {
+    errors.push(
+      answerError(card.cardId, 'word_unscramble has duplicate option ids'),
+    );
+  }
+
+  const correct = options.find((option) => option.id === correctOptionId);
+  if (!correct) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `word_unscramble correctOptionId "${correctOptionId}" is not among options`,
+      ),
+    );
+  } else if (typeof answer === 'string' && correct.label !== answer) {
+    // The correct option's label must be exactly the answer word, so the
+    // answer key the renderer/evaluator trusts is consistent with the puzzle.
+    errors.push(
+      answerError(
+        card.cardId,
+        `word_unscramble correct option label "${correct.label}" does not equal answer "${answer}"`,
+      ),
+    );
+  }
+
+  // Uniqueness of the valid unscramble: every NON-correct option's label must
+  // NOT itself be a valid anagram of `scrambled`. The mechanic scores purely by
+  // `correctOptionId`, so a distractor that is also a genuine unscramble of the
+  // letters would be a second "right" answer — a player picking it would be
+  // wrongly marked incorrect. Reject such ambiguous cards at startup. Guarded on
+  // a non-empty `scrambled` so a malformed card (already reported above) does not
+  // produce noise here.
+  if (typeof scrambled === 'string' && scrambled.length > 0) {
+    for (const option of options) {
+      if (option.id === correctOptionId) {
+        continue;
+      }
+      if (isValidUnscramble(scrambled, option.label)) {
+        errors.push(
+          answerError(
+            card.cardId,
+            `word_unscramble distractor "${option.label}" is itself a valid unscramble of the letters (ambiguous)`,
+          ),
+        );
+      }
+    }
+  }
+
+  return errors;
+}
+
+/** Inclusive bounds for a quick_math expression's operand count. */
+export const MIN_QUICK_MATH_OPERANDS = 2;
+export const MAX_QUICK_MATH_OPERANDS = 5;
+/** Inclusive lower bound for a quick_math's option count. */
+export const MIN_QUICK_MATH_OPTIONS = 2;
+
+const QUICK_MATH_OPERATORS = new Set(['+', '-', '*', '/']);
+
+function validateQuickMathAnswer(card: QuickMathCard): ValidationError[] {
+  const { display, expression, options, correctOptionId } = card.config;
+  const errors: ValidationError[] = [];
+
+  if (typeof display !== 'string' || display.trim().length === 0) {
+    errors.push(answerError(card.cardId, 'quick_math has an empty display'));
+  }
+
+  const { operands, operators } = expression;
+  if (
+    operands.length < MIN_QUICK_MATH_OPERANDS ||
+    operands.length > MAX_QUICK_MATH_OPERANDS
+  ) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `quick_math operand count ${operands.length} is outside [${MIN_QUICK_MATH_OPERANDS}, ${MAX_QUICK_MATH_OPERANDS}]`,
+      ),
+    );
+  }
+  if (operators.length !== operands.length - 1) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `quick_math operator count ${operators.length} must be one less than operand count ${operands.length}`,
+      ),
+    );
+  }
+  if (!operands.every((operand) => Number.isFinite(operand))) {
+    errors.push(
+      answerError(card.cardId, 'quick_math operands must all be finite numbers'),
+    );
+  }
+  if (!operators.every((operator) => QUICK_MATH_OPERATORS.has(operator))) {
+    errors.push(
+      answerError(card.cardId, 'quick_math has an unsupported operator'),
+    );
+  }
+
+  if (options.length < MIN_QUICK_MATH_OPTIONS) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `quick_math must have at least ${MIN_QUICK_MATH_OPTIONS} options, got ${options.length}`,
+      ),
+    );
+  }
+  const ids = options.map((option) => option.id);
+  if (new Set(ids).size !== ids.length) {
+    errors.push(answerError(card.cardId, 'quick_math has duplicate option ids'));
+  }
+
+  // Only attempt to compute + cross-check the answer once the structure is sound
+  // (otherwise computeQuickMath would throw on a malformed expression).
+  if (errors.length > 0) {
+    return errors;
+  }
+
+  let computed: number;
+  try {
+    computed = computeQuickMath(expression);
+  } catch (error) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `quick_math expression could not be computed: ${(error as Error).message}`,
+      ),
+    );
+    return errors;
+  }
+
+  if (!Number.isFinite(computed)) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `quick_math expression computes to a non-finite value ${computed}`,
+      ),
+    );
+  }
+
+  const correct = options.find((option) => option.id === correctOptionId);
+  if (!correct) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `quick_math correctOptionId "${correctOptionId}" is not among options`,
+      ),
+    );
+  } else if (correct.value !== computed) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `quick_math correct option value ${correct.value} does not equal computed result ${computed}`,
+      ),
+    );
+  }
+
+  // Exactly one option may carry the computed value, otherwise the answer is
+  // ambiguous (two correct choices).
+  const matching = options.filter((option) => option.value === computed);
+  if (matching.length > 1) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `quick_math has ${matching.length} options equal to the computed result (must be exactly one)`,
+      ),
+    );
+  }
+
+  return errors;
+}
+
+/** Inclusive bounds for a color_word's swatch (response option) count. */
+export const MIN_COLOR_WORD_COLORS = 2;
+export const MAX_COLOR_WORD_COLORS = 6;
+/** Inclusive bounds for a color_word's number of trials. */
+export const MIN_COLOR_WORD_TRIALS = 4;
+export const MAX_COLOR_WORD_TRIALS = 12;
+
+function validateColorWordAnswer(card: ColorWordCard): ValidationError[] {
+  const { colors, trials } = card.config;
+  const errors: ValidationError[] = [];
+
+  if (
+    colors.length < MIN_COLOR_WORD_COLORS ||
+    colors.length > MAX_COLOR_WORD_COLORS
+  ) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `color_word color count ${colors.length} is outside [${MIN_COLOR_WORD_COLORS}, ${MAX_COLOR_WORD_COLORS}]`,
+      ),
+    );
+  }
+  const colorIds = colors.map((color) => color.id);
+  if (
+    new Set(colorIds).size !== colorIds.length ||
+    colorIds.some((id) => id.trim().length === 0)
+  ) {
+    errors.push(
+      answerError(card.cardId, 'color_word color ids must be unique and non-empty'),
+    );
+  }
+  if (
+    colors.some(
+      (color) =>
+        typeof color.label !== 'string' || color.label.trim().length === 0,
+    )
+  ) {
+    errors.push(
+      answerError(
+        card.cardId,
+        'color_word colors must each have a non-empty label (color is never the sole signal)',
+      ),
+    );
+  }
+
+  if (
+    trials.length < MIN_COLOR_WORD_TRIALS ||
+    trials.length > MAX_COLOR_WORD_TRIALS
+  ) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `color_word trial count ${trials.length} is outside [${MIN_COLOR_WORD_TRIALS}, ${MAX_COLOR_WORD_TRIALS}]`,
+      ),
+    );
+  }
+
+  const colorIdSet = new Set(colorIds);
+  const trialIds = trials.map((trial) => trial.id);
+  if (
+    new Set(trialIds).size !== trialIds.length ||
+    trialIds.some((id) => id.trim().length === 0)
+  ) {
+    errors.push(
+      answerError(card.cardId, 'color_word trial ids must be unique and non-empty'),
+    );
+  }
+
+  trials.forEach((trial, index) => {
+    if (typeof trial.word !== 'string' || trial.word.trim().length === 0) {
+      errors.push(
+        answerError(card.cardId, `color_word trial ${index} has an empty word`),
+      );
+    }
+    if (!colorIdSet.has(trial.inkColorId)) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `color_word trial ${index} inkColorId "${trial.inkColorId}" is not a defined color`,
+        ),
+      );
+    }
+  });
+
+  return errors;
+}
+
+/** Inclusive bounds for an n_back's stream length, in items. */
+export const MIN_NBACK_STREAM = 5;
+export const MAX_NBACK_STREAM = 16;
+/** Allowed N values for n_back (1 or 2, per the difficulty ramp). */
+export const ALLOWED_NBACK_N: readonly number[] = [1, 2];
+
+function validateNBackAnswer(card: NBackCard): ValidationError[] {
+  const { stream, n, matchIndices } = card.config;
+  const errors: ValidationError[] = [];
+
+  if (stream.length < MIN_NBACK_STREAM || stream.length > MAX_NBACK_STREAM) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `n_back stream length ${stream.length} is outside [${MIN_NBACK_STREAM}, ${MAX_NBACK_STREAM}]`,
+      ),
+    );
+  }
+  if (
+    stream.some((item) => typeof item !== 'string' || item.length === 0)
+  ) {
+    errors.push(
+      answerError(card.cardId, 'n_back stream items must be non-empty strings'),
+    );
+  }
+  if (!ALLOWED_NBACK_N.includes(n)) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `n_back n ${n} is not allowed (must be one of ${ALLOWED_NBACK_N.join(', ')})`,
+      ),
+    );
+  }
+
+  // matchIndices must be in-bounds (>= n, < length); the authored key is then
+  // cross-checked against the truth derived from the stream + n.
+  matchIndices.forEach((matchIndex, position) => {
+    if (
+      !Number.isInteger(matchIndex) ||
+      matchIndex < n ||
+      matchIndex >= stream.length
+    ) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `n_back matchIndices[${position}] ${matchIndex} is outside the scorable window [${n}, ${stream.length - 1}]`,
+        ),
+      );
+    }
+  });
+
+  // Only cross-check the authored key once the structure is sound (otherwise the
+  // derived set would be compared against an obviously-malformed authored list).
+  if (errors.length === 0 && !matchIndicesAreConsistent(card.config)) {
+    errors.push(
+      answerError(
+        card.cardId,
+        'n_back matchIndices do not match the positions derived from the stream and n',
+      ),
+    );
+  }
+
+  // The pre-match window (the first n items) must exist for the puzzle to make
+  // sense — n must leave at least one scorable position.
+  if (errors.length === 0 && stream.length <= n) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `n_back stream length ${stream.length} leaves no scorable position for n=${n}`,
+      ),
+    );
+  }
+
+  return errors;
+}
+
+/** Inclusive bounds for an odd_one_out's item count. */
+export const MIN_ODD_ONE_OUT_ITEMS = 3;
+export const MAX_ODD_ONE_OUT_ITEMS = 6;
+
+function validateOddOneOutAnswer(card: OddOneOutCard): ValidationError[] {
+  const { items, oddItemId } = card.config;
+  const errors: ValidationError[] = [];
+
+  if (
+    items.length < MIN_ODD_ONE_OUT_ITEMS ||
+    items.length > MAX_ODD_ONE_OUT_ITEMS
+  ) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `odd_one_out item count ${items.length} is outside [${MIN_ODD_ONE_OUT_ITEMS}, ${MAX_ODD_ONE_OUT_ITEMS}]`,
+      ),
+    );
+  }
+
+  const ids = items.map((item) => item.id);
+  if (new Set(ids).size !== ids.length || ids.some((id) => id.trim().length === 0)) {
+    errors.push(
+      answerError(card.cardId, 'odd_one_out item ids must be unique and non-empty'),
+    );
+  }
+
+  if (
+    items.some(
+      (item) => typeof item.label !== 'string' || item.label.trim().length === 0,
+    )
+  ) {
+    errors.push(
+      answerError(
+        card.cardId,
+        'odd_one_out items must each have a non-empty label (the meaning is never colour/position alone)',
+      ),
+    );
+  }
+
+  // The odd item (answer key) must be present among the items.
+  if (!items.some((item) => item.id === oddItemId)) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `odd_one_out oddItemId "${oddItemId}" is not among items`,
+      ),
+    );
+  }
+
+  return errors;
+}
+
+/**
+ * Inclusive bounds for a schulte_order's target count. The upper bound is a
+ * full 5×5 board (25): now that the renderer gives NO next-target hint, harder
+ * cards rely on bigger grids to stay challenging, and a 5×5 scan is the largest
+ * that still fits comfortably on a phone screen.
+ */
+export const MIN_SCHULTE_TARGETS = 4;
+export const MAX_SCHULTE_TARGETS = 25;
+/**
+ * schulte_order is a timed visual scan. Its time limit now follows the uniform
+ * per-difficulty budget like every other template (product decision 2026-06 —
+ * limits apply to ALL games), so this cap is the global maximum rather than a
+ * tighter band.
+ */
+export const MAX_SCHULTE_TIME_LIMIT_MS = MAX_TIME_LIMIT_MS;
+
+function validateSchulteOrderAnswer(card: SchulteOrderCard): ValidationError[] {
+  const { rows, columns, targets, timeLimitMs } = card.config;
+  const errors: ValidationError[] = [];
+
+  if (rows <= 0 || columns <= 0) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `schulte_order grid must have positive dimensions, got ${rows}x${columns}`,
+      ),
+    );
+  }
+
+  if (
+    targets.length < MIN_SCHULTE_TARGETS ||
+    targets.length > MAX_SCHULTE_TARGETS
+  ) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `schulte_order target count ${targets.length} is outside [${MIN_SCHULTE_TARGETS}, ${MAX_SCHULTE_TARGETS}]`,
+      ),
+    );
+  }
+
+  // Targets must fit on the grid (a grid can hold rows*columns cells).
+  if (rows > 0 && columns > 0 && targets.length > rows * columns) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `schulte_order has ${targets.length} targets but only ${rows * columns} cells`,
+      ),
+    );
+  }
+
+  const ids = targets.map((target) => target.id);
+  if (new Set(ids).size !== ids.length || ids.some((id) => id.trim().length === 0)) {
+    errors.push(
+      answerError(
+        card.cardId,
+        'schulte_order target ids must be unique and non-empty',
+      ),
+    );
+  }
+
+  const labels = targets.map((target) => target.label);
+  if (
+    new Set(labels).size !== labels.length ||
+    labels.some(
+      (label) => typeof label !== 'string' || label.trim().length === 0,
+    )
+  ) {
+    errors.push(
+      answerError(
+        card.cardId,
+        'schulte_order target labels must be unique and non-empty (the order is read from the value, never position alone)',
+      ),
+    );
+  }
+
+  // Every target coordinate must lie inside the grid, and no two may overlap.
+  const occupied = new Set<string>();
+  targets.forEach((target, index) => {
+    if (
+      !Number.isInteger(target.row) ||
+      target.row < 0 ||
+      target.row >= rows ||
+      !Number.isInteger(target.column) ||
+      target.column < 0 ||
+      target.column >= columns
+    ) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `schulte_order target ${index} (${target.row}, ${target.column}) is outside grid bounds [0, ${rows - 1}] x [0, ${columns - 1}]`,
+        ),
+      );
+      return;
+    }
+    const key = coordKey(target.row, target.column);
+    if (occupied.has(key)) {
+      errors.push(
+        answerError(
+          card.cardId,
+          `schulte_order has overlapping targets at ${key}`,
+        ),
+      );
+    }
+    occupied.add(key);
+  });
+
+  // Tighter time-limit band for the timed scan (the [5s, 120s] base rule still
+  // applies via the shared check; this caps the upper end).
+  if (Number.isFinite(timeLimitMs) && timeLimitMs > MAX_SCHULTE_TIME_LIMIT_MS) {
+    errors.push(
+      answerError(
+        card.cardId,
+        `schulte_order timeLimitMs ${timeLimitMs} exceeds the timed-scan maximum ${MAX_SCHULTE_TIME_LIMIT_MS}`,
+      ),
+    );
+  }
+
+  return errors;
+}
+
 /**
  * Validates a single card's template-agnostic rules plus its template-specific
  * correct answer. Catalog-wide rules (unique `cardId`) are checked separately by
@@ -736,7 +1857,7 @@ function validateCard(card: LiquidCard): ValidationError[] {
     });
   }
 
-  // Per-template time limit between 5s and 30s inclusive. The finiteness guard
+  // Per-template time limit between 5s and 120s inclusive. The finiteness guard
   // leads so a NaN/Infinity timeLimitMs is rejected rather than slipping past
   // the range comparisons (both `< MIN` and `> MAX` are false for NaN).
   const timeLimitMs = card.config.timeLimitMs;

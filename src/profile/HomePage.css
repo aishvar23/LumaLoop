@@ -1,0 +1,546 @@
+/**
+ * Home / Discover landing styles — PLAYFUL & COLORFUL direction (accounts pivot).
+ * Token-driven (no scattered hex beyond a few brand gradients), mobile-first,
+ * roomy. A bright loop logo, a tactile gradient hero, color-tinted stat chips and
+ * vibrant per-category game tiles. Deliberately distinct from the /you profile.
+ */
+.home-page {
+  min-height: 100dvh;
+  box-sizing: border-box;
+  background:
+    radial-gradient(70% 50% at 100% -5%, rgba(157, 123, 255, 0.18), transparent 70%),
+    radial-gradient(60% 45% at -5% 5%, rgba(63, 214, 201, 0.14), transparent 70%),
+    var(--color-bg);
+  color: var(--color-text);
+  padding: calc(var(--safe-top) + var(--space-3)) var(--space-3)
+    calc(var(--safe-bottom) + var(--space-6));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+/* ---- Top bar + logo ----------------------------------------------------- */
+.home-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.home-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.home-logo {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
+  background: linear-gradient(135deg, #6c7bff 0%, #9d7bff 45%, #ff7eb6 100%);
+  box-shadow: 0 6px 18px rgba(124, 110, 255, 0.45);
+}
+
+.home-logo__loop {
+  /* The brand spark ✦ — the "clever / aha" mark. */
+  font-size: 20px;
+  font-weight: var(--font-weight-bold);
+  color: #fff;
+  line-height: 1;
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.45);
+}
+
+/* Match the greeting's prominence (xl); the gradient + spark live in `.wordmark`. */
+.home-wordmark {
+  font-size: var(--font-size-xl);
+}
+
+.home-topbar__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.home-search-link {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  text-decoration: none;
+  font-size: var(--font-size-md);
+}
+
+.home-search-link:hover,
+.home-search-link:focus-visible {
+  border-color: var(--color-accent);
+  outline: none;
+}
+
+/* Reminders opt-in — an unobtrusive pill above the CTA pair. */
+.home-push-pill {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 var(--space-2);
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.home-push-pill:hover:not(:disabled),
+.home-push-pill:focus-visible {
+  border-color: var(--color-accent);
+  outline: none;
+}
+
+.home-push-pill:disabled {
+  cursor: default;
+  opacity: 0.85;
+}
+
+.home-push-pill[data-state='on'] {
+  border-color: rgba(63, 214, 201, 0.6);
+  opacity: 1;
+}
+
+.home-push-hint {
+  margin: -4px 0 var(--space-2);
+  font-size: 12px;
+  opacity: 0.72;
+}
+
+/* "Play now" + "Upload puzzle" — a matched, eye-catching pair under the greeting. */
+.home-hero__cta {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.home-cta-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+/* Both CTAs share the SAME format: a bold white pill with a gradient icon chip. */
+.home-cta-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  border: 0;
+  background: #ffffff;
+  color: #1a1330;
+  border-radius: var(--radius-pill);
+  padding: 10px 20px 10px 10px;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.home-cta-btn:hover,
+.home-cta-btn:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.34);
+  outline: none;
+}
+
+.home-cta-btn:active {
+  transform: translateY(0) scale(0.97);
+}
+
+/* Gradient icon chip — same shape on both, different hue so the pair is playful. */
+.home-cta-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-pill);
+  color: #fff;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.home-cta-icon--play {
+  background: linear-gradient(135deg, #3fd6c9, #5b8cff);
+}
+
+.home-cta-icon--upload {
+  background: linear-gradient(135deg, #ff7eb6, #9d7bff);
+}
+
+/* "Coming soon" popover — pops OUT of the Upload button (above it, with a tail). */
+.home-upload-pop {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: #15101f;
+  color: #fff;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
+  animation: home-pop-in 0.18s var(--ease-pop, ease-out) both;
+}
+
+.home-upload-pop__tail {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 8px solid #15101f;
+}
+
+@keyframes home-pop-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(6px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-upload-pop {
+    animation: none;
+  }
+}
+
+.home-profile-link {
+  display: inline-flex;
+  text-decoration: none;
+}
+
+.home-avatar {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-pill);
+  object-fit: cover;
+  background: linear-gradient(135deg, #ff7eb6, #9d7bff);
+  color: #fff;
+  font-weight: var(--font-weight-bold);
+  border: 2px solid rgba(255, 255, 255, 0.15);
+}
+
+/* ---- Section titles ----------------------------------------------------- */
+.home-section-title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+}
+
+/* ---- Recent activity (stories rail) ------------------------------------- */
+.home-stories {
+  display: flex;
+  gap: var(--space-3);
+  overflow-x: auto;
+  padding-bottom: var(--space-2);
+  scrollbar-width: none;
+  scroll-snap-type: x proximity;
+}
+
+.home-stories::-webkit-scrollbar {
+  display: none;
+}
+
+.home-story {
+  flex: 0 0 auto;
+  width: 70px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  text-decoration: none;
+  color: var(--color-text-muted);
+  scroll-snap-align: start;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.home-story__ring {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  border-radius: var(--radius-pill);
+  padding: 3px;
+  background: conic-gradient(
+    from 210deg,
+    #ff7eb6,
+    #ffd76b,
+    #3fd6c9,
+    #6c7bff,
+    #ff7eb6
+  );
+}
+
+.home-story__avatar {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  object-fit: cover;
+  background: var(--color-surface-raised);
+  border: 2px solid var(--color-bg);
+  color: var(--color-text);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-md);
+}
+
+.home-story__badge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  background: #ff5d8f;
+  color: #fff;
+  border: 2px solid var(--color-bg);
+  font-size: 11px;
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+}
+
+.home-story__name {
+  max-width: 100%;
+  font-size: var(--font-size-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-story:hover .home-story__name,
+.home-story:focus-visible .home-story__name {
+  color: var(--color-text);
+}
+
+/* ---- Hero --------------------------------------------------------------- */
+.home-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-4);
+  border-radius: 28px;
+  background: linear-gradient(140deg, #5a52e0 0%, #7b54d6 50%, #b659c6 100%);
+  box-shadow: 0 16px 40px rgba(91, 82, 224, 0.4);
+}
+
+.home-hero__glow {
+  position: absolute;
+  inset: -30% 20% auto -10%;
+  height: 200px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.35), transparent 60%);
+  filter: blur(6px);
+  z-index: -1;
+}
+
+.home-hero__blob {
+  position: absolute;
+  border-radius: var(--radius-pill);
+  filter: blur(2px);
+  opacity: 0.7;
+  z-index: -1;
+}
+
+.home-hero__blob--a {
+  width: 120px;
+  height: 120px;
+  right: -24px;
+  top: -24px;
+  background: radial-gradient(circle, rgba(255, 126, 182, 0.6), transparent 70%);
+}
+
+.home-hero__blob--b {
+  width: 90px;
+  height: 90px;
+  right: 40px;
+  bottom: -30px;
+  background: radial-gradient(circle, rgba(63, 214, 201, 0.5), transparent 70%);
+}
+
+.home-greeting {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.1;
+  color: #fff;
+}
+
+.home-subtitle {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: var(--font-size-md);
+}
+
+/* Daily-streak badge — a warm "days played in a row" pill (engagement, not a
+   skill claim). Only shown when there's a live streak. */
+.home-streak {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: calc(var(--space-1) * -1);
+}
+
+.home-streak__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 4px 12px;
+  border-radius: var(--radius-pill, 999px);
+  background: linear-gradient(135deg, #ff9d4d 0%, #ff5d8f 100%);
+  color: #fff;
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-sm);
+  box-shadow: 0 6px 16px rgba(255, 93, 143, 0.35);
+}
+
+.home-streak__count {
+  letter-spacing: -0.01em;
+}
+
+.home-streak__best {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium, 600);
+}
+
+/* Color-tinted stat chips. */
+.home-stat-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.home-stat-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+
+.home-stat-chip__icon {
+  font-size: var(--font-size-sm);
+}
+
+.home-stat-chip__value {
+  font-weight: var(--font-weight-bold);
+}
+
+.home-stat-chip__label {
+  font-size: var(--font-size-sm);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* ---- Featured games ----------------------------------------------------- */
+.home-featured-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-3);
+}
+
+@media (min-width: 480px) {
+  .home-featured-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.home-game-tile {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-3);
+  min-height: 138px;
+  border-radius: 22px;
+  text-decoration: none;
+  color: #fff;
+  background:
+    linear-gradient(160deg, var(--tile-accent, var(--color-accent)) -10%, var(--tile-deep, #4f5dff) 120%);
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--tile-accent, #4f5dff) 35%, transparent);
+  transition: transform 0.12s ease;
+}
+
+.home-game-tile:hover,
+.home-game-tile:focus-visible {
+  transform: translateY(-3px);
+  outline: none;
+}
+
+.home-game-monogram {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-md);
+}
+
+.home-game-title {
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-md);
+}
+
+.home-game-meta {
+  font-size: var(--font-size-sm);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.home-game-play {
+  margin-top: auto;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: #fff;
+}

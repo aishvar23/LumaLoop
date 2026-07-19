@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -7,17 +7,37 @@ import { v4 as uuidV4 } from 'uuid';
 
 import FeedScreen from './src/feed/FeedScreen';
 import FirstRunNotice from './src/feed/FirstRunNotice';
+import { CardReplayProvider } from './src/feed/FeedbackGate';
+import {
+  applyResolution,
+  INITIAL_SCORE_STATE,
+} from './src/core/feed/scoring';
+import type { LiquidCard } from './src/core/cards/types';
+import type { CardResolution } from './src/core/templates/contract';
 import { createTelemetryClient } from './src/telemetry/telemetryClient';
 import { ensureAnonymousUserId } from './src/telemetry/anonymousUser';
 import { useFeedTelemetry } from './src/telemetry/useFeedTelemetry';
 import { AuthProvider, useAuth, useOptionalAuth } from './src/auth/AuthProvider';
 import RequireAuth from './src/auth/RequireAuth';
 import ProfilePage from './src/profile/ProfilePage';
-import { useRecordGamePlay } from './src/feed/useRecordGamePlay';
+import HomeScreen from './src/HomeScreen';
+import PeopleSearchScreen from './src/PeopleSearchScreen';
+import UserProfileScreen from './src/UserProfileScreen';
+import { useRecordGamePlay, type RecordGamePlay } from './src/feed/useRecordGamePlay';
 import { usePlayedCardIds } from './src/feed/usePlayedCardIds';
+import { recordPlayToday } from './src/feed/streakStore';
+import { SocialConfigProvider } from './src/social/SocialContext';
 import { supabase } from './src/auth/supabaseClient';
 import { getCardById as getCatalogCardById } from './src/core/cards/catalog';
 import { colors, fontSize, fontWeight } from './src/feed/templates/tokens';
+import {
+  configureNotificationHandler,
+  ensureDailyReminders,
+} from './src/notifications/localReminders';
+
+// Configure how a scheduled LOCAL reminder is presented while the app is
+// foregrounded. Set once at module import — idempotent and otherwise inert.
+configureNotificationHandler();
 
 /**
  * LumaLoop mobile (React Native + Expo).
@@ -63,13 +83,30 @@ export default function App() {
 }
 
 /**
- * The signed-in app surface: the first-run notice + the feed, with a simple
- * router-less toggle to the profile screen (native has no React Router). A small
- * "You" button overlays the feed; tapping it shows {@link ProfilePage}, which has a
- * Back affordance to return.
+ * The signed-in app surface, with a simple router-less view toggle (native has no
+ * React Router). A signed-in user lands on the {@link HomeScreen} (accounts pivot
+ * — replaces dropping straight into a game card); "Start playing" enters the feed.
+ * A small "You" button overlays the feed → {@link ProfilePage}; a "Home" button
+ * returns to the landing. ProfilePage and Home both have Back affordances.
  */
 function FeedApp() {
-  const [view, setView] = useState<'feed' | 'profile'>('feed');
+  const [view, setView] = useState<'home' | 'feed' | 'profile' | 'search' | 'user'>(
+    'home',
+  );
+  // A featured-game deep link: the card to open FIRST when entering the feed
+  // (undefined ⇒ the generic feed). Cleared when entering the feed generically.
+  const [startCardId, setStartCardId] = useState<string | undefined>(undefined);
+  // The other user whose profile is open (when view === 'user').
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+
+  // Twice-daily LOCAL reminder notifications (on-device, at each user's local
+  // time — no server/push). FeedApp only mounts behind RequireAuth (user +
+  // profile present), so scheduling here means we only nudge signed-in users.
+  // Best-effort and run once per signed-in launch: it re-schedules idempotently
+  // and never throws, so we ignore the result and don't block rendering.
+  useEffect(() => {
+    void ensureDailyReminders();
+  }, []);
 
   // Resolve the best-effort anonymous id once (AsyncStorage-backed, §10). The feed
   // waits for it so the deck seed and telemetry identity share one stable id.
@@ -84,19 +121,76 @@ function FeedApp() {
     };
   }, []);
 
+  // Enter the feed, optionally pinned to a specific game (featured tile / status).
+  const openFeed = (cardId?: string) => {
+    setStartCardId(cardId);
+    setView('feed');
+  };
+
+  if (view === 'home') {
+    return (
+      <HomeScreen
+        onStart={openFeed}
+        onOpenProfile={() => setView('profile')}
+        onOpenSearch={() => setView('search')}
+      />
+    );
+  }
+
   if (view === 'profile') {
     return <ProfilePage onBack={() => setView('feed')} />;
+  }
+
+  if (view === 'search') {
+    return (
+      <PeopleSearchScreen
+        onBack={() => setView('home')}
+        onOpenUser={(id) => {
+          setSelectedUserId(id);
+          setView('user');
+        }}
+      />
+    );
+  }
+
+  if (view === 'user' && selectedUserId) {
+    return (
+      <UserProfileScreen
+        userId={selectedUserId}
+        onBack={() => setView('search')}
+        onStart={openFeed}
+      />
+    );
   }
 
   return (
     <View style={styles.root}>
       <FirstRunNotice>
         {anonymousUserId !== null ? (
-          <TelemetryFeed anonymousUserId={anonymousUserId} />
+          <TelemetryFeed
+            anonymousUserId={anonymousUserId}
+            startCardId={startCardId}
+          />
         ) : null}
       </FirstRunNotice>
+      <HomeButton onPress={() => setView('home')} />
       <YouButton onPress={() => setView('profile')} />
     </View>
+  );
+}
+
+/** A small overlay entry back to the Home landing (top-left, clear of the HUD). */
+function HomeButton({ onPress }: { onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Back to home"
+      testID="open-home"
+      onPress={onPress}
+      style={styles.homeButton}
+    >
+      <Text style={styles.homeButtonText}>⌂</Text>
+    </Pressable>
   );
 }
 
@@ -127,7 +221,13 @@ function YouButton({ onPress }: { onPress: () => void }) {
  * shared by the feed's per-card start context and the telemetry `sessionId`
  * envelope, then forwards the M3 FeedScreen seam callbacks to the instrumentation.
  */
-function TelemetryFeed({ anonymousUserId }: { anonymousUserId: string }) {
+function TelemetryFeed({
+  anonymousUserId,
+  startCardId,
+}: {
+  anonymousUserId: string;
+  startCardId?: string;
+}) {
   const [client] = useState(() => createTelemetryClient());
   const [feedId] = useState(() => uuidV4());
 
@@ -162,6 +262,35 @@ function TelemetryFeed({ anonymousUserId }: { anonymousUserId: string }) {
     client: effectiveClient,
   });
 
+  // Engagement: every scored card also counts as "played today" for the daily
+  // streak (the NYT/Duolingo habit loop). Local-only, idempotent per day, and
+  // best-effort — `recordPlayToday` never rejects; fire-and-forget so it can
+  // never break the feed.
+  const recordScored = useCallback<RecordGamePlay>(
+    (index, resolution, score) => {
+      recordGamePlay(index, resolution, score);
+      void recordPlayToday();
+    },
+    [recordGamePlay],
+  );
+
+  // "Play again" replays the same card; each replayed attempt is recorded as its
+  // own play (product decision 2026-06). The first attempt records on resolve via
+  // the latched `onCardScored` path; the feed's per-index latch would drop a
+  // replay's resolution, so the gate records replays HERE with per-attempt points
+  // computed standalone (a replay carries no in-feed streak/combo). Best-effort.
+  const recordReplayPlay = useCallback(
+    (card: LiquidCard, resolution: CardResolution) => {
+      const { cardScore } = applyResolution(
+        INITIAL_SCORE_STATE,
+        resolution,
+        card.config.timeLimitMs,
+      );
+      recordGamePlay(-1, resolution, cardScore);
+    },
+    [recordGamePlay],
+  );
+
   // D2: best-effort fetch of the signed-in user's already-played games so the
   // feed skips them. The controller captures the exclusion set ONCE at mount, so
   // we wait for `ready` before mounting the feed (the first batch already skips
@@ -187,19 +316,30 @@ function TelemetryFeed({ anonymousUserId }: { anonymousUserId: string }) {
   if (!played.ready) return null;
 
   return (
-    <FeedScreen
-      key={userId ?? 'anon'}
-      anonymousUserId={anonymousUserId}
-      excludeCardIds={played.cardIds}
-      feedId={feedId}
-      onCardActive={handlers.onCardActive}
-      onCardEngaged={handlers.onCardEngaged}
-      onCardResolved={handlers.onCardResolved}
-      onCardSkipped={handlers.onCardSkipped}
-      onCardAbandoned={handlers.onCardAbandoned}
-      onCardExplanationViewed={handlers.onCardExplanationViewed}
-      onCardScored={recordGamePlay}
-    />
+    // Supply the per-card social surface (likes + comments) with the SAME client
+    // the provider authenticated against + the signed-in user id. Feed-layer
+    // concern keyed by cardId — the feed/engine stays auth-free (the rail reads
+    // this context; no provider → it renders nothing).
+    <SocialConfigProvider value={{ client: effectiveClient, userId }}>
+      {/* Records each "Play again" replay as a new play (off the feed's per-index
+          latch). No provider in tests → replay just remounts. */}
+      <CardReplayProvider handler={recordReplayPlay}>
+        <FeedScreen
+          key={userId ?? 'anon'}
+          anonymousUserId={anonymousUserId}
+          excludeCardIds={played.cardIds}
+          startCardId={startCardId}
+          feedId={feedId}
+          onCardActive={handlers.onCardActive}
+          onCardEngaged={handlers.onCardEngaged}
+          onCardResolved={handlers.onCardResolved}
+          onCardSkipped={handlers.onCardSkipped}
+          onCardAbandoned={handlers.onCardAbandoned}
+          onCardExplanationViewed={handlers.onCardExplanationViewed}
+          onCardScored={recordScored}
+        />
+      </CardReplayProvider>
+    </SocialConfigProvider>
   );
 }
 
@@ -227,6 +367,25 @@ const styles = StyleSheet.create({
   youButtonText: {
     color: colors.accentContrast,
     fontSize: fontSize.md,
+    fontWeight: fontWeight.bold,
+  },
+  homeButton: {
+    position: 'absolute',
+    top: 52,
+    left: 16,
+    height: 40,
+    minWidth: 40,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: 'rgba(20, 20, 28, 0.7)',
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  homeButtonText: {
+    color: colors.text,
+    fontSize: fontSize.lg,
     fontWeight: fontWeight.bold,
   },
 });

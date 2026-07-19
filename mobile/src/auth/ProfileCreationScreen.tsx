@@ -42,7 +42,7 @@ export interface ProfileCreationScreenProps {
 export default function ProfileCreationScreen({
   client = supabase,
 }: ProfileCreationScreenProps) {
-  const { user, refreshProfile } = useAuth();
+  const { user, refreshProfile, signOut } = useAuth();
   const [handle, setHandle] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
@@ -84,7 +84,7 @@ export default function ProfileCreationScreen({
       <View style={s.card}>
         <Text style={s.brand}>Create your profile</Text>
         <Text style={s.tagline}>
-          Pick a handle and name. This is how you show up across LumaLoop.
+          Pick a handle and name. This is how you show up across Witzy.
         </Text>
 
         <View style={s.field}>
@@ -155,6 +155,17 @@ export default function ProfileCreationScreen({
             {error}
           </Text>
         )}
+
+        {/* Escape hatch: a stale/expired session can land here with no way out.
+            Signing out clears it so the player can sign in fresh. */}
+        <Pressable
+          accessibilityRole="button"
+          testID="profile-signout"
+          onPress={() => void signOut()}
+          style={s.signOutLink}
+        >
+          <Text style={s.signOutText}>Wrong account? Sign out</Text>
+        </Pressable>
       </View>
     </ScrollView>
   );

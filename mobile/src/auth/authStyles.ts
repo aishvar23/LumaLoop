@@ -36,6 +36,22 @@ export const authStyles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: space.md,
   },
+  /** Centers the composed Witzy Wordmark on the auth screens. */
+  brandWrap: {
+    alignSelf: 'center',
+    marginBottom: space.md,
+  },
+  /** A subtle centered "Sign out" escape on the profile-creation screen. */
+  signOutLink: {
+    alignSelf: 'center',
+    marginTop: space.lg,
+    paddingVertical: space.sm,
+  },
+  signOutText: {
+    color: colors.textMuted,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.semibold,
+  },
   tagline: {
     color: colors.textMuted,
     fontSize: fontSize.md,

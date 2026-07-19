@@ -22,9 +22,9 @@
  * outcome is announced exactly once; the explanation is plain headed copy too.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 
-import type { CardScore } from '../feed/scoring';
+import { performanceTags, type CardScore } from '../feed/scoring';
 import type { CardResolution, ResolutionType } from '../templates/contract';
 import Button from './Button';
 import Stack from './Stack';
@@ -40,8 +40,36 @@ export type CardFeedbackProps = {
    * renders, tests) → the chip is not shown. GAME language only (Design §7/§21.8).
    */
   cardScore?: CardScore | null;
+  /**
+   * The player's LOCAL best game-points for THIS card so far (engagement §4.4 —
+   * "something to chase"). Shown as a subtle "Best: N" beside the score chip when
+   * no new best was set this play. Omitted ≡ no stored best to show.
+   */
+  personalBest?: number;
+  /**
+   * True when this play STRICTLY beat the card's prior best — shows a celebratory
+   * "🏆 New best!" instead of the subtle best line. GAME framing only (Design §7).
+   */
+  isNewBest?: boolean;
+  /**
+   * The card's time limit (ms), used to derive the FAST performance tag
+   * (engagement §4.3). Omitted/non-finite ≡ no time pressure → never "Fast".
+   */
+  timeLimitMs?: number;
+  /**
+   * Optional presentational slot rendered just above "Next" — used by the feed to
+   * inject the social Share action (kept OUT of this component so it stays pure /
+   * Supabase-free; CLAUDE.md §4). Omitted in standalone renders/tests.
+   */
+  footer?: ReactNode;
   /** Advance the feed to the next card. The ONLY way out of this state. */
   onContinue: () => void;
+  /**
+   * Replay the SAME card from the start. When provided, a secondary "Play again"
+   * action is shown beneath "Next"; each replay is recorded as a new play
+   * (product decision 2026-06). Omitted in standalone renders/tests → not shown.
+   */
+  onReplay?: () => void;
 };
 
 /** Per-outcome heading copy. Modest + performance-based (Design §7). */
@@ -73,13 +101,25 @@ export default function CardFeedback({
   resolution,
   explanation,
   cardScore,
+  personalBest,
+  isNewBest,
+  timeLimitMs,
+  footer,
   onContinue,
+  onReplay,
 }: CardFeedbackProps) {
   const { resolutionType } = resolution;
+  // Game-framing performance tags (engagement §4.3) — empty for a miss/timeout.
+  const tags = performanceTags(resolution, timeLimitMs ?? Number.POSITIVE_INFINITY);
   const heading = OUTCOME_HEADING[resolutionType];
   const detail = OUTCOME_DETAIL[resolutionType];
   const glyph = OUTCOME_GLYPH[resolutionType];
   const positive = resolutionType === 'correct';
+  const failureReason =
+    typeof resolution.signals.failure_reason === 'string' &&
+    resolution.signals.failure_reason.trim().length > 0
+      ? resolution.signals.failure_reason
+      : null;
 
   // Outcome-tinted RESULT card (Phase 3, mirroring mobile): a success hue
   // reinforces "Correct"; the softer error hue reinforces "Not quite"/"Time's up".
@@ -110,10 +150,19 @@ export default function CardFeedback({
       data-outcome={resolutionType}
       style={{
         ...cardStyle,
+        position: 'relative',
         background: tint.surface,
         borderColor: tint.border,
+        // Juice: a correct answer POPS in; a miss SHAKES in. (Both auto-disable
+        // under prefers-reduced-motion via the global rule.)
+        animation: positive
+          ? 'card-feedback-pop var(--motion-base) var(--ease-pop) both'
+          : 'card-shake 400ms ease both',
       }}
     >
+      {/* Juice: a ✦ spark burst radiates from the badge on a correct answer
+          (on-brand, decorative). Hidden from assistive tech. */}
+      {positive ? <SparkBurst /> : null}
       <Stack gap={3}>
         {/* Dedicated polite live region — empty on first paint, set post-mount
             (above) so the outcome reliably announces. Visually hidden; the
@@ -138,13 +187,59 @@ export default function CardFeedback({
           </div>
         </div>
 
+        {/* Engagement §4.3: game-framing performance tags (Perfect/Fast/Clean/
+            Recovered) above the points chip — a small reward flourish. Empty for a
+            miss/timeout → nothing rendered. GAME words only (Design §7/§21.8). */}
+        {tags.length > 0 ? (
+          <div style={tagsRowStyle} data-testid="feedback-tags">
+            {tags.map((tag) => (
+              <span key={tag} style={tagChipStyle} data-testid="feedback-tag">
+                {tag}
+              </span>
+            ))}
+          </div>
+        ) : null}
+
         {/* Phase-4 slot: the per-resolution GAME-POINTS chip — points earned plus
             the current streak/combo — themed with the slide accent. Shown only
             when a score was supplied (feed runs); omitted in standalone renders. */}
         {cardScore ? <ScoreChip cardScore={cardScore} /> : null}
 
+        {/* Engagement §4.4: the LOCAL per-card personal best — "something to
+            chase". Shown only when points were earned this play (the score chip is
+            up). A new best gets a celebratory chip; otherwise the prior best is a
+            subtle line. GAME framing only — "best", never skill/ability (Design §7). */}
+        {cardScore && cardScore.points > 0
+          ? isNewBest
+            ? (
+                <span style={newBestChipStyle} data-testid="feedback-newbest">
+                  🏆 New best!
+                </span>
+              )
+            : personalBest && personalBest > 0
+              ? (
+                  <span style={bestChipStyle} data-testid="feedback-best">
+                    Best: {personalBest}
+                  </span>
+                )
+              : null
+          : null}
+
         {/* Explanation state — headed copy, not a second live region, so the
             outcome above is not double-announced. */}
+        {failureReason ? (
+          <section
+            aria-labelledby="card-failure-title"
+            data-testid="card-failure-reason"
+            style={failureReasonStyle}
+          >
+            <p id="card-failure-title" style={failureReasonTitleStyle}>
+              What went wrong
+            </p>
+            <p style={failureReasonBodyStyle}>{failureReason}</p>
+          </section>
+        ) : null}
+
         <section aria-labelledby="card-explanation-title" style={explanationStyle}>
           <p id="card-explanation-title" style={explanationTitleStyle}>
             {explanation.title}
@@ -152,13 +247,65 @@ export default function CardFeedback({
           <p style={explanationBodyStyle}>{explanation.body}</p>
         </section>
 
+        {/* Optional injected actions (the feed's Share button). Above "Next" so
+            the player can share before advancing. */}
+        {footer}
+
         {/* Land focus here on mount so a keyboard / screen-reader user moves
             straight from the announced outcome to the only forward affordance. */}
         <Button autoFocus onClick={onContinue} data-testid="feedback-next">
           Next
         </Button>
+
+        {/* Optional replay of the SAME card — secondary to "Next". Each replay
+            is recorded as a new play (the gate wires the recording). */}
+        {onReplay ? (
+          <Button
+            variant="ghost"
+            onClick={onReplay}
+            data-testid="feedback-replay"
+          >
+            Play again
+          </Button>
+        ) : null}
       </Stack>
     </section>
+  );
+}
+
+/** Angles (deg) the celebratory sparks radiate along from the badge. */
+const BURST_ANGLES = [0, 55, 120, 180, 240, 305];
+
+/**
+ * A one-shot ✦ spark burst radiating from the outcome badge on a correct answer
+ * (engagement "juice", on-brand). Purely decorative; each spark sets its own
+ * `--dx`/`--dy` direction and the shared `card-spark-burst` keyframe (global.css)
+ * flies it outward + fades. Disabled under prefers-reduced-motion by the global
+ * rule.
+ */
+function SparkBurst() {
+  return (
+    <div aria-hidden="true" style={burstStyle}>
+      {BURST_ANGLES.map((deg) => {
+        const rad = (deg * Math.PI) / 180;
+        const dx = `${Math.round(Math.cos(rad) * 50)}px`;
+        const dy = `${Math.round(Math.sin(rad) * 50)}px`;
+        return (
+          <span
+            key={deg}
+            style={
+              {
+                ...sparkStyle,
+                '--dx': dx,
+                '--dy': dy,
+              } as CSSProperties
+            }
+          >
+            ✦
+          </span>
+        );
+      })}
+    </div>
   );
 }
 
@@ -219,9 +366,50 @@ const scoreChipStyle = {
 } as const;
 
 const scorePointsStyle = {
-  fontSize: 'var(--font-size-md)',
+  fontSize: 'var(--font-size-lg)',
   fontWeight: 'var(--font-weight-bold)',
   color: 'var(--color-text)',
+} as const;
+
+/** The celebratory "New best!" chip (engagement §4.4) — a success-tinted pill
+ * that pops just under the points chip when the player beats their prior best on
+ * this card. GAME framing only. */
+const newBestChipStyle = {
+  alignSelf: 'flex-start',
+  padding: 'var(--space-1) var(--space-3)',
+  borderRadius: 'var(--radius-pill)',
+  border: '1px solid var(--color-success-border)',
+  background: 'var(--color-success-surface)',
+  color: 'var(--color-success-bright)',
+  fontSize: 'var(--font-size-sm)',
+  fontWeight: 'var(--font-weight-bold)',
+} as const;
+
+/** The subtle "Best: N" line (engagement §4.4) — shown when no new best was set,
+ * so the player still sees the bar to chase. Muted, non-pressuring. */
+const bestChipStyle = {
+  alignSelf: 'flex-start',
+  fontSize: 'var(--font-size-sm)',
+  fontWeight: 'var(--font-weight-semibold)',
+  color: 'var(--color-text-muted)',
+} as const;
+
+/** The performance-tags row (engagement §4.3) — small accent-tinted chips that
+ * sit just above the points chip. Accent-aware via the slide's `--accent`. */
+const tagsRowStyle = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 'var(--space-2)',
+} as const;
+
+const tagChipStyle = {
+  padding: 'var(--space-1) var(--space-2)',
+  borderRadius: 'var(--radius-pill)',
+  border: '1px solid var(--accent, var(--color-accent))',
+  background: 'var(--accent-tint, var(--color-surface-overlay))',
+  color: 'var(--accent, var(--color-accent))',
+  fontSize: 'var(--font-size-sm)',
+  fontWeight: 'var(--font-weight-bold)',
 } as const;
 
 const scoreMetaStyle = {
@@ -248,6 +436,26 @@ const cardStyle = {
   border: '1px solid var(--color-border)',
   boxShadow: 'var(--shadow-md)',
   animation: 'card-feedback-pop var(--motion-base) var(--ease-pop) both',
+} as const;
+
+/* Spark-burst origin — centered over the outcome badge (top-left of the card). */
+const burstStyle = {
+  position: 'absolute',
+  top: 'calc(var(--space-4) + 22px)',
+  left: 'calc(var(--space-4) + 22px)',
+  width: 0,
+  height: 0,
+  pointerEvents: 'none',
+  zIndex: 2,
+} as const;
+
+const sparkStyle = {
+  position: 'absolute',
+  fontSize: 'var(--font-size-md)',
+  lineHeight: 1,
+  color: '#ffd76a',
+  textShadow: '0 0 10px rgba(255, 215, 106, 0.7)',
+  animation: 'card-spark-burst 620ms var(--ease-out, ease-out) both',
 } as const;
 
 const outcomeRowStyle = {
@@ -306,6 +514,30 @@ const explanationStyle = {
   borderRadius: 'var(--radius-md)',
   border: '1px solid var(--color-border)',
   background: 'var(--color-surface-raised)',
+} as const;
+
+const failureReasonStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 'var(--space-1)',
+  padding: 'var(--space-3)',
+  borderRadius: 'var(--radius-md)',
+  border: '1px solid var(--color-error-border)',
+  background: 'var(--color-error-surface)',
+} as const;
+
+const failureReasonTitleStyle = {
+  margin: 0,
+  fontSize: 'var(--font-size-sm)',
+  fontWeight: 'var(--font-weight-bold)',
+  color: 'var(--color-error-bright)',
+} as const;
+
+const failureReasonBodyStyle = {
+  margin: 0,
+  fontSize: 'var(--font-size-sm)',
+  lineHeight: 'var(--line-height-normal)',
+  color: 'var(--color-text)',
 } as const;
 
 const explanationTitleStyle = {

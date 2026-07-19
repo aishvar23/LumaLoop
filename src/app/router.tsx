@@ -13,25 +13,38 @@
 import { Route, Routes } from 'react-router-dom';
 import { ROUTES } from './routes';
 import FeedRoute from '../feed/FeedRoute';
+import HomePage from '../profile/HomePage';
 import AuthCallback from '../auth/AuthCallback';
 import RequireAuth from '../auth/RequireAuth';
 import ProfilePage from '../profile/ProfilePage';
-import {
-  CardDeepLinkRoutePlaceholder,
-  NotFoundRoutePlaceholder,
-} from './placeholders';
+import PeopleSearchPage from '../social/PeopleSearchPage';
+import UserProfilePage from '../social/UserProfilePage';
+import ChallengeRoute from '../social/ChallengeRoute';
+import { NotFoundRoutePlaceholder } from './placeholders';
 
 /** The route table. Mount under a router (BrowserRouter / MemoryRouter). */
 export function AppRoutes() {
   return (
     <Routes>
-      {/* `/` is the endless swipe feed (#107), now GATED behind auth (accounts
-          pivot): {@link RequireAuth} shows the login screen when signed out, the
-          profile-creation screen when signed in without a profile, and the feed
-          (with the one-time data notice) once a profile exists. The guard is a
-          clean wrapper — it never touches the feed/session controller. */}
+      {/* `/` is the Home / Discover landing (accounts pivot), GATED behind auth:
+          {@link RequireAuth} shows the login screen when signed out, the
+          profile-creation screen when signed in without a profile, and the Home
+          landing once a profile exists. Home is a clean presentational surface —
+          it never touches the feed/session controller; "Start playing" routes to
+          `/feed`. */}
       <Route
-        path={ROUTES.session}
+        path={ROUTES.home}
+        element={
+          <RequireAuth>
+            <HomePage />
+          </RequireAuth>
+        }
+      />
+      {/* `/feed` is the endless swipe feed (#107), reached from Home, also gated
+          behind auth and layered with the one-time first-run data notice. The
+          guard never touches the feed/session controller. */}
+      <Route
+        path={ROUTES.feed}
         element={
           <RequireAuth>
             <FeedRoute />
@@ -50,10 +63,28 @@ export function AppRoutes() {
           </RequireAuth>
         }
       />
+      {/* Search other users to follow (accounts pivot, Phase 2/3). */}
       <Route
-        path={ROUTES.cardDeepLink}
-        element={<CardDeepLinkRoutePlaceholder />}
+        path={ROUTES.people}
+        element={
+          <RequireAuth>
+            <PeopleSearchPage />
+          </RequireAuth>
+        }
       />
+      {/* Another user's public profile + follow toggle. */}
+      <Route
+        path={ROUTES.userProfile}
+        element={
+          <RequireAuth>
+            <UserProfilePage />
+          </RequireAuth>
+        }
+      />
+      {/* `/c/:cardId` — the PUBLIC, no-auth, playable challenge arrival surface
+          (engagement strategy §4.6). Deliberately mounted OUTSIDE RequireAuth so
+          a shared "beat my score" link is openable with no account. */}
+      <Route path={ROUTES.cardDeepLink} element={<ChallengeRoute />} />
       {/* Catch-all → minimal not-found surface. */}
       <Route path="*" element={<NotFoundRoutePlaceholder />} />
     </Routes>

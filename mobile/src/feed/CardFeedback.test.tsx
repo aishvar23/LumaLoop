@@ -5,7 +5,7 @@
  * GAME-POINTS copy (no ability/IQ/trait language).
  */
 
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import CardFeedback from './CardFeedback';
 import type { CardResolution, ResolutionType } from '../core/templates/contract';
@@ -30,6 +30,46 @@ describe('CardFeedback score chip (RN)', () => {
       <CardFeedback resolution={makeResolution('correct')} explanation={explanation} />,
     );
     expect(screen.queryByTestId('card-score')).toBeNull();
+  });
+
+  it('shows "Play again" only when onReplay is provided, and fires it', () => {
+    const onReplay = jest.fn();
+    const { rerender } = render(
+      <CardFeedback resolution={makeResolution('correct')} explanation={explanation} />,
+    );
+    expect(screen.queryByTestId('feedback-replay')).toBeNull();
+
+    rerender(
+      <CardFeedback
+        resolution={makeResolution('correct')}
+        explanation={explanation}
+        onReplay={onReplay}
+      />,
+    );
+    fireEvent.press(screen.getByTestId('feedback-replay'));
+    expect(onReplay).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders a renderer-supplied failure reason above the authored explanation', () => {
+    render(
+      <CardFeedback
+        resolution={{
+          ...makeResolution('incorrect'),
+          signals: {
+            failure_reason:
+              'Step 2 (B) was answered Match, but "Tap blue" expected No-match.',
+          },
+        }}
+        explanation={explanation}
+      />,
+    );
+
+    expect(screen.getByTestId('feedback-failure-reason')).toHaveTextContent(
+      /What went wrong/,
+    );
+    expect(screen.getByTestId('feedback-failure-reason')).toHaveTextContent(
+      /Step 2 \(B\)/,
+    );
   });
 
   it('shows points + streak/combo on a correct resolution', () => {
@@ -68,5 +108,62 @@ describe('CardFeedback score chip (RN)', () => {
     );
     expect(screen.getByTestId('card-score-reset')).toBeTruthy();
     expect(screen.queryByText(/pts/)).toBeNull();
+  });
+
+  // ── Engagement §4.4: per-card personal best ────────────────────────────────
+  it('celebrates a new best when isNewBest and points were earned', () => {
+    render(
+      <CardFeedback
+        resolution={makeResolution('correct')}
+        explanation={explanation}
+        cardScore={{ points: 132, correct: true, streak: 1, combo: 1 }}
+        personalBest={132}
+        isNewBest
+      />,
+    );
+    expect(screen.getByText(/New best/)).toBeTruthy();
+    expect(screen.queryByTestId('feedback-best')).toBeNull();
+  });
+
+  it('shows the subtle prior best when no new best was set', () => {
+    render(
+      <CardFeedback
+        resolution={makeResolution('correct')}
+        explanation={explanation}
+        cardScore={{ points: 100, correct: true, streak: 1, combo: 1 }}
+        personalBest={300}
+        isNewBest={false}
+      />,
+    );
+    expect(screen.getByText('Best: 300')).toBeTruthy();
+    expect(screen.queryByTestId('feedback-newbest')).toBeNull();
+  });
+
+  // ── Engagement §4.3: performance tags ──────────────────────────────────────
+  it('renders a "Perfect" tag for a correct, first-attempt, fast resolution', () => {
+    render(
+      <CardFeedback
+        resolution={{
+          ...makeResolution('correct'),
+          interactionElapsedMs: 800,
+          attemptCount: 1,
+        }}
+        explanation={explanation}
+        timeLimitMs={60_000}
+      />,
+    );
+    expect(screen.getByTestId('feedback-tags')).toBeTruthy();
+    expect(screen.getByTestId('feedback-tag')).toHaveTextContent('Perfect');
+  });
+
+  it('renders no performance tags on a miss', () => {
+    render(
+      <CardFeedback
+        resolution={makeResolution('incorrect')}
+        explanation={explanation}
+        timeLimitMs={60_000}
+      />,
+    );
+    expect(screen.queryByTestId('feedback-tags')).toBeNull();
   });
 });

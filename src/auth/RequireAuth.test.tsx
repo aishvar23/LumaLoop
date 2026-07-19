@@ -31,7 +31,7 @@ describe('RequireAuth (three gate states)', () => {
     renderGuard({ session: null, profile: null });
     await waitFor(() =>
       expect(
-        screen.getByRole('heading', { name: 'LumaLoop' }),
+        screen.getByRole('heading', { name: 'Witzy' }),
       ).toBeInTheDocument(),
     );
     expect(screen.queryByText('FEED CONTENT')).not.toBeInTheDocument();
@@ -53,7 +53,7 @@ describe('RequireAuth (three gate states)', () => {
       expect(screen.getByText('FEED CONTENT')).toBeInTheDocument(),
     );
     expect(
-      screen.queryByRole('heading', { name: 'LumaLoop' }),
+      screen.queryByRole('heading', { name: 'Witzy' }),
     ).not.toBeInTheDocument();
   });
 });

@@ -1,0 +1,31 @@
+/** Follow / Unfollow toggle. Filled accent to follow; muted outline once following. */
+.follow-btn {
+  appearance: none;
+  min-height: 36px;
+  padding: var(--space-1) var(--space-4);
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+  background: var(--color-accent);
+  color: var(--color-accent-contrast, #fff);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.follow-btn:hover,
+.follow-btn:focus-visible {
+  filter: brightness(1.08);
+  outline: none;
+}
+
+.follow-btn--on {
+  background: transparent;
+  border-color: var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.follow-btn:disabled {
+  opacity: 0.7;
+  cursor: default;
+}

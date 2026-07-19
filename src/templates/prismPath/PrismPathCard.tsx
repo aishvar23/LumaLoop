@@ -6,7 +6,7 @@
  * pure evaluator. Beam correctness is never reimplemented here.
  */
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type {
   GridCoordinate,
@@ -40,6 +40,44 @@ function mirrorGlyph(orientation: PrismMirrorOrientation): string {
   return orientation === 'slash' ? '/' : '\\';
 }
 
+const PRISM_PATH_DESCRIPTION =
+  'Rotate mirrors to bend the beam from IN to the star while avoiding blocker squares. Use the live preview, then fire only when the route reaches the target.';
+const DEMO_TIME_HINT =
+  'Watching the demo adds about 5 seconds to your overall solve time.';
+const DEMO_CONNECT_MS = 1300;
+const DEMO_TARGET_MS = 2600;
+const DEMO_CLOSE_MS = 4200;
+
+type DemoStep = 0 | 1 | 2;
+
+const DEMO_CONFIG: PrismPathCardType['config'] = {
+  rows: 3,
+  columns: 4,
+  entry: { row: 2, column: 0 },
+  entryDirection: 'right',
+  target: { row: 0, column: 3 },
+  mirrors: [
+    { id: 'demo-a', row: 2, column: 1, initialOrientation: 'backslash' },
+    { id: 'demo-b', row: 0, column: 1, initialOrientation: 'backslash' },
+  ],
+  blockers: [{ row: 0, column: 0 }],
+  solution: [
+    { mirrorId: 'demo-a', orientation: 'slash' },
+    { mirrorId: 'demo-b', orientation: 'slash' },
+  ],
+  timeLimitMs: 0,
+};
+
+function demoOrientationsForStep(step: DemoStep): PrismPathOrientationMap {
+  if (step === 0) {
+    return { 'demo-a': 'backslash', 'demo-b': 'backslash' };
+  }
+  if (step === 1) {
+    return { 'demo-a': 'slash', 'demo-b': 'backslash' };
+  }
+  return { 'demo-a': 'slash', 'demo-b': 'slash' };
+}
+
 export default function PrismPathCard({
   card,
   context,
@@ -56,6 +94,39 @@ export default function PrismPathCard({
   const firstInputElapsedRef = useRef<number | null>(null);
   const attemptCountRef = useRef(0);
   const resolvedRef = useRef(false);
+  const [demoOpen, setDemoOpen] = useState(false);
+  const [demoStep, setDemoStep] = useState<DemoStep>(0);
+  const [showYourTurn, setShowYourTurn] = useState(false);
+  const [hasInteracted, setHasInteracted] = useState(false);
+
+  const finishDemo = useCallback(() => {
+    setDemoOpen(false);
+    setDemoStep(0);
+    setShowYourTurn(true);
+  }, []);
+
+  useEffect(() => {
+    if (!demoOpen) return undefined;
+    setDemoStep(0);
+    const connectTimer = setTimeout(
+      () => setDemoStep(1),
+      DEMO_CONNECT_MS,
+    );
+    const targetTimer = setTimeout(() => setDemoStep(2), DEMO_TARGET_MS);
+    const closeTimer = setTimeout(finishDemo, DEMO_CLOSE_MS);
+    return () => {
+      clearTimeout(connectTimer);
+      clearTimeout(targetTimer);
+      clearTimeout(closeTimer);
+    };
+  }, [demoOpen, finishDemo]);
+
+  const openDemo = useCallback(() => {
+    if (resolvedRef.current || hasInteracted) return;
+    setShowYourTurn(false);
+    setDemoStep(0);
+    setDemoOpen(true);
+  }, [hasInteracted]);
 
   const handleResolve = useCallback(
     (resolution: CardResolution) => {
@@ -87,6 +158,8 @@ export default function PrismPathCard({
 
   const markFirstInput = useCallback(() => {
     if (firstInputElapsedRef.current !== null) return;
+    setHasInteracted(true);
+    setShowYourTurn(false);
     const tti = now() - context.interactionEnabledAtMs;
     firstInputElapsedRef.current = tti;
     onAttempt({ time_to_interaction: tti });
@@ -165,10 +238,47 @@ export default function PrismPathCard({
   }, [config.rows, config.columns]);
 
   return (
-    <section aria-label="Prism path" style={sectionStyle}>
+    <section
+      aria-label={`Prism path. ${PRISM_PATH_DESCRIPTION}`}
+      style={sectionStyle}
+    >
+      <div style={demoLaunchRowStyle}>
+        <div style={introCopyStyle}>
+          <div
+            data-testid="pp-description-trigger"
+            title={PRISM_PATH_DESCRIPTION}
+            tabIndex={0}
+            style={eyebrowStyle}
+          >
+            PRISM PATH · MIRROR ROUTING
+          </div>
+        </div>
+        {!hasInteracted ? (
+          <button
+            type="button"
+            data-testid="pp-demo-button"
+            aria-label="Watch Prism Path demo"
+            title={DEMO_TIME_HINT}
+            onClick={openDemo}
+            style={demoButtonStyle}
+          >
+            Watch demo
+          </button>
+        ) : null}
+      </div>
       <p data-testid="pp-prompt" style={promptStyle}>
         {card.prompt}
       </p>
+      {showYourTurn && !hasInteracted ? (
+        <p
+          data-testid="pp-your-turn"
+          role="status"
+          aria-live="polite"
+          style={yourTurnStyle}
+        >
+          Your turn — rotate mirrors until the preview reaches the star.
+        </p>
+      ) : null}
 
       <div
         role="grid"
@@ -250,16 +360,176 @@ export default function PrismPathCard({
           ? 'Beam preview reaches the star.'
           : `Beam currently ${trace.exitReason.replace('_', ' ')}.`}
       </p>
+      {demoOpen ? (
+        <PrismDemo step={demoStep} onClose={finishDemo} />
+      ) : null}
     </section>
   );
 }
 
 PrismPathCard.displayName = 'PrismPathCard';
 
+function PrismDemo({
+  step,
+  onClose,
+}: {
+  step: DemoStep;
+  onClose: () => void;
+}) {
+  const orientations = demoOrientationsForStep(step);
+  const trace = tracePrismPath(DEMO_CONFIG, orientations);
+  const pathSet = new Set(trace.cells.map(coordKey));
+  const blockerSet = new Set(DEMO_CONFIG.blockers.map(coordKey));
+  const mirrorByCoord = new Map<string, (typeof DEMO_CONFIG.mirrors)[number]>();
+  for (const mirror of DEMO_CONFIG.mirrors) {
+    mirrorByCoord.set(coordKey(mirror), mirror);
+  }
+  const instruction =
+    step === 0
+      ? 'The beam starts at IN and follows the current mirror angle.'
+      : step === 1
+        ? 'One mirror turns the beam upward, but the next angle still hits a block.'
+        : 'Rotate the second mirror and the beam reaches the star.';
+  const cells: GridCoordinate[] = [];
+  for (let row = 0; row < DEMO_CONFIG.rows; row++) {
+    for (let column = 0; column < DEMO_CONFIG.columns; column++) {
+      cells.push({ row, column });
+    }
+  }
+
+  return (
+    <div style={demoBackdropStyle}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Prism Path demonstration"
+        style={demoPanelStyle}
+      >
+        <h2 style={demoTitleStyle}>How Prism Path works</h2>
+        <p
+          data-testid="pp-demo-instruction"
+          aria-live="polite"
+          style={demoInstructionStyle}
+        >
+          {instruction}
+        </p>
+        <div
+          data-testid="pp-demo-board"
+          role="grid"
+          aria-label="Separate Prism Path demo board"
+          style={{
+            ...demoBoardStyle,
+            gridTemplateColumns: `repeat(${DEMO_CONFIG.columns}, minmax(0, 1fr))`,
+          }}
+        >
+          {cells.map((coord) => {
+            const key = coordKey(coord);
+            const mirror = mirrorByCoord.get(key);
+            const isEntry =
+              coord.row === DEMO_CONFIG.entry.row &&
+              coord.column === DEMO_CONFIG.entry.column;
+            const isTarget =
+              coord.row === DEMO_CONFIG.target.row &&
+              coord.column === DEMO_CONFIG.target.column;
+            const isBlocker = blockerSet.has(key);
+            const isBeam = pathSet.has(key);
+            const cellStyle = {
+              ...demoCellStyle,
+              ...(isBeam ? demoBeamCellStyle : null),
+              ...(isEntry ? entryCellStyle : null),
+              ...(isTarget ? targetCellStyle : null),
+              ...(isBlocker ? blockerCellStyle : null),
+              ...(mirror ? mirrorCellStyle : null),
+            };
+
+            return (
+              <div
+                key={key}
+                role="gridcell"
+                data-testid={`pp-demo-cell-${key}`}
+                data-beam={isBeam ? 'true' : 'false'}
+                style={cellStyle}
+              >
+                {mirror ? (
+                  <span aria-hidden="true" style={demoMirrorGlyphStyle}>
+                    {mirrorGlyph(orientations[mirror.id] ?? 'slash')}
+                  </span>
+                ) : isEntry ? (
+                  <span style={entryTextStyle}>IN</span>
+                ) : isTarget ? (
+                  <span aria-label="target" style={targetTextStyle}>
+                    ★
+                  </span>
+                ) : isBlocker ? (
+                  <span aria-label="blocker" style={blockerTextStyle}>
+                    ×
+                  </span>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+        <p style={demoCaptionStyle}>
+          Demo uses a separate mini board, not this puzzle’s answer.
+        </p>
+        <div aria-hidden="true" style={demoProgressStyle}>
+          {[0, 1, 2].map((item) => (
+            <span
+              key={item}
+              style={{
+                ...demoDotStyle,
+                background:
+                  item <= step ? 'var(--accent)' : 'var(--color-border)',
+              }}
+            />
+          ))}
+        </div>
+        <button
+          type="button"
+          data-testid="pp-demo-skip"
+          onClick={onClose}
+          style={demoSkipStyle}
+        >
+          Skip demo
+        </button>
+      </div>
+    </div>
+  );
+}
+
 const sectionStyle = {
   display: 'flex',
   flexDirection: 'column',
   gap: 'var(--space-3)',
+} as const;
+
+const demoLaunchRowStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 'var(--space-2)',
+} as const;
+
+const introCopyStyle = {
+  minWidth: 0,
+} as const;
+
+const eyebrowStyle = {
+  color: 'var(--accent)',
+  fontSize: 12,
+  fontWeight: 800,
+  letterSpacing: '0.16em',
+  outline: 'none',
+} as const;
+
+const demoButtonStyle = {
+  minHeight: 'var(--tap-target-min)',
+  padding: '0 var(--space-3)',
+  borderRadius: 'var(--radius-pill)',
+  border: '1px solid var(--game-border, var(--color-border))',
+  background: 'var(--game-surface, transparent)',
+  color: 'var(--accent)',
+  fontWeight: 700,
 } as const;
 
 const promptStyle = {
@@ -269,6 +539,17 @@ const promptStyle = {
   lineHeight: 'var(--line-height-tight)',
 } as const;
 
+const yourTurnStyle = {
+  margin: 0,
+  padding: 'var(--space-2)',
+  borderRadius: 'var(--radius-md)',
+  border: '1px solid var(--accent)',
+  background: 'var(--accent-tint)',
+  color: 'var(--accent)',
+  fontSize: 'var(--font-size-sm)',
+  fontWeight: 700,
+} as const;
+
 const boardStyle = {
   display: 'grid',
   gap: 'var(--space-1)',
@@ -276,7 +557,7 @@ const boardStyle = {
   border: '1px solid color-mix(in srgb, var(--accent) 45%, transparent)',
   borderRadius: 'var(--radius-md)',
   background:
-    'radial-gradient(circle at 50% 20%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 58%), var(--surface)',
+    'radial-gradient(circle at 50% 20%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 58%), var(--game-board, var(--surface))',
   boxShadow: '0 18px 50px rgb(0 0 0 / 0.24)',
 } as const;
 
@@ -291,7 +572,7 @@ const baseCellStyle = {
   borderColor: 'var(--border)',
   borderRadius: 'var(--radius-sm)',
   color: 'var(--text)',
-  background: 'rgb(255 255 255 / 0.055)',
+  background: 'var(--game-surface-raised, rgb(255 255 255 / 0.055))',
   font: 'inherit',
 } as const;
 
@@ -363,4 +644,92 @@ const statusStyle = {
   margin: 0,
   color: 'var(--muted)',
   fontSize: 'var(--font-size-sm)',
+} as const;
+
+const demoBackdropStyle = {
+  position: 'fixed',
+  inset: 0,
+  zIndex: 1000,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: 'var(--space-5)',
+  background: 'rgba(4, 6, 12, 0.88)',
+} as const;
+
+const demoPanelStyle = {
+  width: 'min(390px, 100%)',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 'var(--space-4)',
+  padding: 'var(--space-5)',
+  borderRadius: 'var(--radius-lg)',
+  border: '1px solid var(--game-border, var(--color-border))',
+  background: 'var(--color-surface)',
+  boxShadow: 'var(--shadow-lg)',
+} as const;
+
+const demoTitleStyle = {
+  margin: 0,
+  color: 'var(--color-text)',
+  fontSize: 'var(--font-size-lg)',
+  textAlign: 'center',
+} as const;
+
+const demoInstructionStyle = {
+  minHeight: 52,
+  margin: 0,
+  color: 'var(--color-text-muted)',
+  textAlign: 'center',
+} as const;
+
+const demoBoardStyle = {
+  display: 'grid',
+  gap: 'var(--space-1)',
+  padding: 'var(--space-2)',
+  borderRadius: 'var(--radius-md)',
+  border: '1px solid color-mix(in srgb, var(--accent) 40%, transparent)',
+  background: 'var(--game-board, rgba(3,8,18,.58))',
+} as const;
+
+const demoCellStyle = {
+  ...baseCellStyle,
+  minHeight: 54,
+} as const;
+
+const demoBeamCellStyle = {
+  ...beamCellStyle,
+  boxShadow: 'inset 0 0 16px color-mix(in srgb, var(--accent) 42%, transparent)',
+} as const;
+
+const demoMirrorGlyphStyle = {
+  ...mirrorGlyphStyle,
+  fontSize: '1.75rem',
+} as const;
+
+const demoCaptionStyle = {
+  margin: 0,
+  color: 'var(--color-text-muted)',
+  fontSize: 'var(--font-size-xs)',
+  textAlign: 'center',
+} as const;
+
+const demoProgressStyle = {
+  display: 'flex',
+  justifyContent: 'center',
+  gap: 'var(--space-2)',
+} as const;
+
+const demoDotStyle = {
+  width: 8,
+  height: 8,
+  borderRadius: '50%',
+} as const;
+
+const demoSkipStyle = {
+  minHeight: 'var(--tap-target-min)',
+  border: 0,
+  background: 'transparent',
+  color: 'var(--color-text-muted)',
+  fontWeight: 700,
 } as const;

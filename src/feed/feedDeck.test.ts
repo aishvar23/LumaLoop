@@ -13,9 +13,11 @@ import {
   appendNextBatch,
   defaultFeedBatchSource,
   ensureDeckLength,
+  excludeWithStart,
   feedBatchSeedUserId,
   feedDifficultyBias,
   makeFeedBatchSource,
+  withPinnedFirst,
   type FeedBatchSource,
 } from './feedDeck';
 
@@ -25,7 +27,13 @@ const fakeSource: FeedBatchSource = (seed) => {
   return [`b${n}-0`, `b${n}-1`, `b${n}-2`];
 };
 
-const DIFFICULTY_RANK: Record<Difficulty, number> = { easy: 0, medium: 1, hard: 2 };
+const DIFFICULTY_RANK: Record<Difficulty, number> = {
+  extremely_easy: 0,
+  easy: 1,
+  medium: 2,
+  hard: 3,
+  extremely_hard: 4,
+};
 const cardById = new Map(catalog.map((c) => [c.cardId, c]));
 const meanRank = (ids: readonly string[]): number => {
   const ranks = ids.map((id) => DIFFICULTY_RANK[cardById.get(id)!.difficulty]);
@@ -209,5 +217,43 @@ describe('makeFeedBatchSource (D2 already-played skip)', () => {
       makeFeedBatchSource(excludeAll),
     );
     expect(grown.cards.length).toBeGreaterThanOrEqual(40);
+  });
+});
+
+describe('withPinnedFirst (featured-game deep link)', () => {
+  it('moves the chosen card to index 0 and removes other occurrences', () => {
+    const deck = { cards: ['a', 'b', 'c', 'b'], batchesUsed: 2 };
+    const pinned = withPinnedFirst(deck, 'b');
+    expect(pinned.cards).toEqual(['b', 'a', 'c']);
+    expect(pinned.batchesUsed).toBe(2);
+  });
+
+  it('prepends a card not already present', () => {
+    expect(withPinnedFirst({ cards: ['a', 'b'], batchesUsed: 1 }, 'z').cards).toEqual([
+      'z',
+      'a',
+      'b',
+    ]);
+  });
+
+  it('returns the deck unchanged for a falsy cardId', () => {
+    const deck = { cards: ['a', 'b'], batchesUsed: 1 };
+    expect(withPinnedFirst(deck, undefined)).toBe(deck);
+  });
+});
+
+describe('excludeWithStart', () => {
+  it('adds the start card to an existing exclusion set', () => {
+    const set = excludeWithStart(['a', 'b'], 'c');
+    expect(new Set(set)).toEqual(new Set(['a', 'b', 'c']));
+  });
+
+  it('returns the original exclusion untouched when there is no start card', () => {
+    const set = ['a'];
+    expect(excludeWithStart(set, undefined)).toBe(set);
+  });
+
+  it('builds a singleton set when only a start card is given', () => {
+    expect(new Set(excludeWithStart(undefined, 'c'))).toEqual(new Set(['c']));
   });
 });

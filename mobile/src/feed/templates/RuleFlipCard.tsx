@@ -34,7 +34,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { RuleFlipCard as RuleFlipCardType } from '../../core/cards/types';
 import type {
@@ -59,6 +59,7 @@ import {
   space,
   TAP_TARGET_MIN,
 } from './tokens';
+import { useGameTheme } from './GameTheme';
 
 /**
  * The renderer accepts the shared {@link TemplateProps} plus an optional injectable
@@ -70,6 +71,81 @@ export type RuleFlipCardProps = TemplateProps<RuleFlipCardType> & {
 };
 
 type Phase = 'gate' | 'stream';
+type DemoStep = 0 | 1 | 2;
+
+const DEMO_TIME_HINT =
+  'Watching the demo adds about 5 seconds to your overall solve time.';
+const DEMO_STEP_MS = 1500;
+const DEMO_CLOSE_MS = 5000;
+const RULE_FLIP_DEMO_STEPS = [
+  {
+    rule: 'Filled circles match',
+    stimulus: '●',
+    answer: 'Match',
+    note: 'The item fits the first rule.',
+  },
+  {
+    rule: 'Rule changed: outlined squares match',
+    stimulus: '○',
+    answer: 'No-match',
+    note: 'The rule flipped, so the old circle rule no longer applies.',
+  },
+  {
+    rule: 'Rule changed: outlined squares match',
+    stimulus: '□',
+    answer: 'Match',
+    note: 'Now the item fits the new rule.',
+  },
+] as const;
+
+function responseCopy(response: RuleFlipResponseKind): string {
+  return response === 'match' ? 'Match' : 'No-match';
+}
+
+function actionLogFor(
+  config: RuleFlipCardType['config'],
+  evaluation: RuleFlipEvaluation,
+): string {
+  return JSON.stringify(
+    evaluation.outcomes.map((outcome) => {
+      const stimulus = config.stimuli[outcome.stimulusIndex];
+      return {
+        step: outcome.stimulusIndex + 1,
+        stimulusId: outcome.stimulusId,
+        stimulus: stimulus?.label ?? outcome.stimulusId,
+        phase: outcome.phase,
+        activeRule: outcome.activeRule,
+        expected: outcome.expectedResponse,
+        response: outcome.response ?? 'omitted',
+        correct: outcome.isCorrect,
+        responseTimeMs: outcome.responseTimeMs ?? -1,
+      };
+    }),
+  );
+}
+
+function firstFailureFor(
+  config: RuleFlipCardType['config'],
+  evaluation: RuleFlipEvaluation,
+) {
+  const outcome = evaluation.outcomes.find((candidate) => !candidate.isCorrect);
+  if (!outcome) {
+    return { failedStep: -1, failureReason: '' };
+  }
+  const stimulus = config.stimuli[outcome.stimulusIndex];
+  const label = stimulus?.label ?? outcome.stimulusId;
+  const ruleLabel =
+    outcome.activeRule === 'initial'
+      ? config.initialRuleLabel
+      : config.flippedRuleLabel;
+  const expected = responseCopy(outcome.expectedResponse);
+  const failureReason = outcome.responded
+    ? `Step ${outcome.stimulusIndex + 1} (${label}) was answered ${responseCopy(
+        outcome.response as RuleFlipResponseKind,
+      )}, but "${ruleLabel}" expected ${expected}.`
+    : `Step ${outcome.stimulusIndex + 1} (${label}) was not answered; "${ruleLabel}" expected ${expected}.`;
+  return { failedStep: outcome.stimulusIndex + 1, failureReason };
+}
 
 export default function RuleFlipCard({
   card,
@@ -84,11 +160,40 @@ export default function RuleFlipCard({
   // in a ref so it survives without forcing a render (mirrors what_changed).
   const [phase, setPhase] = useState<Phase>('gate');
   const streamStartRef = useRef<number | null>(null);
+  const [demoOpen, setDemoOpen] = useState(false);
+  const [demoStep, setDemoStep] = useState<DemoStep>(0);
+  const [showYourTurn, setShowYourTurn] = useState(false);
 
   const nowRef = useRef(now);
   nowRef.current = now;
 
+  const finishDemo = useCallback(() => {
+    setDemoOpen(false);
+    setDemoStep(0);
+    setShowYourTurn(true);
+  }, []);
+
+  useEffect(() => {
+    if (!demoOpen) return undefined;
+    setDemoStep(0);
+    const secondTimer = setTimeout(() => setDemoStep(1), DEMO_STEP_MS);
+    const thirdTimer = setTimeout(() => setDemoStep(2), DEMO_STEP_MS * 2);
+    const closeTimer = setTimeout(finishDemo, DEMO_CLOSE_MS);
+    return () => {
+      clearTimeout(secondTimer);
+      clearTimeout(thirdTimer);
+      clearTimeout(closeTimer);
+    };
+  }, [demoOpen, finishDemo]);
+
+  const handleDemo = useCallback(() => {
+    setShowYourTurn(false);
+    setDemoStep(0);
+    setDemoOpen(true);
+  }, []);
+
   const handleStart = useCallback(() => {
+    setShowYourTurn(false);
     streamStartRef.current = nowRef.current();
     setPhase('stream');
   }, []);
@@ -99,6 +204,8 @@ export default function RuleFlipCard({
       {phase === 'gate' ? (
         <RuleFlipGate
           initialRuleLabel={config.initialRuleLabel}
+          showYourTurn={showYourTurn}
+          onDemo={handleDemo}
           onStart={handleStart}
         />
       ) : (
@@ -113,6 +220,7 @@ export default function RuleFlipCard({
           now={now}
         />
       )}
+      <RuleFlipDemo visible={demoOpen} step={demoStep} onClose={finishDemo} />
     </View>
   );
 }
@@ -125,11 +233,16 @@ RuleFlipCard.displayName = 'RuleFlipCard';
  */
 function RuleFlipGate({
   initialRuleLabel,
+  showYourTurn,
+  onDemo,
   onStart,
 }: {
   initialRuleLabel: string;
+  showYourTurn: boolean;
+  onDemo: () => void;
   onStart: () => void;
 }) {
+  const theme = useGameTheme();
   return (
     <View style={styles.gate}>
       <Text testID="rf-gate-rule" style={styles.ruleLabel}>
@@ -138,6 +251,31 @@ function RuleFlipGate({
       <Text style={styles.instruction}>
         Tap Match when the item fits the rule, No-match when it does not.
       </Text>
+      {showYourTurn ? (
+        <Text
+          testID="rf-your-turn"
+          accessibilityLiveRegion="polite"
+          style={[styles.yourTurn, { borderColor: theme.accent, color: theme.accent }]}
+        >
+          Your turn — answer each item under the active rule.
+        </Text>
+      ) : null}
+      <Pressable
+        testID="rf-demo-button"
+        accessibilityRole="button"
+        accessibilityLabel="Watch Rule Flip demo"
+        accessibilityHint={DEMO_TIME_HINT}
+        onPress={onDemo}
+        style={({ pressed }) => [
+          styles.demoButton,
+          { borderColor: theme.border },
+          pressed && { backgroundColor: theme.surfaceStrong },
+        ]}
+      >
+        <Text style={[styles.demoButtonText, { color: theme.accent }]}>
+          Watch demo
+        </Text>
+      </Pressable>
       <Pressable
         testID="rf-start"
         accessibilityRole="button"
@@ -145,12 +283,94 @@ function RuleFlipGate({
         onPress={onStart}
         style={({ pressed }) => [
           styles.primaryButton,
-          pressed && styles.primaryButtonPressed,
+          { backgroundColor: theme.accent, borderColor: theme.accent },
+          pressed && { backgroundColor: theme.deep },
         ]}
       >
         <Text style={styles.primaryButtonText}>Start</Text>
       </Pressable>
     </View>
+  );
+}
+
+function RuleFlipDemo({
+  visible,
+  step,
+  onClose,
+}: {
+  visible: boolean;
+  step: DemoStep;
+  onClose: () => void;
+}) {
+  const theme = useGameTheme();
+  const item = RULE_FLIP_DEMO_STEPS[step];
+  return (
+    <Modal
+      transparent
+      visible={visible}
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <View
+        style={styles.demoBackdrop}
+        accessibilityViewIsModal
+        accessibilityLabel="Rule Flip demonstration"
+      >
+        <View style={styles.demoPanel}>
+          <Text style={styles.demoTitle}>How Rule Flip works</Text>
+          <Text
+            testID="rf-demo-rule"
+            accessibilityLiveRegion="polite"
+            style={styles.ruleLabel}
+          >
+            {item.rule}
+          </Text>
+          <View
+            testID="rf-demo-stimulus"
+            style={[
+              styles.demoStimulus,
+              { borderColor: theme.border, backgroundColor: theme.surfaceRaised },
+            ]}
+          >
+            <Text style={styles.demoStimulusText}>{item.stimulus}</Text>
+          </View>
+          <Text
+            testID="rf-demo-answer"
+            style={[styles.demoAnswer, { backgroundColor: theme.accent }]}
+          >
+            Demo taps: {item.answer}
+          </Text>
+          <Text testID="rf-demo-note" style={styles.demoInstruction}>
+            {item.note}
+          </Text>
+          <Text style={styles.demoCaption}>
+            Demo uses a separate pattern, not this card’s answer stream.
+          </Text>
+          <View style={styles.demoProgress} accessibilityElementsHidden>
+            {[0, 1, 2].map((itemIndex) => (
+              <View
+                key={itemIndex}
+                style={[
+                  styles.demoDot,
+                  {
+                    backgroundColor:
+                      itemIndex <= step ? theme.accent : colors.border,
+                  },
+                ]}
+              />
+            ))}
+          </View>
+          <Pressable
+            testID="rf-demo-skip"
+            accessibilityRole="button"
+            onPress={onClose}
+            style={styles.demoSkip}
+          >
+            <Text style={styles.demoSkipText}>Skip demo</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -185,6 +405,7 @@ function RuleFlipStream({
   now,
 }: RuleFlipStreamProps) {
   const { config } = card;
+  const theme = useGameTheme();
   const {
     stimuli,
     flipAtStimulusIndex,
@@ -241,21 +462,27 @@ function RuleFlipStream({
   // timeout paths so the two never drift; `correct` is forced by the caller (a
   // timeout is incorrect by contract regardless of partial accuracy).
   const buildSignals = useCallback(
-    (evaluation: RuleFlipEvaluation, correct: boolean, atMs: number) => ({
-      pre_flip_accuracy: evaluation.preFlipAccuracy,
-      post_flip_accuracy: evaluation.postFlipAccuracy,
-      // -1 is the "absent" sentinel (the signals map can't carry null): no
-      // responded post-flip stimulus, so switch latency is undefined. Downstream
-      // consumers MUST exclude -1 before averaging latencies.
-      switch_latency_ms: evaluation.switchLatencyMs ?? -1,
-      perseveration: evaluation.perseverationCount,
-      overall_accuracy: evaluation.overallAccuracy,
-      correct,
-      // -1 = no interaction at all (player never responded); exclude before averaging.
-      time_to_interaction: firstResponseRtRef.current ?? -1,
-      elapsed: atMs - streamStartMs,
-    }),
-    [streamStartMs],
+    (evaluation: RuleFlipEvaluation, correct: boolean, atMs: number) => {
+      const failure = firstFailureFor(config, evaluation);
+      return {
+        pre_flip_accuracy: evaluation.preFlipAccuracy,
+        post_flip_accuracy: evaluation.postFlipAccuracy,
+        // -1 is the "absent" sentinel (the signals map can't carry null): no
+        // responded post-flip stimulus, so switch latency is undefined. Downstream
+        // consumers MUST exclude -1 before averaging latencies.
+        switch_latency_ms: evaluation.switchLatencyMs ?? -1,
+        perseveration: evaluation.perseverationCount,
+        overall_accuracy: evaluation.overallAccuracy,
+        correct,
+        failed_step: failure.failedStep,
+        failure_reason: failure.failureReason,
+        step_action_log: actionLogFor(config, evaluation),
+        // -1 = no interaction at all (player never responded); exclude before averaging.
+        time_to_interaction: firstResponseRtRef.current ?? -1,
+        elapsed: atMs - streamStartMs,
+      };
+    },
+    [config, streamStartMs],
   );
 
   const timer = useCardTimer({
@@ -387,7 +614,10 @@ function RuleFlipStream({
 
       <View
         accessibilityLabel="Current stimulus"
-        style={styles.stimulusStage}
+        style={[
+          styles.stimulusStage,
+          { backgroundColor: theme.surface, borderColor: theme.border },
+        ]}
       >
         {visibleIndex !== null ? (
           <Text
@@ -411,7 +641,14 @@ function RuleFlipStream({
           onPress={() => handleResponse('match')}
           style={({ pressed }) => [
             styles.responseButton,
-            pressed && styles.responseButtonPressed,
+            {
+              backgroundColor: theme.surfaceRaised,
+              borderColor: theme.border,
+            },
+            pressed && {
+              backgroundColor: theme.surfaceStrong,
+              borderColor: theme.accent,
+            },
           ]}
         >
           <Text style={styles.responseButtonText}>Match</Text>
@@ -423,7 +660,14 @@ function RuleFlipStream({
           onPress={() => handleResponse('no_match')}
           style={({ pressed }) => [
             styles.responseButton,
-            pressed && styles.responseButtonPressed,
+            {
+              backgroundColor: theme.surfaceRaised,
+              borderColor: theme.border,
+            },
+            pressed && {
+              backgroundColor: theme.surfaceStrong,
+              borderColor: theme.accent,
+            },
           ]}
         >
           <Text style={styles.responseButtonText}>No-match</Text>
@@ -462,6 +706,26 @@ const styles = StyleSheet.create({
     fontSize: fontSize.md,
     color: colors.textMuted,
     lineHeight: fontSize.md * lineHeight.normal,
+  },
+  yourTurn: {
+    padding: space.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.semibold,
+  },
+  demoButton: {
+    minHeight: TAP_TARGET_MIN,
+    paddingHorizontal: space.md,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  demoButtonText: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold,
   },
   stream: {
     gap: space.lg,
@@ -555,5 +819,82 @@ const styles = StyleSheet.create({
     minHeight: fontSize.md,
     fontSize: fontSize.sm,
     color: colors.textMuted,
+  },
+  demoBackdrop: {
+    flex: 1,
+    padding: space.xl,
+    backgroundColor: 'rgba(4,6,12,0.88)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  demoPanel: {
+    width: '100%',
+    maxWidth: 360,
+    gap: space.lg,
+    padding: space.xl,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: '#151923',
+    ...elevation.card,
+  },
+  demoTitle: {
+    color: colors.text,
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.heavy,
+    textAlign: 'center',
+  },
+  demoStimulus: {
+    minHeight: 96,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  demoStimulusText: {
+    color: colors.text,
+    fontSize: fontSize.xl,
+    fontWeight: fontWeight.heavy,
+  },
+  demoAnswer: {
+    paddingVertical: space.sm,
+    paddingHorizontal: space.md,
+    borderRadius: radius.pill,
+    color: colors.accentContrast,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.bold,
+    textAlign: 'center',
+    overflow: 'hidden',
+  },
+  demoInstruction: {
+    minHeight: 44,
+    color: colors.textMuted,
+    fontSize: fontSize.md,
+    textAlign: 'center',
+  },
+  demoCaption: {
+    color: colors.textMuted,
+    fontSize: fontSize.xs,
+    textAlign: 'center',
+  },
+  demoProgress: {
+    flexDirection: 'row',
+    alignSelf: 'center',
+    gap: space.sm,
+  },
+  demoDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  demoSkip: {
+    minHeight: TAP_TARGET_MIN,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  demoSkipText: {
+    color: colors.textMuted,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.semibold,
   },
 });

@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import { AppRoutes } from './router';
 import { buildCardDeepLink } from './routes';
+import { catalog } from '../cards/catalog';
 import { AuthProvider } from '../auth/AuthProvider';
 import {
   createFakeAuthClient,
@@ -11,11 +12,11 @@ import {
 } from '../auth/testFakes';
 
 /**
- * The route table now gates `/` (and `/you`) behind {@link AuthProvider} +
- * RequireAuth (accounts pivot). Tests mount AppRoutes under an AuthProvider with
- * an injected FAKE Supabase client so we can drive the gate state (signed-in WITH
- * a profile → the feed renders). Public routes (`/c/:cardId`, not-found) are
- * unaffected by auth.
+ * The route table gates `/` (Home landing), `/feed` (the feed) and `/you` behind
+ * {@link AuthProvider} + RequireAuth (accounts pivot). Tests mount AppRoutes under
+ * an AuthProvider with an injected FAKE Supabase client so we can drive the gate
+ * state (signed-in WITH a profile → the gated surface renders). Public routes
+ * (`/c/:cardId`, not-found) are unaffected by auth.
  */
 function renderAt(
   path: string,
@@ -31,9 +32,27 @@ function renderAt(
 }
 
 describe('AppRoutes', () => {
-  it('renders the endless feed at `/` for a signed-in user with a profile', async () => {
+  it('renders the Home landing at `/` for a signed-in user with a profile', async () => {
     renderAt('/');
-    // `/` is the feed surface (#107), gated behind auth, named by a hidden heading.
+    // `/` is the Home landing (accounts pivot), gated behind auth.
+    await waitFor(() =>
+      expect(
+        screen.getByRole('heading', { name: /hi player one/i }),
+      ).toBeInTheDocument(),
+    );
+    // It is NOT the feed — that lives at `/feed` now.
+    expect(
+      screen.queryByRole('heading', { name: 'Game feed' }),
+    ).not.toBeInTheDocument();
+    // Home routes into the feed via a "Play now" link.
+    expect(
+      screen.getByRole('link', { name: /play now/i }),
+    ).toHaveAttribute('href', '/feed');
+  });
+
+  it('renders the endless feed at `/feed` for a signed-in user with a profile', async () => {
+    renderAt('/feed');
+    // `/feed` is the feed surface (#107), gated behind auth, named by a hidden heading.
     await waitFor(() =>
       expect(
         screen.getByRole('heading', { name: 'Game feed' }),
@@ -50,7 +69,7 @@ describe('AppRoutes', () => {
     renderAt('/', auth);
     await waitFor(() =>
       expect(
-        screen.getByRole('heading', { name: 'LumaLoop' }),
+        screen.getByRole('heading', { name: 'Witzy' }),
       ).toBeInTheDocument(),
     );
     expect(
@@ -68,27 +87,22 @@ describe('AppRoutes', () => {
     );
   });
 
-  it('no longer serves the standalone `/feed` preview route (folded into `/`)', async () => {
-    renderAt('/feed');
-    await waitFor(() =>
-      expect(
-        screen.getByRole('heading', { name: 'Page not found' }),
-      ).toBeInTheDocument(),
-    );
-  });
-
-  it('renders the deep-link placeholder and exposes the decoded cardId', () => {
-    renderAt('/c/card-42');
+  it('renders the public challenge arrival surface for a known cardId', () => {
+    // `/c/:cardId` is the PUBLIC, playable challenge surface (engagement §4.6) —
+    // a real catalog card resolves to its banner with no auth gate involved.
+    renderAt(buildCardDeepLink(catalog[0].cardId));
+    expect(screen.getByTestId('challenge-banner')).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: 'Shared card' }),
+      screen.getByRole('heading', { name: 'Take on this challenge' }),
     ).toBeInTheDocument();
-    expect(screen.getByTestId('deep-link-card-id')).toHaveTextContent('card-42');
   });
 
-  it('decodes an encoded cardId param from a built deep link', () => {
-    const cardId = 'a/b?c#d';
-    renderAt(buildCardDeepLink(cardId));
-    expect(screen.getByTestId('deep-link-card-id')).toHaveTextContent(cardId);
+  it('shows the "not available" panel for an unknown cardId', () => {
+    renderAt('/c/does-not-exist');
+    expect(
+      screen.getByRole('heading', { name: /this challenge isn’t available/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId('challenge-banner')).not.toBeInTheDocument();
   });
 
   it('renders the not-found placeholder for an unknown path', () => {
@@ -101,9 +115,9 @@ describe('AppRoutes', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('routes "Back to the feed" through a client-side link to `/`', () => {
+  it('routes "Back to home" through a client-side link to `/`', () => {
     renderAt('/totally/unknown');
-    const back = screen.getByRole('link', { name: 'Back to the feed' });
+    const back = screen.getByRole('link', { name: 'Back to home' });
     expect(back).toHaveAttribute('href', '/');
   });
 });

@@ -21,6 +21,7 @@ import {
   accuracyMultiplier,
   applyResolution,
   comboForStreak,
+  performanceTags,
   scoreResolution,
   speedMultiplier,
 } from './scoring';
@@ -223,5 +224,51 @@ describe('applyResolution — streak / combo accumulation', () => {
     const a = applyResolution(INITIAL_SCORE_STATE, res({ interactionElapsedMs: 3_333, attemptCount: 2 }), 7_777);
     const b = applyResolution(INITIAL_SCORE_STATE, res({ interactionElapsedMs: 3_333, attemptCount: 2 }), 7_777);
     expect(a).toEqual(b);
+  });
+});
+
+describe('performanceTags', () => {
+  const LIMIT = 60_000;
+
+  it('is empty for a miss/timeout', () => {
+    expect(
+      performanceTags(
+        res({ isCorrect: false, interactionElapsedMs: 0, attemptCount: 1 }),
+        LIMIT,
+      ),
+    ).toEqual([]);
+  });
+
+  it('is Perfect for a correct, first-attempt, fast answer', () => {
+    expect(
+      performanceTags(res({ interactionElapsedMs: 5_000, attemptCount: 1 }), LIMIT),
+    ).toEqual(['Perfect']);
+  });
+
+  it('is Clean for a correct, first-attempt, slow answer', () => {
+    expect(
+      performanceTags(res({ interactionElapsedMs: 50_000, attemptCount: 1 }), LIMIT),
+    ).toEqual(['Clean']);
+  });
+
+  it('is Fast + Recovered for a correct, fast, multi-attempt answer', () => {
+    expect(
+      performanceTags(res({ interactionElapsedMs: 5_000, attemptCount: 3 }), LIMIT),
+    ).toEqual(['Fast', 'Recovered']);
+  });
+
+  it('is Recovered for a correct, slow, multi-attempt answer', () => {
+    expect(
+      performanceTags(res({ interactionElapsedMs: 50_000, attemptCount: 3 }), LIMIT),
+    ).toEqual(['Recovered']);
+  });
+
+  it('treats a non-finite time limit as not fast (Clean only on first attempt)', () => {
+    expect(
+      performanceTags(
+        res({ interactionElapsedMs: 0, attemptCount: 1 }),
+        Number.POSITIVE_INFINITY,
+      ),
+    ).toEqual(['Clean']);
   });
 });

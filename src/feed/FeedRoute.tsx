@@ -25,10 +25,11 @@
  * deterministic feed and assert events with NO real network/storage. Real router
  * usage passes none of them.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { getCardById as defaultGetCardById } from '../cards/catalog';
 import type { LiquidCard } from '../cards/types';
+import type { CardResolution } from '../templates/contract';
 import type { RendererRegistry } from '../session/rendererRegistry';
 import { getAnonymousUserId } from '../telemetry/anonymousUser';
 import { parseTelemetrySource } from '../telemetry/feedTelemetry';
@@ -38,15 +39,19 @@ import {
 } from '../telemetry/telemetryClient';
 import type { TelemetrySource } from '../telemetry/telemetryEvents';
 import { useFeedTelemetry } from '../telemetry/useFeedTelemetry';
-import { ExplanationViewedProvider } from '../ui/feedRegistry';
+import { CardReplayProvider, ExplanationViewedProvider } from '../ui/feedRegistry';
+import { applyResolution, INITIAL_SCORE_STATE } from './scoring';
+import { SocialConfigProvider } from '../social/SocialContext';
 import { useOptionalAuth } from '../auth/AuthProvider';
 import { supabase } from '../auth/supabaseClient';
 import type { AuthClient } from '../auth/authClient';
+import { ROUTES } from '../app/routes';
 import type { FeedBatchSource } from './feedDeck';
 import FeedScreen from './FeedScreen';
 import FirstRunNotice from './FirstRunNotice';
-import { useRecordGamePlay } from './useRecordGamePlay';
+import { useRecordGamePlay, type RecordGamePlay } from './useRecordGamePlay';
 import { usePlayedCardIds } from './usePlayedCardIds';
+import { recordPlayToday } from './streakStore';
 
 export interface FeedRouteProps {
   /** Test seam: telemetry client. Defaults to the real `/api/event` client. */
@@ -61,6 +66,8 @@ export interface FeedRouteProps {
   feedId?: string;
   /** Test seam: deterministic feed batch source. Defaults to seeded catalog. */
   feedSource?: FeedBatchSource;
+  /** Pin a featured game first. Defaults to the `?card=` URL param (deep link). */
+  startCardId?: string;
   /** Test seam: renderer registry. Defaults to the shipped feed registry. */
   registry?: RendererRegistry;
   /**
@@ -85,6 +92,15 @@ function currentSearch(): string {
   }
 }
 
+/** Parse the `?card=<id>` featured-game deep link from a query string, if any. */
+function parseStartCardId(search: string): string | undefined {
+  try {
+    return new URLSearchParams(search).get('card') ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export default function FeedRoute({
   telemetryClient,
   anonymousUserId,
@@ -92,10 +108,15 @@ export default function FeedRoute({
   now,
   feedId: feedIdProp,
   feedSource,
+  startCardId: startCardIdProp,
   registry,
   getCardById = defaultGetCardById,
   authClient,
 }: FeedRouteProps = {}) {
+  // Featured-game deep link: pin `?card=<id>` (or the injected prop) as slide 0.
+  const [startCardId] = useState(
+    () => startCardIdProp ?? parseStartCardId(currentSearch()),
+  );
   // Resolve identity + attribution ONCE per mount (Technical Design §10): the
   // persisted anon id, the parsed `?source=` (headline return uses 'direct'),
   // and a single feed-instance id shared with the feed below.
@@ -153,6 +174,35 @@ export default function FeedRoute({
     client: effectiveClient,
   });
 
+  // Engagement: every scored card also counts as "played today" for the daily
+  // streak (the NYT/Duolingo habit loop). Local-only, idempotent per day, and
+  // best-effort — `recordPlayToday` never throws, so it can never break the feed.
+  const recordScored = useCallback<RecordGamePlay>(
+    (index, resolution, score) => {
+      recordGamePlay(index, resolution, score);
+      recordPlayToday();
+    },
+    [recordGamePlay],
+  );
+
+  // "Play again" replays the same card; each replayed attempt is recorded as its
+  // own `game_plays` row (product decision 2026-06). The engine's per-index
+  // resolution latch deliberately ignores repeat resolutions of one slide, so we
+  // record the replay HERE — off that latched path — with per-attempt points
+  // computed standalone (a replay carries no in-feed streak/combo). Best-effort:
+  // `recordGamePlay` no-ops when signed out.
+  const recordReplayPlay = useCallback(
+    (card: LiquidCard, resolution: CardResolution) => {
+      const { cardScore } = applyResolution(
+        INITIAL_SCORE_STATE,
+        resolution,
+        card.config.timeLimitMs,
+      );
+      recordGamePlay(-1, resolution, cardScore);
+    },
+    [recordGamePlay],
+  );
+
   // D2: best-effort fetch of the signed-in user's already-played games so the
   // feed skips them. The controller captures the exclusion set ONCE at mount, so
   // we wait for `ready` before mounting the feed — that way even the first batch
@@ -164,15 +214,29 @@ export default function FeedRoute({
 
   return (
     <>
+      {/* Minimal feed chrome to escape the immersive feed back to Home / the
+          profile (the feed itself owns no routing). Plain anchors (not react-
+          router Links) so the feed can mount standalone in tests without a Router
+          context; in the real app under BrowserRouter they navigate normally. */}
+      <FeedNav />
       {/* The gate fires Card_Explanation_Viewed through this seam (no telemetry
           coupling inside the gate/renderer — CLAUDE.md §4/§6). */}
       <ExplanationViewedProvider handler={telemetry.onExplanationViewed}>
-        {played.ready && (
-          <FeedScreen
+        {/* Records each "Play again" replay as a new play (off the engine's
+            per-index latch). No provider in tests → replay just remounts. */}
+        <CardReplayProvider handler={recordReplayPlay}>
+        {/* Supply the per-card social surface (likes + comments) with the SAME
+            client the provider authenticated against + the signed-in user id.
+            Feed-layer concern keyed by cardId — the feed/engine stays auth-free
+            (the rail reads this context; no provider → it renders nothing). */}
+        <SocialConfigProvider value={{ client: effectiveClient, userId }}>
+          {played.ready && (
+            <FeedScreen
             key={userId ?? 'anon'}
             registry={registry}
             source={feedSource}
             excludeCardIds={played.cardIds}
+            startCardId={startCardId}
             anonymousUserId={resolvedAnonymousUserId}
             getCardById={getCardById}
             now={now}
@@ -182,11 +246,32 @@ export default function FeedRoute({
             onCardSkipped={telemetry.onCardSkipped}
             onCardAbandoned={telemetry.onCardAbandoned}
             onCardResolved={telemetry.onCardResolved}
-            onCardScored={recordGamePlay}
+            onCardScored={recordScored}
           />
-        )}
+          )}
+        </SocialConfigProvider>
+        </CardReplayProvider>
       </ExplanationViewedProvider>
       <FirstRunNotice />
     </>
+  );
+}
+
+/**
+ * Tiny overlay nav so the immersive feed isn't a dead-end: a link back to Home
+ * (`/`) and to the profile (`/you`). Plain anchors keep the feed mountable with
+ * no Router in tests; the `.feed-nav` styles ship with `FeedScreen.css` (always
+ * loaded while the feed is on screen).
+ */
+function FeedNav() {
+  return (
+    <nav className="feed-nav" aria-label="Feed navigation">
+      <a className="feed-nav__link" href={ROUTES.home} aria-label="Back to home">
+        ⌂ Home
+      </a>
+      <a className="feed-nav__link" href={ROUTES.profile} aria-label="Open your profile">
+        You
+      </a>
+    </nav>
   );
 }

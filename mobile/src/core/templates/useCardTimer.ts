@@ -1,9 +1,9 @@
 // Ported from web `src/templates/useCardTimer.ts`; source of truth is the web app
 // — keep in sync (Phase M). Unlike the rest of the M2 core port this hook IS now
-// ported, because the M3 feed needs the shared, template-AGNOSTIC timeout
-// primitive to honour the free-scroll "timer arms on engage" rule for its stub
-// renderer (and, in M4, the four real native renderers). It is plain React with
-// no DOM/web dependency, so it runs unchanged under React Native.
+// ported, because the feed needs the shared, template-AGNOSTIC timeout primitive
+// to honour the free-scroll "countdown arms on ACTIVATION" rule (the card timer
+// starts when the game appears) for its renderers. It is plain React with no
+// DOM/web dependency, so it runs unchanged under React Native.
 /**
  * Shared renderer-side timeout primitive (Technical Design §7).
  *
@@ -15,8 +15,9 @@
  * The hook is template-AGNOSTIC: it reads only `cardId` and the card config's
  * `timeLimitMs` (both common to every {@link LiquidCard} member) plus the shared
  * contract types — never a concrete template config by name beyond extracting the
- * limit. A non-finite `timeLimitMs` disarms the countdown entirely; the M3 feed
- * uses exactly that to keep a game's timer off until the player engages it.
+ * limit. A non-finite `timeLimitMs` disarms the countdown entirely; the feed uses
+ * exactly that to keep a pre-mounted (non-active) game's timer off, flipping the
+ * limit finite once the slide becomes active so the countdown starts on appear.
  *
  * Design guarantees:
  *  - Single-fire: the card resolves at most once, whether by timeout or by the

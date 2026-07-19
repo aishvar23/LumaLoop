@@ -33,7 +33,9 @@ function renderGuard(options: FakeAuthOptions) {
 describe('RequireAuth (three gate states)', () => {
   it('signed out → shows the login screen, never the feed', async () => {
     renderGuard({ session: null, profile: null });
-    await waitFor(() => expect(screen.getByText('LumaLoop')).toBeTruthy());
+    // The brand is the composed Witzy wordmark (a spark dots the "i"); it exposes
+    // the accessible name "Witzy" rather than a single "Witzy" text node.
+    await waitFor(() => expect(screen.getByLabelText('Witzy')).toBeTruthy());
     expect(screen.queryByText('FEED CONTENT')).toBeNull();
   });
 
@@ -48,6 +50,6 @@ describe('RequireAuth (three gate states)', () => {
   it('signed in WITH a profile → renders the feed (children)', async () => {
     renderGuard({ session: makeSession(), profile: makeProfile() });
     await waitFor(() => expect(screen.getByText('FEED CONTENT')).toBeTruthy());
-    expect(screen.queryByText('LumaLoop')).toBeNull();
+    expect(screen.queryByLabelText('Witzy')).toBeNull();
   });
 });

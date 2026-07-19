@@ -122,7 +122,9 @@ describe('AuthProvider', () => {
       'https://provider/authorize?x=1',
       AUTH_REDIRECT_URL,
     );
-    expect(auth.calls.exchangeCodeForSession).toContain(returnedUrl);
+    // The BARE code is exchanged, not the URL (supabase-js expects the code).
+    expect(auth.calls.exchangeCodeForSession).toContain('abc123');
+    expect(auth.calls.exchangeCodeForSession).not.toContain(returnedUrl);
   });
 
   it('OAuth dismissed (no returned URL) → no error, no exchange', async () => {
@@ -183,9 +185,7 @@ describe('AuthProvider', () => {
       </AuthProvider>,
     );
     await waitFor(() =>
-      expect(auth.calls.exchangeCodeForSession).toContain(
-        `${AUTH_REDIRECT_URL}?code=cold`,
-      ),
+      expect(auth.calls.exchangeCodeForSession).toContain('cold'),
     );
   });
 
@@ -202,9 +202,26 @@ describe('AuthProvider', () => {
       linking.emit(`${AUTH_REDIRECT_URL}?code=warm`);
       await Promise.resolve();
     });
-    expect(auth.calls.exchangeCodeForSession).toContain(
-      `${AUTH_REDIRECT_URL}?code=warm`,
+    expect(auth.calls.exchangeCodeForSession).toContain('warm');
+  });
+
+  it('exchanges a one-time code only once even if delivered twice (dedupe)', async () => {
+    const auth = createFakeAuthClient({ session: null });
+    const linking = createFakeLinking();
+    render(
+      <AuthProvider client={auth.client} linking={linking}>
+        <Probe />
+      </AuthProvider>,
     );
+    await waitFor(() => expect(screen.getByTestId('loading').props.children).toBe('false'));
+    await act(async () => {
+      linking.emit(`${AUTH_REDIRECT_URL}?code=dup`);
+      linking.emit(`${AUTH_REDIRECT_URL}?code=dup`);
+      await Promise.resolve();
+    });
+    expect(
+      auth.calls.exchangeCodeForSession.filter((c) => c === 'dup'),
+    ).toHaveLength(1);
   });
 
   it('signOut clears the session and profile', async () => {

@@ -228,17 +228,17 @@ describe('overall correctness and aggregates', () => {
     expect(result.perseverationCount).toBe(2);
   });
 
-  it('uses RULE_FLIP_PASS_ACCURACY as the >= pass threshold', () => {
-    // Exactly half correct (2 of 4) must pass at the 0.5 threshold.
+  it('requires every Rule Flip step to be correct', () => {
+    // One missed step should fail the card even when most responses are right.
     const result = evaluateRuleFlip(rules({ flipAt: 2 }), [
       respond(0, initialExpected[0]), // correct
       respond(1, initialExpected[1]), // correct
-      respond(2, initialExpected[2]), // wrong
+      respond(2, flippedExpected[2]), // correct
       respond(3, initialExpected[3]), // wrong
     ]);
-    expect(result.overallAccuracy).toBe(0.5);
-    expect(RULE_FLIP_PASS_ACCURACY).toBe(0.5);
-    expect(result.isCorrect).toBe(true);
+    expect(result.overallAccuracy).toBe(0.75);
+    expect(RULE_FLIP_PASS_ACCURACY).toBe(1);
+    expect(result.isCorrect).toBe(false);
   });
 
   it('handles an empty stimulus list without NaN and resolves incorrect', () => {

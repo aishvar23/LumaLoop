@@ -32,8 +32,9 @@
  * never by colour alone.
  */
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
+import { orderOptions } from '../../cards/optionOrder';
 import type { TinyLogicCard as TinyLogicCardType } from '../../cards/types';
 import type { CardResolution, TemplateProps } from '../contract';
 import { useCardTimer } from '../useCardTimer';
@@ -165,13 +166,21 @@ export default function TinyLogicCard({
       ? `Correct: ${selectedLabel}`
       : `Incorrect: ${selectedLabel}.`;
 
+  // Present options in a deterministic, card-seeded order so the correct answer
+  // is not positionally guessable (it is keyed by `correctOptionId`, not slot).
+  // Stable across renders and identical on web↔mobile.
+  const orderedOptions = useMemo(
+    () => orderOptions(card.cardId, config.options),
+    [card.cardId, config.options],
+  );
+
   return (
     <section aria-label="Tiny logic" style={sectionStyle}>
       <p data-testid="tl-stem" style={stemStyle}>
         {config.stem}
       </p>
       <div role="group" aria-label="Pick the correct answer" style={optionsStyle}>
-        {config.options.map((option) => {
+        {orderedOptions.map((option) => {
           const isSelected = option.id === selectedId;
           return (
             <button
@@ -239,8 +248,8 @@ const optionStyle = {
   minHeight: 'var(--tap-target-min)',
   padding: 'var(--space-3)',
   borderRadius: 'var(--radius-md)',
-  border: '1px solid var(--color-border)',
-  background: 'var(--color-surface-raised)',
+  border: '1px solid var(--game-border, var(--color-border))',
+  background: 'var(--game-surface-raised, var(--color-surface-raised))',
   color: 'var(--color-text)',
   fontSize: 'var(--font-size-md)',
   fontFamily: 'var(--font-sans)',
@@ -255,7 +264,7 @@ const optionStyle = {
 const optionSelectedStyle = {
   ...optionStyle,
   border: '1px solid var(--accent, var(--color-accent))',
-  background: 'var(--accent-tint, var(--color-surface-raised))',
+  background: 'var(--accent-tint, var(--game-surface-raised, var(--color-surface-raised)))',
 } as const;
 
 const liveRegionStyle = {
@@ -271,8 +280,8 @@ const explanationStyle = {
   gap: 'var(--space-1)',
   padding: 'var(--space-3)',
   borderRadius: 'var(--radius-md)',
-  border: '1px solid var(--color-border)',
-  background: 'var(--color-surface-raised)',
+  border: '1px solid var(--game-border, var(--color-border))',
+  background: 'var(--game-surface-raised, var(--color-surface-raised))',
 } as const;
 
 const explanationTitleStyle = {

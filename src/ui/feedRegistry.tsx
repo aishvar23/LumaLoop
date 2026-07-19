@@ -28,6 +28,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -39,7 +40,10 @@ import type {
 } from '../session/rendererRegistry';
 import { defaultRendererRegistry } from '../session/rendererRegistry';
 import { useCardScoreLookup } from '../feed/cardScoreContext';
+import { recordCardBest } from '../feed/cardBestStore';
 import type { CardResolution, TemplateProps } from '../templates/contract';
+import CardShareButton from '../social/CardShareButton';
+import CardChallengeButton from '../social/CardChallengeButton';
 import CardFeedback from './CardFeedback';
 
 /**
@@ -73,6 +77,38 @@ export function ExplanationViewedProvider({
 }
 
 /**
+ * Records ONE finished attempt as a play when the player taps "Play again" to
+ * replay the same card (product decision 2026-06 — each replay counts as a new
+ * play). Threaded via context — like {@link ExplanationViewedHandler} — so the
+ * gate stays template-agnostic and the engine's per-index resolution latch
+ * (which deliberately ignores repeat resolutions of the same slide) is left
+ * untouched. `FeedRoute` supplies a handler that records a `game_plays` row from
+ * the card + resolution; absent a provider (tests/standalone) replay just
+ * remounts the card with no recording.
+ */
+export type CardReplayHandler = (
+  card: LiquidCard,
+  resolution: CardResolution,
+) => void;
+
+const CardReplayContext = createContext<CardReplayHandler | null>(null);
+
+/** Provide the replay-record handler to the gates rendered beneath it. */
+export function CardReplayProvider({
+  handler,
+  children,
+}: {
+  handler: CardReplayHandler;
+  children: ReactNode;
+}) {
+  return (
+    <CardReplayContext.Provider value={handler}>
+      {children}
+    </CardReplayContext.Provider>
+  );
+}
+
+/**
  * Wraps one renderer so its resolution pauses on the uniform feedback +
  * explanation step before the feed advances.
  *
@@ -97,6 +133,13 @@ export function withFeedbackGate(
     // so every new card mounts a fresh gate.
     const [resolution, setResolution] = useState<CardResolution | null>(null);
 
+    // "Play again" remounts the SAME card fresh by bumping this counter, which is
+    // part of the inner renderer's React key — a fresh mount resets the renderer's
+    // internal state AND re-arms its countdown (the slide is still active). The
+    // gate's own state is reset explicitly (resolution → null) at the same time.
+    const [replayKey, setReplayKey] = useState(0);
+    const recordReplay = useContext(CardReplayContext);
+
     // Fire the explanation-viewed seam exactly once, when the feedback +
     // explanation step first becomes visible for this card. The gate remounts
     // per card (keyed by session+index), so `resolution` transitions null→set
@@ -111,6 +154,31 @@ export function withFeedbackGate(
     // (standalone renders) → the result card omits the chip.
     const scoreLookup = useCardScoreLookup();
     const cardScore = scoreLookup ? scoreLookup(context.cardIndex) : null;
+
+    // Engagement §4.4: the LOCAL per-card personal best — "something to chase".
+    // When a scored resolution becomes visible, record its points against this
+    // card's stored best ONCE (a ref latch guards re-renders), and surface the
+    // outcome so CardFeedback can celebrate a "New best!" or show the prior best.
+    // The latch resets when `resolution` returns to null on "Play again", so the
+    // NEXT attempt records again. Best-effort, never throws into the feed.
+    const [cardBest, setCardBest] = useState<{
+      personalBest: number;
+      isNewBest: boolean;
+    } | null>(null);
+    const bestRecordedRef = useRef(false);
+    useEffect(() => {
+      if (!resolution) {
+        bestRecordedRef.current = false;
+        setCardBest(null);
+        return;
+      }
+      if (bestRecordedRef.current) return;
+      if (cardScore && cardScore.points > 0) {
+        bestRecordedRef.current = true;
+        const { best, isNewBest } = recordCardBest(card.cardId, cardScore.points);
+        setCardBest({ personalBest: best, isNewBest });
+      }
+    }, [resolution, cardScore, card.cardId]);
 
     if (resolution) {
       // KNOWN TRADEOFF (tracked: ADO #99). Because we delay the controller's
@@ -127,15 +195,48 @@ export function withFeedbackGate(
           resolution={resolution}
           explanation={card.explanation}
           cardScore={cardScore}
+          personalBest={cardBest?.personalBest}
+          isNewBest={cardBest?.isNewBest}
+          timeLimitMs={card.config.timeLimitMs}
+          // Inject the social Share-to-status action AND the "Challenge a friend"
+          // viral-loop action (both feed-layer concerns keyed by cardId; the share
+          // button renders nothing without a social provider, so the engine stays
+          // auth-free). The challenge button only shows when the player scored
+          // (there's a score to beat).
+          footer={
+            <>
+              <CardShareButton
+                cardId={card.cardId}
+                outcome={resolution.resolutionType}
+                points={cardScore?.points ?? 0}
+              />
+              {cardScore && cardScore.points > 0 ? (
+                <CardChallengeButton
+                  cardId={card.cardId}
+                  points={cardScore.points}
+                />
+              ) : null}
+            </>
+          }
           // Advancing is the controller's job: only now do we fire its real
           // `onResolve`, which records the result and auto-advances the feed.
           onContinue={() => onResolve(resolution)}
+          // "Play again": record THIS finished attempt as a play (each attempt
+          // counts once — here, or via `onContinue`'s `onResolve` for the attempt
+          // the player ends on), then remount the same card fresh.
+          onReplay={() => {
+            recordReplay?.(card, resolution);
+            setResolution(null);
+            setReplayKey((key) => key + 1);
+          }}
         />
       );
     }
 
     return (
       <Inner
+        // Bumped by "Play again" to force a fresh mount of the same card.
+        key={replayKey}
         card={card}
         context={context}
         // Forward the feed's ACTIVATION signal verbatim (#137): renderers with a

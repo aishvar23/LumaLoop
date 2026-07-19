@@ -2,8 +2,8 @@
  * Login screen (accounts pivot).
  *
  * The gate before the feed for signed-out users (see {@link RequireAuth}): a
- * TikTok/IG-style "sign in to start playing" surface with OAuth buttons (Google /
- * Apple / Facebook) and an email magic-link fallback. On-brand with the token
+ * TikTok/IG-style "sign in to start playing" surface with a Google OAuth button
+ * and an email magic-link fallback. On-brand with the token
  * system. It only KICKS OFF auth — the resulting session arrives asynchronously
  * (OAuth via the /auth/callback redirect; magic link after the user clicks their
  * email), at which point {@link AuthProvider} updates and the guard lets them
@@ -15,14 +15,16 @@
 import { useState, type FormEvent } from 'react';
 
 import Button from '../ui/Button';
+import Wordmark from '../ui/Wordmark';
 import { useAuth } from './AuthProvider';
 import type { OAuthProvider } from './authClient';
 import './AuthScreens.css';
 
+// Only Google OAuth + the email magic link are wired up (Apple/Facebook are not
+// configured in Supabase, so they only error). The AuthProvider still supports
+// them mechanically, so re-adding a button here is all it takes to re-enable one.
 const PROVIDERS: { id: OAuthProvider; label: string }[] = [
   { id: 'google', label: 'Continue with Google' },
-  { id: 'apple', label: 'Continue with Apple' },
-  { id: 'facebook', label: 'Continue with Facebook' },
 ];
 
 export default function LoginScreen() {
@@ -64,7 +66,9 @@ export default function LoginScreen() {
   return (
     <div className="auth-screen">
       <div className="auth-card">
-        <h1 className="auth-brand">LumaLoop</h1>
+        <h1 className="auth-brand" aria-label="Witzy">
+          <Wordmark />
+        </h1>
         <p className="auth-tagline">
           Sign in to scroll the feed and play. Your profile tracks the games you
           play.

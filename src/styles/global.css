@@ -42,6 +42,11 @@ body {
   padding-right: var(--safe-right);
   display: flex;
   flex-direction: column;
+  /* Positioning context for the app's absolute overlays (e.g. the feed's
+   * Home/You nav, which is a sibling of the feed — not a child). Without this it
+   * would fall back to the viewport and land in the browser's top-left corner,
+   * detached from the centered 480px column (desktop). */
+  position: relative;
 }
 
 button {
@@ -101,6 +106,42 @@ button {
   }
   100% {
     transform: scale(1);
+  }
+}
+
+/* Juice: a ✦ spark flies outward + fades from the outcome badge on a correct
+ * answer. Each spark sets its own `--dx`/`--dy` direction inline. */
+@keyframes card-spark-burst {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.3);
+  }
+  55% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--dx, 0), var(--dy, 0)) scale(0.8);
+  }
+}
+
+/* Juice: a quick horizontal shake — the entrance for a MISS result card. */
+@keyframes card-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-8px);
+  }
+  40% {
+    transform: translateX(8px);
+  }
+  60% {
+    transform: translateX(-6px);
+  }
+  80% {
+    transform: translateX(6px);
   }
 }
 

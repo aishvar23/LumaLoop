@@ -8,6 +8,7 @@
  * controller's real `onResolve`) when the player taps "Next".
  */
 
+import { useEffect } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -17,7 +18,11 @@ import type {
   TemplateRenderer,
 } from '../session/rendererRegistry';
 import type { CardResolution, TemplateProps } from '../templates/contract';
-import { createFeedRegistry, withFeedbackGate } from './feedRegistry';
+import {
+  CardReplayProvider,
+  createFeedRegistry,
+  withFeedbackGate,
+} from './feedRegistry';
 
 // ---------------------------------------------------------------------------
 // Fixtures.
@@ -268,6 +273,102 @@ describe('FeedbackGate — feedback + explanation step', () => {
         signals: { timedOut: true },
       }),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Play again: replay the SAME card; each replay counts as a new play.
+// ---------------------------------------------------------------------------
+
+/** A stub that calls `onMount` each time it mounts, so a remount is observable. */
+function makeMountCountingRenderer(
+  onMount: () => void,
+): TemplateRenderer<LiquidCard> {
+  function Counting({ onResolve }: TemplateProps<LiquidCard>) {
+    useEffect(onMount, [onMount]);
+    return (
+      <button
+        type="button"
+        data-testid="stub-renderer"
+        onClick={() => onResolve(resolution())}
+      >
+        resolve correct
+      </button>
+    );
+  }
+  return Counting;
+}
+
+describe('FeedbackGate — Play again (replay)', () => {
+  function renderReplayGate() {
+    const onResolve = vi.fn();
+    const onReplayRecord = vi.fn();
+    const onMount = vi.fn();
+    const Gate = withFeedbackGate(makeMountCountingRenderer(onMount));
+    render(
+      <CardReplayProvider handler={onReplayRecord}>
+        <Gate
+          card={tinyLogicCard()}
+          context={{
+            sessionId: 'sess-1',
+            cardIndex: 0,
+            activeAtMs: 0,
+            interactionEnabledAtMs: 0,
+          }}
+          onAttempt={vi.fn()}
+          onResolve={onResolve}
+        />
+      </CardReplayProvider>,
+    );
+    return { onResolve, onReplayRecord, onMount };
+  }
+
+  it('records the attempt and remounts the same card on "Play again"', () => {
+    const { onResolve, onReplayRecord, onMount } = renderReplayGate();
+    expect(onMount).toHaveBeenCalledTimes(1); // initial mount
+
+    fireEvent.click(screen.getByTestId('stub-renderer')); // resolve
+    expect(screen.getByTestId('card-feedback')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('feedback-replay'));
+
+    // The replay was recorded as a play (the card + its resolution)…
+    expect(onReplayRecord).toHaveBeenCalledTimes(1);
+    expect(onReplayRecord).toHaveBeenCalledWith(
+      expect.objectContaining({ cardId: 'card-1' }),
+      expect.objectContaining({ resolutionType: 'correct' }),
+    );
+    // …the normal advance path did NOT fire (that is "Next")…
+    expect(onResolve).not.toHaveBeenCalled();
+    // …and the card is back in play, freshly remounted.
+    expect(screen.queryByTestId('card-feedback')).not.toBeInTheDocument();
+    expect(screen.getByTestId('stub-renderer')).toBeInTheDocument();
+    expect(onMount).toHaveBeenCalledTimes(2); // remounted
+  });
+
+  it('still offers "Play again" but no-ops recording without a provider', () => {
+    const onResolve = vi.fn();
+    const Gate = withFeedbackGate(makeStubRenderer());
+    render(
+      <Gate
+        card={tinyLogicCard()}
+        context={{
+          sessionId: 's',
+          cardIndex: 0,
+          activeAtMs: 0,
+          interactionEnabledAtMs: 0,
+        }}
+        onAttempt={vi.fn()}
+        onResolve={onResolve}
+      />,
+    );
+    fireEvent.click(screen.getByText('resolve correct'));
+    // No provider → replay must not throw and must not advance the feed.
+    expect(() =>
+      fireEvent.click(screen.getByTestId('feedback-replay')),
+    ).not.toThrow();
+    expect(onResolve).not.toHaveBeenCalled();
+    expect(screen.getByTestId('stub-renderer')).toBeInTheDocument();
   });
 });
 

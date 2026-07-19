@@ -14,7 +14,7 @@ describe('App', () => {
     render(<App />);
     await waitFor(() =>
       expect(
-        screen.getByRole('heading', { name: 'LumaLoop' }),
+        screen.getByRole('heading', { name: 'Witzy' }),
       ).toBeInTheDocument(),
     );
     // Sign-in affordances are present; the feed is NOT shown to a signed-out user.

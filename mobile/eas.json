@@ -1,0 +1,33 @@
+{
+  "cli": {
+    "version": ">= 12.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://pnygisdojhxzbqubyeln.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_BZFGwj2BJDVHFlrK8EAv_g_PgYg6Ax4",
+        "EXPO_PUBLIC_API_BASE_URL": "https://luma-loop-madhursethji-7775s-projects.vercel.app"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://pnygisdojhxzbqubyeln.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_BZFGwj2BJDVHFlrK8EAv_g_PgYg6Ax4",
+        "EXPO_PUBLIC_API_BASE_URL": "https://luma-loop-madhursethji-7775s-projects.vercel.app"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

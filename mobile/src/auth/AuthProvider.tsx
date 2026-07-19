@@ -190,17 +190,40 @@ export function AuthProvider({
     setProfileLoading(false);
   }, []);
 
+  // Codes we've already exchanged, so a code delivered by BOTH the auth-browser
+  // return AND the deep-link listener is exchanged exactly once (a second exchange
+  // of a consumed one-time code fails with "invalid flow state").
+  const exchangedCodesRef = useRef<Set<string>>(new Set());
+
   // Exchange a returned deep link (`lumaloop://auth/callback?code=…`) for a
-  // session. Idempotent/no-op for links without an auth code. Never throws.
-  const exchangeFromUrl = useCallback(async (url: string | null) => {
-    if (!url || !url.includes('code=')) return;
-    try {
-      await clientRef.current.auth.exchangeCodeForSession(url);
-    } catch {
-      // Best-effort: a bad/expired code leaves the user signed out; the guard
-      // keeps them on the login screen. No crash.
-    }
-  }, []);
+  // session. Extracts the BARE `code` — supabase-js `exchangeCodeForSession`
+  // expects the code, NOT the URL; passing the URL yields "invalid flow state".
+  // Deduped (one-time codes) and never throws; returns the error so the OAuth
+  // caller can surface it while the deep-link listener ignores it.
+  const exchangeAuthCode = useCallback(
+    async (url: string | null): Promise<{ error: string | null }> => {
+      const match = url ? /[?&]code=([^&]+)/.exec(url) : null;
+      const code = match ? decodeURIComponent(match[1]) : null;
+      if (!code) return { error: null }; // not an auth callback — nothing to do.
+      if (exchangedCodesRef.current.has(code)) return { error: null }; // already done.
+      exchangedCodesRef.current.add(code);
+      try {
+        const { error } =
+          await clientRef.current.auth.exchangeCodeForSession(code);
+        return { error: error?.message ?? null };
+      } catch (err) {
+        // Best-effort: a bad/expired code leaves the user signed out; the guard
+        // keeps them on the login screen. No crash.
+        return {
+          error:
+            err instanceof Error
+              ? err.message
+              : 'Sign-in could not be completed.',
+        };
+      }
+    },
+    [],
+  );
 
   // On mount: read the existing session, load its profile, subscribe to all future
   // auth changes, and wire the deep-link handlers (cold-start initial URL + warm
@@ -219,7 +242,7 @@ export function AuthProvider({
       // Cold start from a magic-link tap: complete any pending code exchange.
       const initialUrl = await linking.getInitialURL();
       if (!active) return;
-      await exchangeFromUrl(initialUrl);
+      await exchangeAuthCode(initialUrl);
     })();
 
     const { data: sub } = clientRef.current.auth.onAuthStateChange(
@@ -231,7 +254,7 @@ export function AuthProvider({
 
     // Warm start: app already running when the deep link arrives.
     const linkSub = linking.addEventListener((url) => {
-      void exchangeFromUrl(url);
+      void exchangeAuthCode(url);
     });
 
     return () => {
@@ -239,7 +262,7 @@ export function AuthProvider({
       sub.subscription.unsubscribe();
       linkSub.remove();
     };
-  }, [loadProfileFor, exchangeFromUrl, linking]);
+  }, [loadProfileFor, exchangeAuthCode, linking]);
 
   const signInWithProvider = useCallback(
     async (provider: OAuthProvider) => {
@@ -278,11 +301,10 @@ export function AuthProvider({
         AUTH_REDIRECT_URL,
       );
       if (!returnedUrl) return { error: null }; // dismissed — no error banner.
-      const { error: exchangeError } =
-        await clientRef.current.auth.exchangeCodeForSession(returnedUrl);
-      return { error: exchangeError?.message ?? null };
+      // Exchange the BARE code (deduped) — not the URL — for the session.
+      return exchangeAuthCode(returnedUrl);
     },
-    [useAppleNative],
+    [useAppleNative, exchangeAuthCode],
   );
 
   const signInWithEmail = useCallback(async (email: string) => {

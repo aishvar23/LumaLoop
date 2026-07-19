@@ -18,6 +18,18 @@ const ALL_TEMPLATE_TYPES: TemplateType[] = [
   'step_logic',
   'code_break',
   'prism_path',
+  'signal_set',
+  'circuit_flow',
+  'word_unscramble',
+  'quick_math',
+  'color_word',
+  'n_back',
+  'odd_one_out',
+  'schulte_order',
+  'matrix_reasoning',
+  'gears_rotation',
+  'memory_match',
+  'maze_path',
 ];
 
 const ALL_CATEGORIES: ChallengeCategory[] = [
@@ -69,7 +81,9 @@ describe('templateCategoryMap', () => {
     // The array is frozen, so a push must throw in strict mode (the test file
     // is an ES module and therefore strict).
     expect(() => {
-      (templateCategoryMap.spot_it as ChallengeCategory[]).push('working_memory');
+      (templateCategoryMap.spot_it as ChallengeCategory[]).push(
+        'working_memory',
+      );
     }).toThrow();
     expect(templateCategoryMap.spot_it).toEqual([
       'visual_attention',
@@ -87,7 +101,23 @@ describe('templateCategoryMap', () => {
       pattern_chain: ['pattern_recognition'],
       step_logic: ['logical_reasoning'],
       code_break: ['logical_reasoning'],
-      prism_path: ['logical_reasoning', 'pattern_recognition', 'working_memory'],
+      prism_path: [
+        'logical_reasoning',
+        'pattern_recognition',
+        'working_memory',
+      ],
+      signal_set: ['pattern_recognition', 'logical_reasoning'],
+      circuit_flow: ['logical_reasoning', 'pattern_recognition'],
+      word_unscramble: ['pattern_recognition'],
+      quick_math: ['logical_reasoning'],
+      color_word: ['cognitive_flexibility', 'processing_speed'],
+      n_back: ['working_memory'],
+      odd_one_out: ['pattern_recognition', 'logical_reasoning'],
+      schulte_order: ['processing_speed', 'visual_attention'],
+      matrix_reasoning: ['pattern_recognition', 'logical_reasoning'],
+      gears_rotation: ['pattern_recognition', 'logical_reasoning'],
+      memory_match: ['working_memory', 'visual_attention'],
+      maze_path: ['logical_reasoning', 'visual_attention'],
     });
   });
 });
@@ -127,6 +157,42 @@ function categoriesForCard(card: LiquidCard): ChallengeCategory {
       return 'logical_reasoning';
     case 'prism_path':
       void card.config.mirrors;
+      return 'logical_reasoning';
+    case 'signal_set':
+      void card.config.solutionIds;
+      return 'pattern_recognition';
+    case 'circuit_flow':
+      void card.config.sourceTileId;
+      return 'logical_reasoning';
+    case 'word_unscramble':
+      void card.config.scrambled;
+      return 'pattern_recognition';
+    case 'quick_math':
+      void card.config.expression;
+      return 'logical_reasoning';
+    case 'color_word':
+      void card.config.trials;
+      return 'cognitive_flexibility';
+    case 'n_back':
+      void card.config.matchIndices;
+      return 'working_memory';
+    case 'odd_one_out':
+      void card.config.oddItemId;
+      return 'pattern_recognition';
+    case 'schulte_order':
+      void card.config.targets;
+      return 'processing_speed';
+    case 'matrix_reasoning':
+      void card.config.grid;
+      return 'pattern_recognition';
+    case 'gears_rotation':
+      void card.config.gearCount;
+      return 'pattern_recognition';
+    case 'memory_match':
+      void card.config.tiles;
+      return 'working_memory';
+    case 'maze_path':
+      void card.config.cells;
       return 'logical_reasoning';
     default: {
       // If a new TemplateType is added without a case above, `card` is no

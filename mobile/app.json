@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "LumaLoop",
+    "name": "Witzy",
     "slug": "lumaloop",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -9,7 +9,10 @@
     "userInterfaceStyle": "light",
     "ios": {
       "bundleIdentifier": "app.lumaloop.mobile",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "app.lumaloop.mobile",
@@ -26,6 +29,11 @@
     },
     "plugins": [
       "expo-web-browser"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "5310d30f-e58a-4e9f-8303-584ec9c3dd08"
+      }
+    }
   }
 }
