@@ -30,6 +30,14 @@ import { SocialConfigProvider } from './src/social/SocialContext';
 import { supabase } from './src/auth/supabaseClient';
 import { getCardById as getCatalogCardById } from './src/core/cards/catalog';
 import { colors, fontSize, fontWeight } from './src/feed/templates/tokens';
+import {
+  configureNotificationHandler,
+  ensureDailyReminders,
+} from './src/notifications/localReminders';
+
+// Configure how a scheduled LOCAL reminder is presented while the app is
+// foregrounded. Set once at module import — idempotent and otherwise inert.
+configureNotificationHandler();
 
 /**
  * LumaLoop mobile (React Native + Expo).
@@ -90,6 +98,15 @@ function FeedApp() {
   const [startCardId, setStartCardId] = useState<string | undefined>(undefined);
   // The other user whose profile is open (when view === 'user').
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+
+  // Twice-daily LOCAL reminder notifications (on-device, at each user's local
+  // time — no server/push). FeedApp only mounts behind RequireAuth (user +
+  // profile present), so scheduling here means we only nudge signed-in users.
+  // Best-effort and run once per signed-in launch: it re-schedules idempotently
+  // and never throws, so we ignore the result and don't block rendering.
+  useEffect(() => {
+    void ensureDailyReminders();
+  }, []);
 
   // Resolve the best-effort anonymous id once (AsyncStorage-backed, §10). The feed
   // waits for it so the deck seed and telemetry identity share one stable id.

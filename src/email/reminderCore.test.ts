@@ -2,10 +2,14 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   buildReminderEmail,
+  buildReminderPush,
   isValidEmail,
   sendDailyReminders,
+  sendWebPush,
+  type PushSubscriptionRow,
   type Recipient,
   type SendEmail,
+  type SendPush,
 } from './reminderCore';
 
 describe('isValidEmail', () => {
@@ -42,6 +46,77 @@ describe('buildReminderEmail', () => {
     const email = buildReminderEmail('evening', 'https://witzy.example.app');
     expect(email.html).toContain('href="https://witzy.example.app"');
     expect(email.text).toContain('https://witzy.example.app');
+  });
+});
+
+describe('buildReminderPush', () => {
+  it('builds guardrail-safe copy (no IQ / brain-training claims)', () => {
+    const push = buildReminderPush();
+    const body = `${push.title} ${push.body}`.toLowerCase();
+    expect(body).not.toMatch(/iq|brain|train|smarter|clinical|cognitive/);
+  });
+
+  it('varies morning vs evening copy', () => {
+    const morning = buildReminderPush('morning');
+    const evening = buildReminderPush('evening');
+    expect(morning.title).not.toBe(evening.title);
+    expect(morning.body).not.toBe(evening.body);
+    for (const p of [morning, evening]) {
+      const body = `${p.title} ${p.body}`.toLowerCase();
+      expect(body).not.toMatch(/iq|brain|train|smarter|clinical|cognitive/);
+    }
+  });
+
+  it('points url at the given app URL (defaulting to DEFAULT_APP_URL)', () => {
+    expect(buildReminderPush('evening').url).toBe('https://witzy.app');
+    expect(buildReminderPush('morning', 'https://witzy.example.app').url).toBe(
+      'https://witzy.example.app',
+    );
+  });
+});
+
+describe('sendWebPush', () => {
+  const subs: PushSubscriptionRow[] = [
+    { endpoint: 'https://push/a', subscription: { keys: 'a' } },
+    { endpoint: 'https://push/b', subscription: { keys: 'b' } },
+  ];
+
+  it('treats a null transport as a safe no-op', async () => {
+    const summary = await sendWebPush(subs, null, null);
+    expect(summary).toEqual({ sent: 0, failed: 0 });
+  });
+
+  it('sends the built payload to every subscription and tallies sent', async () => {
+    const send: SendPush = vi.fn(async () => ({ ok: true }));
+    const summary = await sendWebPush(subs, send, null, 'morning', 'https://app');
+    expect(send).toHaveBeenCalledTimes(2);
+    const payload = JSON.parse((send as ReturnType<typeof vi.fn>).mock.calls[0][1]);
+    expect(payload).toEqual(buildReminderPush('morning', 'https://app'));
+    expect(summary).toEqual({ sent: 2, failed: 0 });
+  });
+
+  it('prunes expired subscriptions and counts them as failed', async () => {
+    const send: SendPush = vi.fn(async (subscription) =>
+      (subscription as { keys: string }).keys === 'a'
+        ? { ok: false, expired: true }
+        : { ok: true },
+    );
+    const deleteExpired = vi.fn(async () => {});
+    const summary = await sendWebPush(subs, send, deleteExpired);
+    expect(summary).toEqual({ sent: 1, failed: 1 });
+    expect(deleteExpired).toHaveBeenCalledWith('https://push/a');
+    expect(deleteExpired).toHaveBeenCalledTimes(1);
+  });
+
+  it('never throws when a send or a prune rejects', async () => {
+    const send: SendPush = vi.fn(async () => {
+      throw new Error('push service down');
+    });
+    const deleteExpired = vi.fn(async () => {
+      throw new Error('delete failed');
+    });
+    const summary = await sendWebPush([subs[0]], send, deleteExpired);
+    expect(summary).toEqual({ sent: 0, failed: 1 });
   });
 });
 

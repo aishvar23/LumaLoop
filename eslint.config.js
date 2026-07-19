@@ -48,5 +48,14 @@ export default tseslint.config(
       ],
     },
   },
+  // The push service worker (public/service-worker.js) is plain JS that runs in
+  // the ServiceWorkerGlobalScope — give it `self`, `clients`, etc. so no-undef
+  // doesn't flag those globals.
+  {
+    files: ['public/**/*.js'],
+    languageOptions: {
+      globals: { ...globals.serviceworker, ...globals.browser },
+    },
+  },
   prettier,
 );

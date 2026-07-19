@@ -103,6 +103,103 @@ export function buildReminderEmail(
   return { subject, html, text };
 }
 
+/** A rendered web-push notification (transport-agnostic). */
+export interface ReminderPush {
+  title: string;
+  body: string;
+  url: string;
+}
+
+/**
+ * Build a web-push payload for a time-of-day `slot`. Deliberately mirrors the
+ * morning/evening TONE of {@link buildReminderEmail} (morning warm-up / evening
+ * wind-down) so a user who gets both channels hears one consistent voice.
+ * `url` is where a tap on the notification deep-links (the live deployment).
+ * Guardrail-safe copy (Design §7/§21.8): games/streak framing only — no IQ /
+ * brain-training / ability / clinical claims.
+ */
+export function buildReminderPush(
+  slot: ReminderSlot = 'evening',
+  appUrl: string = DEFAULT_APP_URL,
+): ReminderPush {
+  const morning = slot === 'morning';
+  const title = morning ? '☀️ Morning warm-up' : '🌙 Evening wind-down';
+  const body = morning
+    ? 'A fresh feed of quick puzzles is ready — play a few and keep your streak going.'
+    : 'Take a short break and solve a few quick puzzles before the day is out.';
+  return { title, body, url: appUrl };
+}
+
+/** A stored web-push subscription row (matches the `push_subscriptions` table). */
+export interface PushSubscriptionRow {
+  /** The push endpoint URL — unique per browser install; the delete key. */
+  endpoint: string;
+  /** The full PushSubscription JSON web-push needs to encrypt + deliver. */
+  subscription: unknown;
+}
+
+/**
+ * Deliver one push. `ok` = accepted; `expired` = the endpoint is gone (a 404/410
+ * from the push service) and its row should be pruned.
+ */
+export type SendPush = (
+  subscription: unknown,
+  payload: string,
+) => Promise<{ ok: boolean; expired?: boolean }>;
+
+/** Remove a dead subscription row (by endpoint). Best-effort; may reject. */
+export type DeleteSubscription = (endpoint: string) => Promise<void>;
+
+/** The outcome of a web-push run — surfaced in the cron response. */
+export interface PushSummary {
+  /** Notifications the push service accepted. */
+  sent: number;
+  /** Notifications that failed (error or expired endpoint). */
+  failed: number;
+}
+
+/**
+ * Send the daily reminder push to every subscription (pure — I/O injected).
+ *
+ * - When `send` is `null` (web push not configured) it's a safe no-op: 0/0.
+ * - Never throws: a failure for one subscription is tallied and the run
+ *   continues. When a send reports `expired`, the row is pruned via
+ *   `deleteExpired` (best-effort — a delete failure is swallowed).
+ */
+export async function sendWebPush(
+  subscriptions: readonly PushSubscriptionRow[],
+  send: SendPush | null,
+  deleteExpired: DeleteSubscription | null,
+  slot: ReminderSlot = 'evening',
+  appUrl: string = DEFAULT_APP_URL,
+): Promise<PushSummary> {
+  if (send === null) return { sent: 0, failed: 0 };
+  const payload = JSON.stringify(buildReminderPush(slot, appUrl));
+  let sent = 0;
+  let failed = 0;
+  for (const row of subscriptions) {
+    let result: { ok: boolean; expired?: boolean };
+    try {
+      result = await send(row.subscription, payload);
+    } catch {
+      result = { ok: false };
+    }
+    if (result.ok) {
+      sent += 1;
+    } else {
+      failed += 1;
+      if (result.expired && deleteExpired) {
+        try {
+          await deleteExpired(row.endpoint);
+        } catch {
+          // Pruning is best-effort — a stale row is harmless (skipped next run).
+        }
+      }
+    }
+  }
+  return { sent, failed };
+}
+
 /**
  * Send the daily reminder to every recipient.
  *

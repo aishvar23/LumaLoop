@@ -18,6 +18,11 @@ export default defineConfig({
     env: {
       VITE_SUPABASE_URL: 'http://localhost:54321',
       VITE_SUPABASE_ANON_KEY: 'test-anon-key',
+      // Placeholder VAPID public key so src/notifications/webPush.ts has a key at
+      // import (it's read once as a module const). Any valid URL-safe base64
+      // string works — tests never contact a real push service.
+      VITE_VAPID_PUBLIC_KEY:
+        'KZFm8DMI4PxVHaR19dy6y2AG29aGWSzuPACeJ6vtk6KjM8dQGqDHpkxbDR4UBSja2SbtW39VnNH8gHBkPkcFQsA',
     },
     // Scope discovery to the web app only. `mobile/` is a self-contained
     // Expo/React Native sub-project with its OWN jest gate; without this,
