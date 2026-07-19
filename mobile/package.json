@@ -13,6 +13,7 @@
     "expo-haptics": "~56.0.3",
     "expo-linear-gradient": "~56.0.4",
     "expo-linking": "~56.0.14",
+    "expo-notifications": "~56.0.21",
     "expo-standard-web-crypto": "^56.0.3",
     "expo-status-bar": "~56.0.4",
     "expo-web-browser": "~56.0.5",
