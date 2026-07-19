@@ -26,6 +26,23 @@ describe('buildReminderEmail', () => {
     expect(body).not.toMatch(/iq|brain|train|smarter|clinical|cognitive/);
     expect(email.html).toContain('href="https://witzy.app"');
   });
+
+  it('varies morning vs evening copy (twice-daily nudges should not read as dupes)', () => {
+    const morning = buildReminderEmail('morning');
+    const evening = buildReminderEmail('evening');
+    expect(morning.subject).not.toBe(evening.subject);
+    expect(morning.subject).toMatch(/witzy/i);
+    for (const e of [morning, evening]) {
+      const body = `${e.text} ${e.html}`.toLowerCase();
+      expect(body).not.toMatch(/iq|brain|train|smarter|clinical|cognitive/);
+    }
+  });
+
+  it('points "Start playing" at the given app URL', () => {
+    const email = buildReminderEmail('evening', 'https://witzy.example.app');
+    expect(email.html).toContain('href="https://witzy.example.app"');
+    expect(email.text).toContain('https://witzy.example.app');
+  });
 });
 
 describe('sendDailyReminders', () => {
