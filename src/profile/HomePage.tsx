@@ -34,6 +34,7 @@ import { selectFeaturedGames, templateLabel, type FeaturedGame } from '../cards/
 import type { LiquidCard } from '../cards/types';
 import { readStreak as defaultReadStreak } from '../feed/streakStore';
 import type { StreakState } from '../feed/dailyStreak';
+import { enablePush, isPushSupported } from '../notifications/webPush';
 import { fetchRecentShares } from '../social/gameShareApi';
 import { fetchFollowing } from '../social/followApi';
 import { groupSharesByUser, type UserStatus } from '../social/statusFeed';
@@ -107,6 +108,19 @@ export default function HomePage({
   // "coming soon" notice that auto-dismisses after 2s.
   const [uploadNotice, setUploadNotice] = useState(false);
   const uploadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Web-push reminders opt-in (best-effort; only offered where supported). We
+  // never auto-prompt — browsers require a user gesture for permission — so this
+  // only ever fires on tap. Kept unobtrusive; failures degrade quietly.
+  const pushSupported = isPushSupported();
+  const [pushState, setPushState] = useState<'idle' | 'pending' | 'on' | 'blocked'>(
+    'idle',
+  );
+  async function turnOnReminders() {
+    if (!user || pushState === 'pending' || pushState === 'on') return;
+    setPushState('pending');
+    const res = await enablePush(client, user.id);
+    setPushState(res.ok ? 'on' : 'blocked');
+  }
   function showComingSoon() {
     setUploadNotice(true);
     if (uploadTimer.current) clearTimeout(uploadTimer.current);
@@ -276,6 +290,28 @@ export default function HomePage({
               <span className="home-streak__best">Best {streak.longest}</span>
             )}
           </div>
+        )}
+        {pushSupported && user && (
+          <button
+            type="button"
+            className="home-push-pill"
+            data-testid="home-enable-push"
+            data-state={pushState}
+            onClick={turnOnReminders}
+            disabled={pushState === 'pending' || pushState === 'on'}
+          >
+            <span aria-hidden="true">🔔</span>
+            {pushState === 'on'
+              ? 'Reminders on ✓'
+              : pushState === 'pending'
+                ? 'Turning on…'
+                : pushState === 'blocked'
+                  ? 'Reminders blocked — allow in browser'
+                  : 'Turn on reminders'}
+          </button>
+        )}
+        {pushSupported && user && pushState !== 'on' && (
+          <p className="home-push-hint">Get a nudge to play</p>
         )}
         <div className="home-hero__cta">
           <Link to={ROUTES.feed} className="home-cta-btn">

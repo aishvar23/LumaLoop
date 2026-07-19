@@ -201,6 +201,27 @@ Notes:
   shows both jobs, and hit the endpoint manually to test:
   `curl -H "Authorization: Bearer <CRON_SECRET>" https://<your-url>/api/daily-reminder?slot=evening`
 
+**Web push (no email domain needed).** The SAME two crons ALSO deliver a browser
+push notification to every user who opted in — reusing the morning/evening tone.
+How it works: a user taps **🔔 Turn on reminders** on Home → the browser
+subscribes and the subscription is stored in `push_subscriptions` → the cron
+pushes twice daily (and prunes dead subscriptions automatically). Web push is
+**gated on its own VAPID keys** — set all of these in **Vercel → Settings →
+Environment Variables (Production)**; with any missing, push is a safe no-op:
+
+| Var | Scope | Where to get it |
+|---|---|---|
+| `VITE_VAPID_PUBLIC_KEY` | client (build) | The VAPID **public** key. Generate a pair with `npx web-push generate-vapid-keys`. Baked into the web bundle. |
+| `VAPID_PUBLIC_KEY` | server | The SAME public key (the cron sets it as the sender). |
+| `VAPID_PRIVATE_KEY` | server | The VAPID **private** key from the same pair — secret, server-only. |
+| `VAPID_SUBJECT` | server | A contact URI, e.g. `mailto:you@yourdomain.com`. |
+
+- The cron's JSON response includes a `push: { sent, failed }` field alongside the
+  email counts, so you can confirm delivery.
+- **iOS caveat:** iOS/iPadOS only delivers web push when the site is **Added to
+  Home Screen** (Safari → Share → Add to Home Screen), and only on **iOS 16.4+**.
+  Desktop Chrome/Edge/Firefox and Android Chrome work in-browser.
+
 ---
 
 ## 5. Pre-flight checklist (all native paths)
